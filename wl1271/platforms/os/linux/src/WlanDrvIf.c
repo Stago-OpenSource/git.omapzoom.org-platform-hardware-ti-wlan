@@ -67,6 +67,8 @@
 #include "txMgmtQueue_Api.h"
 #include "TWDriver.h"
 #include "Ethernet.h"
+#include "SdioDrv.h"
+
 #ifdef TI_DBG
 #include "tracebuf_api.h"
 #endif
@@ -1085,32 +1087,17 @@ static void wlanDrvIf_Destroy (TWlanDrvIfObj *drv)
  * \return Init: 0 - OK, else - failure.   Exit: void
  * \sa     wlanDrvIf_Create, wlanDrvIf_Destroy
  */ 
-#ifndef TI_SDIO_STANDALONE
-static int sdc_ctrl = 3;
-
-extern int sdioDrv_init(int sdcnum);
-extern void sdioDrv_exit(void);
-#endif
-
 static int __init wlanDrvIf_ModuleInit (void)
 {
 	printk(KERN_INFO "TIWLAN: driver init\n");
-#ifndef TI_SDIO_STANDALONE
-#ifndef CONFIG_MMC_EMBEDDED_SDIO
-	sdioDrv_init(sdc_ctrl);
-#endif
-#endif
+	sdioDrv_init();
 	return wlanDrvIf_Create ();
 }
 
 static void __exit wlanDrvIf_ModuleExit (void)
 {
 	wlanDrvIf_Destroy (pDrvStaticHandle);
-#ifndef TI_SDIO_STANDALONE
-#ifndef CONFIG_MMC_EMBEDDED_SDIO
 	sdioDrv_exit();
-#endif
-#endif
 	printk (KERN_INFO "TI WLAN: driver unloaded\n");
 }
 
