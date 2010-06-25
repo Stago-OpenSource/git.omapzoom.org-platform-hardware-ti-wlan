@@ -3,7 +3,7 @@ include $(CLEAR_VARS)
 
 STATIC_LIB ?= y
 DEBUG ?= y
-BUILD_SUPPL ?= n
+BUILD_SUPPL ?= y
 WPA_ENTERPRISE ?= y
 
 ifeq ($(DEBUG),y)
@@ -60,9 +60,9 @@ LOCAL_SRC_FILES:= \
 
 ifeq ($(BUILD_SUPPL), y)
 	ifeq ($(WPA_SUPPLICANT_VERSION),VER_0_5_X)
-	LOCAL_SRC_FILES += $(WPA_SUPPL_DIR)/wpa_ctrl.c
+	LOCAL_SRC_FILES += ../../../../../../../../$(WPA_SUPPL_DIR)/wpa_ctrl.c
 	else
-	LOCAL_SRC_FILES += $(WPA_SUPPL_DIR)/common/src/wpa_ctrl.c
+	LOCAL_SRC_FILES += ../../../../../../../../$(WPA_SUPPL_DIR)/src/common/wpa_ctrl.c
 	endif
 endif
 
