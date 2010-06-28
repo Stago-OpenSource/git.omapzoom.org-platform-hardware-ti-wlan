@@ -81,9 +81,9 @@ TI_BOOL bRedirectOutputToLogger = TI_FALSE;
 TI_BOOL use_debug_module = TI_FALSE;
 
 /****************************************************************************************
- *                        																*
- *						OS Report API													*       
- *																						*
+ *                        								*
+ *					OS Report API					*       
+ *											*
  ****************************************************************************************/
 static void SendLoggerData (TI_HANDLE OsContext, TI_UINT8 *pMsg, TI_UINT16 len)
 {    
@@ -132,7 +132,7 @@ void os_printf(const char *format ,...)
 	static int from_new_line = 1;		/* Used to save the last message EOL */
 	va_list ap;
 	static char msg[MAX_MESSAGE_SIZE];
-	char *p_msg = msg;					/* Pointer to the message */
+	char *p_msg = msg;			/* Pointer to the message */
 	TI_UINT16 message_len;					
 	TI_UINT32 sec = 0;
 	TI_UINT32 uSec = 0;
@@ -141,33 +141,36 @@ void os_printf(const char *format ,...)
 	/* Format the message and keep the message length */
 	va_start(ap,format);
 	message_len = vsnprintf(&msg[0], sizeof(msg) -1 , format, ap);
-	if( from_new_line )
-        {
-            if (msg[1] == '$')
-            {
-                p_msg += 4;
-            }
+
+	if(message_len > 0)
+	{
+		if( from_new_line )
+        	{
+			if (msg[1] == '$')
+			{
+				p_msg += 4;
+			}
             
-            sec = os_timeStampUs(NULL);
-            uSec = sec % MICROSECOND_IN_SECONDS;
-            sec /= MICROSECOND_IN_SECONDS;
-            
-            printk(KERN_INFO DRIVER_NAME ": %d.%06d: %s",sec,uSec,p_msg);
-        }
-        else
-        {
-		printk(&msg[0]);
-        }
-        
-	from_new_line = ( msg[message_len - 1] == '\n' );
+			sec = os_timeStampUs(NULL);
+			uSec = sec % MICROSECOND_IN_SECONDS;
+			sec /= MICROSECOND_IN_SECONDS;
+			printk(KERN_INFO DRIVER_NAME ": %d.%06d: %s",sec,uSec,p_msg);
+        	}
+        	else
+        	{
+			printk(&msg[0]);
+        	}
+ 
+		from_new_line = ( msg[message_len - 1] == '\n' );
+	}
 
 	va_end(ap);
 }
 
 /****************************************************************************************
- *                        																*
- *							OS TIMER API												*
- *																						*
+ *                      								*
+ *					OS TIMER API					*
+ *											*
  ****************************************************************************************/
 
 /****************************************************************************************
@@ -339,11 +342,11 @@ void os_StalluSec (TI_HANDLE OsContext, TI_UINT32 uSec)
 
 
 /****************************************************************************************
- *                        																*
- *							Protection services	API										*
- *																						*
+ *											*
+ *					Protection services API				*
+ *											*
  ****************************************************************************************
- * OS protection is implemented as spin_lock_irqsave and spin_unlock_irqrestore  								*
+ * OS protection is implemented as spin_lock_irqsave and spin_unlock_irqrestore 	*
  ****************************************************************************************/
 
 

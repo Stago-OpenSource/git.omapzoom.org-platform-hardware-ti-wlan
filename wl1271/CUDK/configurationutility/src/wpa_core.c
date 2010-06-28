@@ -160,6 +160,15 @@ VOID WpaCore_Destroy(THandle hWpaCore)
 {
 	TWpaCore* pWpaCore = (TWpaCore*)hWpaCore;
 
+#ifdef ANDROID
+	if(pWpaCore->hIpcWpa)
+	{
+		/* Restore configuration back to AP_SCAN 1 for Android */
+		IpcWpa_Command(pWpaCore->hIpcWpa, (PS8)"AP_SCAN 1", FALSE);
+		IpcWpa_Command(pWpaCore->hIpcWpa, (PS8)"SAVE_CONFIG", FALSE);
+	}
+#endif
+
 	if(pWpaCore->hIpcWpa)
 		IpcWpa_Destroy(pWpaCore->hIpcWpa);
 #ifdef CONFIG_WPS

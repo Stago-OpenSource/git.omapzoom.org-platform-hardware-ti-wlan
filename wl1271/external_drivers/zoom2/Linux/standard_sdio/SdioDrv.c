@@ -421,29 +421,3 @@ void sdioDrv_exit(void)
 	printk(KERN_INFO "TI WiLink 1271 SDIO Driver unloaded\n");
 }
 
-#if 0
-module_init(sdioDrv_init);
-module_exit(sdioDrv_exit);
-module_param(g_sdio_debug_level, int, SDIO_DEBUGLEVEL_ERR);
-MODULE_PARM_DESC(g_sdio_debug_level, "TIWLAN SDIO debug level");
-EXPORT_SYMBOL(g_sdio_debug_level);
-EXPORT_SYMBOL(sdioDrv_ConnectBus);
-EXPORT_SYMBOL(sdioDrv_DisconnectBus);
-EXPORT_SYMBOL(sdioDrv_ReadSync);
-EXPORT_SYMBOL(sdioDrv_WriteSync);
-EXPORT_SYMBOL(sdioDrv_ReadAsync);
-EXPORT_SYMBOL(sdioDrv_WriteAsync);
-EXPORT_SYMBOL(sdioDrv_ReadSyncBytes);
-EXPORT_SYMBOL(sdioDrv_WriteSyncBytes);
-EXPORT_SYMBOL(sdioDrv_EnableFunction);
-EXPORT_SYMBOL(sdioDrv_EnableInterrupt);
-EXPORT_SYMBOL(sdioDrv_DisableFunction);
-EXPORT_SYMBOL(sdioDrv_DisableInterrupt);
-EXPORT_SYMBOL(sdioDrv_SetBlockSize);
-EXPORT_SYMBOL(sdioDrv_Register_Notification);
-MODULE_DESCRIPTION("TI WLAN 1271 SDIO interface");
-MODULE_LICENSE("GPL");
-MODULE_ALIAS(SDIO_DRIVER_NAME);
-MODULE_AUTHOR("Texas Instruments");
-#endif
-

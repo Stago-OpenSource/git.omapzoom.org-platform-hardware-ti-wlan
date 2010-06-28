@@ -85,7 +85,7 @@ static TWlanDrvIfObj *pDrvStaticHandle;
 
 
 MODULE_DESCRIPTION("TI WLAN Embedded Station Driver");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual BSD/GPL");
 
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 31))
