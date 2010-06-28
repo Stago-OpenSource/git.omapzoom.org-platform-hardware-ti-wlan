@@ -104,7 +104,6 @@ ifeq ($(DEBUG),y)
     DK_DEFINES += -D TI_DBG
     DK_DEFINES += -D REPORT_LOG
     DK_DEFINES += -O2
-    DK_DEFINES += -D PRINTF_ROLLBACK
 else
     DK_DEFINES += -D TI_DBG
     DK_DEFINES += -U REPORT_LOG
@@ -175,7 +174,7 @@ endif
 ##
 ##
 
-EXTRA_CFLAGS += -fsigned-char
+EXTRA_CFLAGS += -fsigned-char -Werror
 EXTRA_CFLAGS += -D __LINUX__ -DTI_RANDOM_DEFAULT_MAC
 EXTRA_CFLAGS += $(DK_DEFINES)
 EXTRA_CFLAGS += $(PFORM_DEFINES)

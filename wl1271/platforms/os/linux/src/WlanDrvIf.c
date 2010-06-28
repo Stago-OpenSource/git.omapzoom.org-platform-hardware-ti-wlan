@@ -1,7 +1,7 @@
 /*
  * WlanDrvIf.c
  *
- * Copyright(c) 1998 - 2009 Texas Instruments. All rights reserved.      
+ * Copyright(c) 1998 - 2010 Texas Instruments. All rights reserved.      
  * All rights reserved.                                                  
  *                                                                       
  * Redistribution and use in source and binary forms, with or without    
@@ -72,12 +72,7 @@
 #ifdef TI_DBG
 #include "tracebuf_api.h"
 #endif
-/* PM hooks */
-#ifdef TI_CONFIG_PM_HOOKS
-#include "SdioDrv.h"
-static int wlanDrvIf_pm_resume(void);
-static int wlanDrvIf_pm_suspend(void);
-#endif
+
 #include "bmtrace_api.h"
 #ifdef STACK_PROFILE
 #include "stack_profile.h"
@@ -687,12 +682,6 @@ int wlanDrvIf_Open (struct net_device *dev)
 	drv->netdev->addr_len = MAC_ADDR_LEN;
 	netif_start_queue (dev);
 
-	/* register 3430 PM hooks in our SDIO driver */
-#ifdef TI_CONFIG_PM_HOOKS
-#ifndef CONFIG_MMC_EMBEDDED_SDIO
-	sdioDrv_register_pm(wlanDrvIf_pm_resume, wlanDrvIf_pm_suspend);
-#endif
-#endif
 	return status;
 }
 
@@ -740,20 +729,6 @@ int wlanDrvIf_Release (struct net_device *dev)
 	netif_stop_queue (dev);
 	return 0;
 }
-
-/* 3430 PM hooks */
-#ifdef TI_CONFIG_PM_HOOKS
-static int wlanDrvIf_pm_resume(void)
-{
-    return(wlanDrvIf_Open(pDrvStaticHandle->netdev));
-}
-
-static int wlanDrvIf_pm_suspend(void)
-{
-    wlanDrvIf_Release(pDrvStaticHandle->netdev);
-    return(wlanDrvIf_Stop(pDrvStaticHandle->netdev));
-}
-#endif
 
 /** 
  * \fn     wlanDrvIf_SetupNetif
