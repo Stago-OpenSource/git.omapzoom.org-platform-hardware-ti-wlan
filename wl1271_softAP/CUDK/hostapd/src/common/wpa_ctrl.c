@@ -80,8 +80,14 @@ struct wpa_ctrl * wpa_ctrl_open(const char *ctrl_path)
 	ctrl->local.sun_family = AF_UNIX;
 	counter++;
 try_again:
+#ifdef ANDROID
+        ret = os_snprintf(ctrl->local.sun_path, sizeof(ctrl->local.sun_path),
+                          "/data/misc/wifi/sockets/wpa_ctrl_%d-%d", getpid(), counter);
+#else
 	ret = os_snprintf(ctrl->local.sun_path, sizeof(ctrl->local.sun_path),
 			  "/tmp/wpa_ctrl_%d-%d", getpid(), counter);
+#endif
+
 	if (ret < 0 || (size_t) ret >= sizeof(ctrl->local.sun_path)) {
 		close(ctrl->s);
 		os_free(ctrl);

@@ -3,7 +3,7 @@ include $(CLEAR_VARS)
 
 STATIC_LIB ?= y
 DEBUG ?= y
-BUILD_SUPPL ?= y
+BUILD_SUPPL = y
 WPA_ENTERPRISE ?= y
 
 WILINK_ROOT = ../..
