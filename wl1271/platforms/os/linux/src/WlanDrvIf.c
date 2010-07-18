@@ -629,7 +629,6 @@ void wlanDrvIf_SetMacAddress (TI_HANDLE hOs, TI_UINT8 *pMacAddr)
 int wlanDrvIf_Start (struct net_device *dev)
 {
 	TWlanDrvIfObj *drv = (TWlanDrvIfObj *)NETDEV_GET_PRIVATE(dev);
-	int status;
 
 	ti_dprintf (TIWLAN_LOG_OTHER, "wlanDrvIf_Start()\n");
 	printk("%s\n", __func__);
@@ -650,8 +649,12 @@ int wlanDrvIf_Start (struct net_device *dev)
 	 *      and wait for action completion (all init process).
 	 */
 	os_wake_lock_timeout_enable(drv);
-	status = drvMain_InsertAction (drv->tCommon.hDrvMain, ACTION_TYPE_START);
-	return (status) ? -1 : 0;
+    if (TI_OK != drvMain_InsertAction (drv->tCommon.hDrvMain, ACTION_TYPE_START)) 
+    {
+        return -ENODEV;
+    }
+
+    return 0;
 }
 
 int wlanDrvIf_Open (struct net_device *dev)
@@ -715,7 +718,11 @@ int wlanDrvIf_Stop (struct net_device *dev)
 	 *      and wait for Stop process completion.
 	 */
 	os_wake_lock_timeout_enable(drv);
-	drvMain_InsertAction (drv->tCommon.hDrvMain, ACTION_TYPE_STOP);
+    if (TI_OK != drvMain_InsertAction (drv->tCommon.hDrvMain, ACTION_TYPE_STOP)) 
+    {
+        return -ENODEV;
+    }
+
 	return 0;
 }
 

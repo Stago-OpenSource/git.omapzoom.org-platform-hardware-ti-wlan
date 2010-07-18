@@ -486,6 +486,14 @@ void twIf_SetPartition (TI_HANDLE hTwIf,
 
     /* Allocate memory for the current 4 partition transactions */
     pPartitionRegTxn = (TPartitionRegTxn *) os_memoryAlloc (pTwIf->hOs, 7*sizeof(TPartitionRegTxn));
+
+    /* Sanity - Make sure allocation did not fail */
+    if(NULL == pPartitionRegTxn)
+    {
+        TRACE0(pTwIf->hReport, REPORT_SEVERITY_FATAL_ERROR, "twIf_SetPartition() - Allocation for pPartitionRegTxn has failed! Return.\n");
+        return;
+    }
+
     pTxnHdr       = &(pPartitionRegTxn->tHdr);
 
     /* Zero the allocated memory to be certain that unused fields will be initialized */

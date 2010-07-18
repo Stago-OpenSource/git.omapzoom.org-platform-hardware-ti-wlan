@@ -78,7 +78,7 @@ RETURN:         None
 *****************************************************************************************/
 VOID os_error_printf(S32 debug_level, const PS8 arg_list ,...)
 {
-    static int g_debug_level = CU_MSG_ERROR; /* TODO ronen: create debug logic for CLI */
+    static int g_debug_level = CU_MSG_ERROR;
     S8 msg[MAX_HOST_MESSAGE_SIZE];
     va_list ap;
 #ifdef OS_CLI_LOG_TO_FILE

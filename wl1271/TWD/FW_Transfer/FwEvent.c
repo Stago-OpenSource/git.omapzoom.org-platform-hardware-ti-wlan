@@ -707,6 +707,36 @@ TI_STATUS fwEvent_Stop (TI_HANDLE hFwEvent)
 }
 
 
+
+/*
+ * \brief	Mask all interrupts
+ * 
+ * \param  hFwEvent  - FwEvent Driver handle
+ * \return void
+ * 
+ * \par Description
+ *
+ * Masks all interrupts from FW.
+ * 
+ * \sa
+ */
+void fwEvent_MaskAllFwInterrupts(TI_HANDLE hFwEvent)
+{
+    TfwEvent *pFwEvent = (TfwEvent *)hFwEvent;
+
+
+    /* Mask all FW interrupts */
+    
+    pFwEvent->uEventMask     = 0;
+    pFwEvent->tMaskTxn.uData = ~pFwEvent->uEventMask;
+    
+    TXN_FW_EVENT_SET_MASK_ADDR(pFwEvent)
+        
+    twIf_Transact(pFwEvent->hTwIf, &(pFwEvent->tMaskTxn.tTxnStruct));
+}
+
+
+
 /*
  * \brief	Unmask all interrupts
  * 

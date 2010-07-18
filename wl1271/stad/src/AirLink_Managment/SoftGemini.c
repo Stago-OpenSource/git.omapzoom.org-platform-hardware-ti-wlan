@@ -122,9 +122,9 @@ void SoftGemini_SetPSmode(TI_HANDLE hSoftGemini)
 		}
 	}
 	else 
-        {
-          TRACE0(pSoftGemini->hReport, REPORT_SEVERITY_ERROR, "  SoftGemini_SetPSmode() - Error hSoftGemini= NULL \n");
-        }
+    {
+        os_printf("  SoftGemini_SetPSmode() - Error hSoftGemini= NULL \n");
+    }
 }
 
 /************************************************************************
@@ -162,7 +162,7 @@ void SoftGemini_unSetPSmode(TI_HANDLE hSoftGemini)
 	}
     else
     {
-		TRACE0(pSoftGemini->hReport, REPORT_SEVERITY_ERROR, " SoftGemini_unSetPSmode() - Error hSoftGemini= NULL \n");
+		os_printf("SoftGemini_unSetPSmode() - Error hSoftGemini= NULL \n");
     }
 }
 

@@ -126,7 +126,6 @@ TI_STATUS cmdHndlr_Destroy (TI_HANDLE hCmdHndlr, TI_HANDLE hEvHandler)
 		cmdInterpret_Destroy (pCmdHndlr->hCmdInterpret, hEvHandler);
 	}
 
-    cmdHndlr_ClearQueue (hCmdHndlr);
 
 	if (pCmdHndlr->hCmdQueue)
 	{

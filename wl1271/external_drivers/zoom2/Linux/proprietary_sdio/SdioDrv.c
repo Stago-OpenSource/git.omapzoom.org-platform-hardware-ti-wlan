@@ -184,6 +184,11 @@ typedef void*                       TI_HANDLE;
 	OMAP_HSMMC_WRITE(CMD, cmd); \
 } while (0)
 
+#define SDIO_SEND_COMMAND(cmdreg, cmdarg)   do \
+{ \
+    OMAP_HSMMC_WRITE(STAT, OMAP_HSMMC_STAT_CLEAR); \
+    OMAP_HSMMC_SEND_COMMAND((cmdreg), (cmdarg)); \
+}  while (0)
 #define OMAP_HSMMC_CMD52_WRITE     ((SD_IO_RW_DIRECT    << 24) | (OMAP_HSMMC_CMD_SHORT_RESPONSE << 16))
 #define OMAP_HSMMC_CMD52_READ      (((SD_IO_RW_DIRECT   << 24) | (OMAP_HSMMC_CMD_SHORT_RESPONSE << 16)) | DDIR)
 #define OMAP_HSMMC_CMD53_WRITE     (((SD_IO_RW_EXTENDED << 24) | (OMAP_HSMMC_CMD_SHORT_RESPONSE << 16)) | DP_SELECT)
@@ -822,15 +827,28 @@ int sdioDrv_ReadAsync (unsigned int uFunc,
 
 	uCmdArg = SDIO_CMD53_READ(0, uFunc, bBlkMode, bIncAddr, uHwAddr, uNumBlks);
 
-	iStatus = sdiodrv_send_data_xfer_commad(OMAP_HSMMC_CMD53_READ_DMA, uCmdArg, uNumBlks, BRE, bBlkMode);
-
-	if (!(iStatus & BRE)) 
 	{
-		PERR("sdioDrv_ReadAsync() buffer disabled! length = %d BLK = 0x%x PSTATE = 0x%x, BlkMode = %d\n", 
-			uLen, OMAP_HSMMC_READ(BLK), iStatus, bBlkMode);
-		return -1;
-	}
+		u32  cmd =  OMAP_HSMMC_CMD53_READ_DMA;
+		if(bBlkMode) {
+		/*
+		 * Bits 31:16 of BLK reg: NBLK Blocks count for current transfer.
+		 * in case of Block MOde the lenght is treated here as number of blocks 
+		 * (and not as a length).
+		 * Bits 11:0 of BLK reg: BLEN Transfer Block Size. in case of block mode set that field to block size. 
+		 */
+		OMAP_HSMMC_WRITE(BLK, (uNumBlks << 16) | (g_drv.uBlkSize << 0));
 
+		/*
+		 * In CMD reg:
+		 * BCE: Block Count Enable
+		 * MSBS: Multi/Single block select
+		 */
+		cmd |= MSBS | BCE ;
+		} else {
+			OMAP_HSMMC_WRITE(BLK, uNumBlks);
+		}
+		SDIO_SEND_COMMAND(cmd, uCmdArg);
+	}
 	sdiodrv_dma_init();
 
 	PDEBUG("sdiodrv_read_async() dma_ch=%d \n",g_drv.dma_rx_channel);
@@ -856,6 +874,13 @@ int sdioDrv_ReadAsync (unsigned int uFunc,
 				0, 0);
 
 	omap_set_dma_transfer_params(g_drv.dma_rx_channel, OMAP_DMA_DATA_TYPE_S32, uNumOfElem , uDmaBlockCount , OMAP_DMA_SYNC_FRAME, OMAP34XX_DMA_MMC3_RX, OMAP_DMA_SRC_SYNC);
+
+	iStatus  = sdiodrv_poll_status(OMAP_HSMMC_STAT, CC, MMC_TIMEOUT_MS);
+	if (!(iStatus & CC)) {
+		omap_clear_dma(g_drv.dma_rx_channel);
+		PERR("sdioDrv_ReadeAsync: Commmand 53 failed\n");
+		return -1;
+	}
 
 	omap_start_dma(g_drv.dma_rx_channel);
 
@@ -923,12 +948,28 @@ int sdioDrv_WriteAsync (unsigned int uFunc,
 
 	uCmdArg = SDIO_CMD53_WRITE(1, uFunc, bBlkMode, bIncAddr, uHwAddr, uNumBlks);
 
-	iStatus = sdiodrv_send_data_xfer_commad(OMAP_HSMMC_CMD53_WRITE_DMA, uCmdArg, uNumBlks, BWE, bBlkMode);
-	if (!(iStatus & BWE)) 
 	{
-		PERR("sdioDrv_WriteAsync() buffer disabled! length = %d, BLK = 0x%x, Status = 0x%x\n", 
-			uLen, OMAP_HSMMC_READ(BLK), iStatus);
-		return -1;
+		u32  cmd =  OMAP_HSMMC_CMD53_WRITE_DMA;
+		/* block mode */
+		if(bBlkMode) {
+		/* 
+		 * Bits 31:16 of BLK reg: NBLK Blocks count for current transfer.
+		 * in case of Block MOde the lenght is treated here as number of blocks 
+		 * (and not as a length).
+		 * Bits 11:0 of BLK reg: BLEN Transfer Block Size. in case of block mode set that field to block size. 
+		 */
+		 OMAP_HSMMC_WRITE(BLK, (uNumBlks << 16) | (g_drv.uBlkSize << 0));
+    
+		/*
+		 * In CMD reg:
+		 * BCE: Block Count Enable
+		 * MSBS: Multi/Single block select
+		 */
+		cmd |=  MSBS | BCE ;
+		} else {
+			OMAP_HSMMC_WRITE(BLK, uNumBlks);
+		}
+		SDIO_SEND_COMMAND(cmd, uCmdArg);
 	}
 
 	OMAP_HSMMC_WRITE(ISE, TC);
@@ -956,6 +997,13 @@ int sdioDrv_WriteAsync (unsigned int uFunc,
 				0, 0);
 
 	omap_set_dma_transfer_params(g_drv.dma_tx_channel, OMAP_DMA_DATA_TYPE_S32, uNumOfElem, uDmaBlockCount, OMAP_DMA_SYNC_FRAME, OMAP34XX_DMA_MMC3_TX, OMAP_DMA_DST_SYNC);
+
+	iStatus  = sdiodrv_poll_status(OMAP_HSMMC_STAT, CC, MMC_TIMEOUT_MS);
+	if (!(iStatus & CC)) {
+		omap_clear_dma(g_drv.dma_tx_channel);
+		PERR("sdioDrv_WriteAsync: Commmand 53 failed\n");
+		return -1;
+	}
 
 	omap_start_dma(g_drv.dma_tx_channel);
 

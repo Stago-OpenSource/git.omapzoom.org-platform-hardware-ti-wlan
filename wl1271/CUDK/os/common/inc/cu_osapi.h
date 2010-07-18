@@ -43,6 +43,13 @@
 /* replaces IFNAMSIZ in Linux */
 #define IF_NAME_SIZE    16
 
+
+/* Macros */
+#define PRINT_FORMAT_S8_VAL(signedVal) \
+(((U8)signedVal > 127) ? (0xFFFFFF00 | signedVal) : signedVal)
+/***********/
+
+
 /* 
  * TODO : supp declares its OS abstarction with primitive types, so these must
  * be specifically declared here, and only if they weren't defined before by someone

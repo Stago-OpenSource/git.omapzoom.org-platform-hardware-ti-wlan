@@ -74,10 +74,6 @@ hPlatform_initInterrupt(
 	void* handle_add
 	);
 
-void*
-hPlatform_hwGetRegistersAddr(
-    TI_HANDLE OsContext
-    );
 
 void*
 hPlatform_hwGetMemoryAddr(
