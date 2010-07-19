@@ -803,7 +803,6 @@ static int wlanDrvIf_Create (void)
     #endif
     memset (drv, 0, sizeof(TWlanDrvIfObj));
 
-	drv->irq = (OMAP_GPIO_IRQ(IRQ_GPIO));
     
     drv->tCommon.eDriverState = DRV_STATE_IDLE;
 
@@ -924,7 +923,6 @@ static void wlanDrvIf_Destroy (TWlanDrvIfObj *drv)
 #else
     if (drv->irq)
     {
-        free_irq (drv->irq, drv);
         hPlatform_freeInterrupt(drv);
     }
 #endif
