@@ -30,7 +30,7 @@
 #include <string.h>
 #include <cutils/properties.h>
 #include <hardware_legacy/power.h>
-#define PROGRAM_NAME    "wlan_loader"
+#define PROGRAM_NAME    "wlan_ap_loader"
 #endif
 
 #include "STADExternalIf.h"
@@ -38,7 +38,7 @@
 #include "ipc_sta.h"
 #include "WlanDrvCommon.h"
 
-#define TIWLAN_DRV_NAME "tiwlan"
+#define TIWLAN_DRV_NAME "tiap"
 
 S8    g_drv_name[IF_NAME_SIZE + 1];
 
@@ -176,7 +176,7 @@ init_driver_end:
     return rc;
 }
 
-#ifdef ANDROID_0
+#ifdef ANDROID
 int check_and_set_property(char *prop_name, char *prop_val)
 {
     char prop_status[PROPERTY_VALUE_MAX];
@@ -236,7 +236,7 @@ S32 user_main(S32 argc, PPS8 argv)
             else
             {
                 os_error_printf (CU_MSG_ERROR, (PS8)"Loader: unknow parameter '%s'\n", argv[i]);
-#ifdef ANDROID_0
+#ifdef ANDROID
                 check_and_set_property("wlanap.driver.status", "failed");
 #endif	
                 return -1;
@@ -249,19 +249,19 @@ S32 user_main(S32 argc, PPS8 argv)
         os_strcpy(g_drv_name, (PS8)TIWLAN_DRV_NAME "0" );
     }
 
-#ifdef ANDROID_0
+#ifdef ANDROID
     acquire_wake_lock(PARTIAL_WAKE_LOCK, PROGRAM_NAME);
 #endif
 
     if (init_driver (g_drv_name, eeprom_file_name, init_file_name, firmware_file_name) != 0)
     {
-#ifdef ANDROID_0
+#ifdef ANDROID
 	check_and_set_property("wlanap.driver.status", "failed");
 	release_wake_lock(PROGRAM_NAME);
 #endif    
         return -1;
     }
-#ifdef ANDROID_0
+#ifdef ANDROID
 	check_and_set_property("wlanap.driver.status", "ok");
 	release_wake_lock(PROGRAM_NAME);
 #endif    

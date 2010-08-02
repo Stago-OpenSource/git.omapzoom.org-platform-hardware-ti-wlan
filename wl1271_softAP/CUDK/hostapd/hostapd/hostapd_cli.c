@@ -103,7 +103,7 @@ static const char *commands_help =
 static struct wpa_ctrl *ctrl_conn;
 static int hostapd_cli_quit = 0;
 static int hostapd_cli_attached = 0;
-static const char *ctrl_iface_dir = "/data/misc/wifi";
+static const char *ctrl_iface_dir = "/dev/socket";
 static char *ctrl_ifname = NULL;
 static int ping_interval = 5;
 

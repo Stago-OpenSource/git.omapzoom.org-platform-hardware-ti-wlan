@@ -36,26 +36,6 @@ include $(BUILD_PREBUILT)
 ########################
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := udhcpdWlan.conf
-LOCAL_MODULE_TAGS := user
-LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/udhcpd
-LOCAL_SRC_FILES := $(LOCAL_MODULE)
-include $(BUILD_PREBUILT)
-
-########################
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := udhcpd
-LOCAL_MODULE_TAGS := user
-LOCAL_MODULE_CLASS := EXECUTABLES
-LOCAL_MODULE_PATH := $(TARGET_OUT_EXECUTABLES)
-LOCAL_SRC_FILES := $(LOCAL_MODULE)
-include $(BUILD_PREBUILT)
-
-########################
-
-include $(CLEAR_VARS)
 LOCAL_MODULE := hostapd
 LOCAL_MODULE_TAGS := user
 LOCAL_MODULE_CLASS := EXECUTABLES
