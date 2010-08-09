@@ -425,8 +425,14 @@ S32 WpaCore_GetDefaultKey(THandle hWpaCore, U32* pDefaultKeyIndex)
 S32 WpaCore_StartWpsPIN(THandle hWpaCore)
 {
 	TWpaCore* pWpaCore = (TWpaCore*)hWpaCore;
+	S8 cmd[100];
 
 	pWpaCore->WpaSupplParams.WscMode = WSC_MODE_PIN;
+
+#ifdef SUPPL_WPS_SUPPORT
+	os_sprintf(cmd, "WPS_PIN any");
+	IpcWpa_Command(pWpaCore->hIpcWpa, cmd, TRUE);
+#endif
 	
 	return OK;
 }
@@ -434,9 +440,15 @@ S32 WpaCore_StartWpsPIN(THandle hWpaCore)
 S32 WpaCore_StartWpsPBC(THandle hWpaCore)
 {
 	TWpaCore* pWpaCore = (TWpaCore*)hWpaCore;
-	
+	S8 cmd[100];
+
 	pWpaCore->WpaSupplParams.WscMode = WSC_MODE_PBC;
-	
+
+#ifdef SUPPL_WPS_SUPPORT
+	os_sprintf(cmd, (PS8)"WPS_PBC");
+	IpcWpa_Command(pWpaCore->hIpcWpa, cmd, TRUE);
+#endif
+
 	return OK;
 }
 
