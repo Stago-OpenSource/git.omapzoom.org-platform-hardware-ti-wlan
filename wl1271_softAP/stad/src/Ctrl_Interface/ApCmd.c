@@ -157,13 +157,19 @@ int apCmd_Execute(TI_HANDLE hApCmd, TConfigCommand *pCmdObj)
  TApCmd *pApCmd = hApCmd;
  TI_UINT32  uModuleNumber;
  TI_STATUS  tRes = TI_NOK;
- TApCmd_Type tParamInfo;
+ TApCmd_Type *pParamInfo;
  ti_private_cmd_t *pMyCmd = (ti_private_cmd_t *)pCmdObj->param3;
  TApAddKeyParams  tKeyParam;
  TTwdParamInfo    tTwdParam;
  TSecurityKeys    tTwdKey;
  TI_UINT32        uHlid;
- 
+
+ pParamInfo = (TApCmd_Type*)os_memoryAlloc(pApCmd->hOs,sizeof(TApCmd_Type));
+ if(!pParamInfo)
+ {
+    return TI_NOK;
+ }
+
  uModuleNumber = GET_AP_MODULE_NUMBER(pMyCmd->cmd);
    
  switch (uModuleNumber)
@@ -224,22 +230,22 @@ int apCmd_Execute(TI_HANDLE hApCmd, TConfigCommand *pCmdObj)
              break;
          case ROLE_AP_SET_DTIM_PERIOD:               
              TRACE0(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n apCmd_Execute:  ROLE_AP_SET_DTIM_PERIOD \n");
-             memcpy(&tParamInfo.GeneralParam,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
-             TRACE1(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n ROLE_AP_SET_DTIM dtim %d\n", tParamInfo.GeneralParam.lValue);
+             memcpy(&pParamInfo->GeneralParam,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
+             TRACE1(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n ROLE_AP_SET_DTIM dtim %d\n", pParamInfo->GeneralParam.lValue);
              break;
          case ROLE_AP_SET_BEACON_INT:
              TRACE0(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n apCmd_Execute:  ROLE_AP_SET_BEACON_INT \n");
-             memcpy(&tParamInfo.GeneralParam,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
-             TRACE1(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n ROLE_AP_SET_BEACON_INT %d\n", tParamInfo.GeneralParam.lValue);
+             memcpy(&pParamInfo->GeneralParam,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
+             TRACE1(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n ROLE_AP_SET_BEACON_INT %d\n", pParamInfo->GeneralParam.lValue);
              break;
          case ROLE_AP_SET_CHANNEL:
              TRACE0(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n apCmd_Execute:  ROLE_AP_SET_CHANNEL \n");
-             memcpy(&tParamInfo.ChannelParam,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
+             memcpy(&pParamInfo->ChannelParam,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
              break;
          case ROLE_AP_ADD_BEACON_PARAM:
              TRACE0(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n apCmd_Execute:  ROLE_AP_ADD_BEACON_PARAM \n");
-             memcpy(&tParamInfo.BeaconParams,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
-             //report_PrintDump(tParamInfo.BeaconParams.cHead,tParamInfo.BeaconParams.iHeadLen);
+             memcpy(&pParamInfo->BeaconParams,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
+             //report_PrintDump(pParamInfo->BeaconParams.cHead,pParamInfo->BeaconParams.iHeadLen);
              break;
          case ROLE_AP_COMMIT_CMD:                     
              TRACE0(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n apCmd_Execute:  ROLE_AP_COMMIT_CMD \n");
@@ -252,8 +258,8 @@ int apCmd_Execute(TI_HANDLE hApCmd, TConfigCommand *pCmdObj)
              break;
         case ROLE_AP_SET_SSID:
 			 TRACE0(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n apCmd_Execute:  ROLE_AP_SET_SSID \n");
-             memcpy(&tParamInfo.SsidParam,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
-             TRACE1(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n ROLE_AP_SET_SSID SSID %s\n", tParamInfo.SsidParam.cSsid);
+             memcpy(&pParamInfo->SsidParam,pMyCmd->in_buffer,pMyCmd->in_buffer_len);
+             TRACE1(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n ROLE_AP_SET_SSID SSID %s\n", pParamInfo->SsidParam.cSsid);
             break;
         case ROLE_AP_SET_SSID_TYPE:
 			TRACE0(pApCmd->hReport,REPORT_SEVERITY_INFORMATION ,"\n apCmd_Execute:  ROLE_AP_SET_SSID_TYPE \n");
