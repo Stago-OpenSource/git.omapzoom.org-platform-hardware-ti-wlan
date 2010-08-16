@@ -1201,9 +1201,10 @@ void TWD_EnableExternalEvents (TI_HANDLE hTWD)
      * Enable sleep after all firmware initializations completed 
      * The awake was in the TWD_initHw phase
      */
-    twIf_Sleep (pTWD->hTwIf);
 
     fwEvent_EnableExternalEvents (pTWD->hFwEvent);
+
+    twIf_Sleep (pTWD->hTwIf);
 }
 
 TI_BOOL TWD_RecoveryEnabled (TI_HANDLE hTWD)
