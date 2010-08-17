@@ -260,33 +260,37 @@ void sendDataPacket (TI_HANDLE hOs)
 }
 
 
-
 void sendMgmtPacket(TI_HANDLE hOs)
 {
     TI_UINT32           i;
-    TI_UINT8            aMsg[2000];
+    TI_UINT8            *pMsg;
     dot11MgmtSubType_e  eMsgType = DE_AUTH;
-    
-    for (i = 0; i < packetLength; i++) 
-    {
-        aMsg[i] = i;
+
+    pMsg = (TI_UINT8 *)os_memoryAlloc(hOs, 2000*sizeof(TI_UINT8));
+    if(!pMsg) {
+	return;
     }
 
-    mlmeBuilder_sendFrame(tmp_hMlme, eMsgType, aMsg, packetLength, 0);
-    
+    for (i = 0; i < packetLength; i++)
+    {
+        *(pMsg+i) = i;
+    }
+
+    mlmeBuilder_sendFrame(tmp_hMlme, eMsgType, pMsg, packetLength, 0);
+
     numOfPackets++;
     if ((infinitLoopFl == 0) && (numOfPackets > packetsNum))
-    {      
+    {
         os_timerStop(hOs, dTimer);
         os_printf("\n *********** Last Packet was sent **********");
         os_timerDestroy(hOs, dTimer);
     }
     else
     {
-        os_timerStart(hOs, dTimer, 1000); 
+        os_timerStart(hOs, dTimer, 1000);
     }
+    os_memoryFree(hOs, pMsg, 2000*sizeof(TI_UINT8));
 }
-
 void FW_DebugSendPacket(TI_HANDLE hDrvMain ,TI_HANDLE hOs, TI_HANDLE hTxMgmtQ, void *pParam)
 {
     void *fSendPkt;
