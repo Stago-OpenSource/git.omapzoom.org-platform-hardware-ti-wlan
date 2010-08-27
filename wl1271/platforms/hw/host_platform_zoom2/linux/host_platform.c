@@ -200,6 +200,11 @@ int hPlatform_DevicePowerOff (void)
 
     err = wifi_set_power(0, 10);
 
+#ifndef PROPRIETARY_SDIO
+    if(wifi_control_data->set_carddetect)
+        wifi_control_data->set_carddetect(0);
+#endif
+
     return err;
 }
 

@@ -48,6 +48,7 @@
 #define SD_IO_SELECT_CARD		  		    7 
 
 #define VDD_VOLTAGE_WINDOW                  0xffffc0
+#define ELP_CTRL_REG_ADDR                   0x1fffc
 
 /********************************************************************/
 /*	SDIO driver functions prototypes                                */

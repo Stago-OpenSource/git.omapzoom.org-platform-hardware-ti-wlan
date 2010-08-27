@@ -127,10 +127,12 @@ int sdioAdapt_ConnectBus (void *        fCbFunc,
 	if (iStatus) { return iStatus; }
 
 #ifndef PROPRIETARY_SDIO
+    sdioDrv_ClaimHost(SDIO_WLAN_FUNC);
     iStatus = sdioDrv_EnableFunction(TXN_FUNC_ID_WLAN);
         if (iStatus) { return iStatus; }
     iStatus = sdioDrv_SetBlockSize(TXN_FUNC_ID_WLAN, uBlkSize);
         if (iStatus) { return iStatus; }
+    sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
 #endif
 
 #ifdef PROPRIETARY_SDIO
@@ -264,7 +266,9 @@ int sdioAdapt_ConnectBus (void *        fCbFunc,
 int sdioAdapt_DisconnectBus (void)
 {
 #ifndef PROPRIETARY_SDIO
+    sdioDrv_ClaimHost(SDIO_WLAN_FUNC);
     sdioDrv_DisableFunction(TXN_FUNC_ID_WLAN);
+    sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
 #endif
     if (pDmaBufAddr)
     {
@@ -352,13 +356,15 @@ ETxnStatus sdioAdapt_TransactBytes (unsigned int  uFuncId,
 {
     int iStatus;
 
-#ifdef PROPRIETARY_SDIO
     if(bMore == 1)
     {
+#ifdef PROPRIETARY_SDIO
         sdioDrv_cancel_inact_timer();
         sdioDrv_clk_enable();
-    }
+#else
+        sdioDrv_ClaimHost(SDIO_WLAN_FUNC);
 #endif
+    }
 
     /* Call read or write bytes Sync method */
     if (bDirection) 
@@ -370,12 +376,14 @@ ETxnStatus sdioAdapt_TransactBytes (unsigned int  uFuncId,
         iStatus = sdioDrv_WriteSyncBytes (uFuncId, uHwAddr, pHostAddr, uLength, bMore);
     }
 
-#ifdef PROPRIETARY_SDIO
     if(bMore == 0)
     {
+#ifdef PROPRIETARY_SDIO
         sdioDrv_start_inact_timer();
-    }
+#else
+        sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
 #endif
+    }
 
     /* If failed return ERROR, if succeeded return COMPLETE */
     if (iStatus) 

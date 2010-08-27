@@ -49,11 +49,12 @@ typedef struct OMAP3430_sdiodrv
 	unsigned int  async_length;
 	int           async_status;
 	struct device *dev;
-	void		(*notify_sdio_ready)(void);
-	int			sdio_host_claim_ref;
+	int           sdio_host_claim_ref;
 } OMAP3430_sdiodrv_t;
 
 int g_sdio_debug_level = SDIO_DEBUGLEVEL_ERR;
+extern int sdio_reset_comm(struct mmc_card *card);
+unsigned char *pElpData;
 
 static OMAP3430_sdiodrv_t g_drv;
 static struct sdio_func *tiwlan_func[1 + SDIO_TOTAL_FUNCS];
@@ -63,7 +64,7 @@ void sdioDrv_ClaimHost(unsigned int uFunc)
     if (g_drv.sdio_host_claim_ref)
         return;
 
-/* currently only wlan sdio function is supported */
+    /* currently only wlan sdio function is supported */
     BUG_ON(uFunc != SDIO_WLAN_FUNC);
     BUG_ON(tiwlan_func[uFunc] == NULL);
 
@@ -99,16 +100,12 @@ int sdioDrv_ConnectBus (void *       fCbFunc,
     g_drv.uBlkSizeShift = uBlkSizeShift;
     g_drv.uBlkSize      = 1 << uBlkSizeShift;
 
-    sdioDrv_ClaimHost(SDIO_WLAN_FUNC);
-
     return 0;
 }
 
 int sdioDrv_DisconnectBus (void)
 {
     printk("%s\n", __FUNCTION__);
-
-    sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
 
     return 0;
 }
@@ -144,19 +141,29 @@ static int generic_read_bytes(unsigned int uFunc, unsigned int uHwAddr,
 }
 
 static int generic_write_bytes(unsigned int uFunc, unsigned int uHwAddr,
-								unsigned char *pData, unsigned int uLen,
-								unsigned int bIncAddr, unsigned int bMore)
+				unsigned char *pData, unsigned int uLen,
+				unsigned int bIncAddr, unsigned int bMore)
 {
 	unsigned int i;
 	int ret;
+	unsigned int defFunc;
 
 	PDEBUG("%s: uFunc %d uHwAddr %d pData %x uLen %d\n", __func__, uFunc, uHwAddr, (unsigned int) pData, uLen);
 
 	BUG_ON(uFunc != SDIO_CTRL_FUNC && uFunc != SDIO_WLAN_FUNC);
 
 	for (i = 0; i < uLen; i++) {
-		if (uFunc == 0)
-			sdio_f0_writeb(tiwlan_func[uFunc], *pData, uHwAddr, &ret);
+		if (uFunc == 0) {
+			/* sdio_f0_writeb(tiwlan_func[uFunc], *pData, uHwAddr, &ret); */
+			/* WorkAround:
+			 * Using sdio_writeb API for bypassing address out of range issue.
+			 * Simulating function number to 0 and then restoring it back
+			 */
+			defFunc = tiwlan_func[uFunc]->num;
+			tiwlan_func[uFunc]->num = 0;
+			sdio_writeb(tiwlan_func[uFunc], *pData, uHwAddr, &ret);
+			tiwlan_func[uFunc]->num = defFunc;
+		}
 		else
 			sdio_writeb(tiwlan_func[uFunc], *pData, uHwAddr, &ret);
 
@@ -383,15 +390,44 @@ static void tiwlan_sdio_remove(struct sdio_func *func)
 
 static const struct sdio_device_id tiwl12xx_devices[] = {
 	{ SDIO_DEVICE_CLASS(SDIO_CLASS_WLAN) },
-       {}
+	{}
 };
 MODULE_DEVICE_TABLE(sdio, tiwl12xx_devices);
 
+int sdio_tiwlan_suspend(struct device *dev)
+{
+	return 0;
+}
+
+int sdio_tiwlan_resume(struct device *dev)
+{
+	/* Waking up the wifi chip for sdio_reset_comm */
+	*pElpData = 1;
+	sdioDrv_ClaimHost(SDIO_WLAN_FUNC);
+	generic_write_bytes(0, ELP_CTRL_REG_ADDR, pElpData, 1, 1, 0);
+	sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
+	mdelay(5);
+
+	/* Configuring the host and chip back to maximum capability
+	 * (bus width and speed)
+	 */
+	sdio_reset_comm(tiwlan_func[SDIO_WLAN_FUNC]->card);
+	return 0;
+}
+
+const struct dev_pm_ops sdio_tiwlan_pmops = {
+	.suspend = sdio_tiwlan_suspend,
+	.resume = sdio_tiwlan_resume,
+};
+
 static struct sdio_driver tiwlan_sdio_drv = {
-    .probe          = tiwlan_sdio_probe,
-    .remove         = tiwlan_sdio_remove,
-    .name           = "sdio_tiwlan",
-    .id_table       = tiwl12xx_devices,
+	.probe          = tiwlan_sdio_probe,
+	.remove         = tiwlan_sdio_remove,
+	.name           = "sdio_tiwlan",
+	.id_table       = tiwl12xx_devices,
+	.drv = {
+		.pm     = &sdio_tiwlan_pmops,
+	 },
 };
 
 int sdioDrv_init(void)
@@ -409,6 +445,10 @@ int sdioDrv_init(void)
 		goto out;
 	}
 
+	pElpData = kmalloc(sizeof (unsigned char), GFP_KERNEL);
+	if (!pElpData)
+		printk(KERN_ERR "Running out of memory\n");
+
 	printk(KERN_INFO "TI WiLink 1271 SDIO: Driver loaded\n");
 
 out:
@@ -418,6 +458,8 @@ out:
 void sdioDrv_exit(void)
 {
 	sdio_unregister_driver(&tiwlan_sdio_drv);
+	if(pElpData);
+		kfree(pElpData);
 	printk(KERN_INFO "TI WiLink 1271 SDIO Driver unloaded\n");
 }
 
