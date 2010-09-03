@@ -49,7 +49,8 @@ TI_STATUS cmdBld_Config                 (TI_HANDLE  hCmdBld,
                                          TI_HANDLE  hFinalizeDownload, 
                                          TI_HANDLE  hEventMbox, 
                                          TI_HANDLE  hCmdQueue,
-                                         TI_HANDLE  hTwIf);
+                                         TI_HANDLE  hTwIf,
+                                         TI_HANDLE  hTxHwQueue);
 TI_STATUS cmdBld_ConfigFw               (TI_HANDLE hCmdBld, void *fConfigFwCb, TI_HANDLE hConfigFwCb);
 TI_STATUS cmdBld_CheckMboxCb            (TI_HANDLE hCmdBld, void *fFailureEvCb, TI_HANDLE hFailureEv);
 TI_STATUS cmdBld_GetParam               (TI_HANDLE hCmdBld, TTwdParamInfo *pParamInfo);
@@ -64,7 +65,7 @@ TI_STATUS cmdBld_CmdMeasurement         (TI_HANDLE hCmdBld, TMeasurementParams *
 TI_STATUS cmdBld_CmdMeasurementStop     (TI_HANDLE hCmdBld, void *fCommandResponseCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdApDiscovery         (TI_HANDLE hCmdBld, TApDiscoveryParams* pApDiscoveryParams, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdApDiscoveryStop     (TI_HANDLE hCmdBld, void *fCb, TI_HANDLE hCb);
-TI_STATUS cmdBld_CmdStartScan           (TI_HANDLE hCmdBld, TScanParams *pScanVals, EScanResultTag eScanTag, TI_BOOL bHighPriority, void *fScanCommandResponseCb, TI_HANDLE hCb);
+TI_STATUS cmdBld_CmdStartScan 			(TI_HANDLE hCmdBld, TScanParams *pScanVals, EScanResultTag eScanTag, TI_BOOL bHighPriority, TI_BOOL bForceScan,void* ScanCommandResponseCB, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdStartSPSScan        (TI_HANDLE hCmdBld, TScanParams *pScanVals, EScanResultTag eScanTag, void *fScanCommandResponseCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdStopScan            (TI_HANDLE hCmdBld, EScanResultTag eScanTag, void *fScanCommandResponseCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdStopSPSScan         (TI_HANDLE hCmdBld, EScanResultTag eScanTag, void *fScanCommandResponseCb, TI_HANDLE hCb);
@@ -80,7 +81,7 @@ TI_STATUS cmdBld_CmdEnableTx            (TI_HANDLE hCmdBld, TI_UINT8 channel, vo
 TI_STATUS cmdBld_CmdDisableTx           (TI_HANDLE hCmdBld, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdFwDisconnect        (TI_HANDLE hCmdBld, TI_UINT32 uConfigOptions, TI_UINT32 uFilterOptions, DisconnectType_e uDisconType, TI_UINT16 uDisconReason, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdHealthCheck         (TI_HANDLE hCmdBld, void *fCb, TI_HANDLE hCb);
-TI_STATUS cmdBld_CmdSetPsMode           (TI_HANDLE hCmdBld, TPowerSaveParams* pPowerSaveParams, void *fCb, TI_HANDLE hCb);
+TI_STATUS cmdBld_CmdSetPsMode 			(TI_HANDLE hCmdBld, TI_BOOL psEnable, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdEnableRx            (TI_HANDLE hCmdBld, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdAddWepDefaultKey    (TI_HANDLE hCmdBld, TSecurityKeys* pKey, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdRemoveWepDefaultKey (TI_HANDLE hCmdBld, TSecurityKeys* pKey, void *fCb, TI_HANDLE hCb);
@@ -191,6 +192,121 @@ TI_STATUS cmdBld_SetDownlinkData  (TI_HANDLE hCmdBld, TI_BOOL bDownlinkFlag);
 void cmdBld_DbgForceTemplatesRates (TI_HANDLE hCmdBld, TI_UINT32 uRateMask);
 #endif
 
+#define CMD_IS_INVALID  0
+#define CMD_IS_VALID    1
+
+#define CMD_BLD_MARK_INIT_SEQUENCE_CMD_AS_VALID(hCmdBld, cmdIdx) \
+((TCmdBld*)hCmdBld)->aInitSeqCmdsStatus[cmdIdx] = CMD_IS_VALID; \
+
+#define CMD_BLD_MARK_INIT_SEQUENCE_CMD_AS_INVALID(hCmdBld, cmdIdx) \
+((TCmdBld*)hCmdBld)->aInitSeqCmdsStatus[cmdIdx] = CMD_IS_INVALID;
+
+#define CMD_BLD_IS_INIT_SEQUENCE_CMD_INVALID(hCmdBld, cmdIdx) \
+(((TCmdBld*)hCmdBld)->aInitSeqCmdsStatus[cmdIdx] == CMD_IS_INVALID) ? TI_TRUE : TI_FALSE
+
+typedef enum
+{
+    __CFG_PLATFORM_PARAMS,
+    __CFG_RADIO_PARAMS,
+#ifndef TNETW1283
+	__CFG_EXTENDED_RADIO_PARAMS,
+#endif
+	__CFG_PS_PARAMS,
+	__CMD_PROBE_REQ,
+    __CMD_NULL_DATA,
+    __CMD_DISCONN,
+    __CMD_PS_POLL,
+    __CMD_QOS_NULL_DATA,
+    __CMD_PROBE_RESP,
+    __CMD_BEACON,
+    __CMD_KEEP_ALIVE_TMPL,
+    __CFG_MEM,
+    __CFG_RX_MSDU_LIFE_TIME,
+    __CFG_RX,
+    /* The ACs and TIDs below should follow each other - do not change this order!!! */
+    __CFG_AC_PARAMS_0,
+    __CFG_TID_0,
+    __CFG_AC_PARAMS_1,
+    __CFG_TID_1,
+    __CFG_AC_PARAMS_2,
+    __CFG_TID_2,
+    __CFG_AC_PARAMS_3,
+    __CFG_TID_3,
+    __CFG_PD_THRESHOLD,
+    __CFG_SLOT_TIME,
+    __CMD_ARP_RSP,
+    __CFG_ARP_IP_FILTER,
+    __CFG_GROUP_ADDRESS_TABLE,
+    __CFG_SERVICE_PERIOD_TIMEOUT,
+    __CFG_RTS_THRESHOLD,
+    __CFG_DCO_ITRIM_PARAMS,
+    __CFG_FRAGMENT_THRESHOLD,
+    __CFG_PM_CONFIG,
+    __CFG_BEACON_FILTER_OPT, /* 31 */
+    __CFG_BEACON_FILTER_TABLE, /* 32  */
+    __CFG_TX_CMPLT_PACING,
+    __CFG_RX_INTR_PACING,
+    __CFG_SG,
+    __CFG_SG_ENABLE,
+    __CFG_FM_COEX,
+    __CFG_CCA_THRESHOLD,
+    __CFG_BCN_BRC_OPTIONS,
+    __CMD_ENABLE_RX,
+    __CMD_ENABLE_TX,
+    __CFG_PS_WMM,
+    __CFG_EVENT_SCAN_CMPLT,
+    __CFG_EVENT_SPS_SCAN_CMPLT,
+    __CFG_EVENT_PLT_RX_CALIBRATION_CMPLT,
+    __CFG_HW_ENC_DEC_ENABLE,
+    __CFG_RSSI_SNR_WEIGHTS,
+    /* The RSSI trigger below should follow each other - do not change this order!!!! */
+    __CFG_RSSI_SNR_TRIGGER_0,
+    __CFG_RSSI_SNR_TRIGGER_1,
+    __CFG_RSSI_SNR_TRIGGER_2,
+    __CFG_RSSI_SNR_TRIGGER_3,
+    __CFG_RSSI_SNR_TRIGGER_4,
+    __CFG_RSSI_SNR_TRIGGER_5,
+    __CFG_RSSI_SNR_TRIGGER_6,
+    __CFG_RSSI_SNR_TRIGGER_7,
+    __CFG_MAX_TX_RETRY,
+    __CFG_SPLIT_SCAN_TIMEOUT,
+
+    /******************** Re-join sequence (57 cmds till here ) **********************/ 
+    __CFG_TX_RATE_POLICY,
+    __CMD_BEACON_JOIN,
+    __CMD_PROBE_RESP_JOIN,
+    __CMD_PROBE_REQ_JOIN,
+    __CMD_NULL_DATA_JOIN,
+	__CMD_QOS_NULL_DATA_JOIN,
+    __CMD_DISCONN_JOIN,
+    __CMD_PS_POLL_JOIN,
+    __CMD_KEEP_ALIVE_TMPL_JOIN,
+    __CFG_SLOT_TIME_JOIN,
+    __CFG_PREAMBLE_JOIN,
+    __CFG_HT_CAPABILITIES,
+    __CFG_HT_INFORMATION,
+    __CMD_START_JOIN,
+    __CFG_AID,
+    __CFG_BA_SET_SESSION,
+    __CFG_TX_POWER_JOIN,
+    __CFG_KEYS,
+    __CMD_KEEP_ALIVE_PARAMS,
+    __CFG_CONN_MONIT_PARAMS,
+    __CFG_BET,
+    __CFG_CTS_PROTECTION,
+    __CFG_PS_RX_STREAMING,
+    __CFG_RX_DATA_FILTER,
+    __CMD_STA_STATE,
+    __CMD_POWER_AUTH,
+    __CMD_BURST_MODE_ENABLE,
+    __CFG_RATE_MANAGEMENT,
+    __CMD_ARP_RSP_JOIN,
+    __CFG_HANG_OVER_PARAMS,
+    __ITR_MEMORY_MAP,
+    MAX_NUM_OF_CMDS_IN_SEQUENCE
+} EInitSeqCmds;
+
+
 
 typedef struct
 {
@@ -208,6 +324,7 @@ typedef struct
     TI_HANDLE                  hCmdQueue;
     TI_HANDLE                  hEventMbox;
     TI_HANDLE                  hTwIf;
+    TI_HANDLE                  hTxHwQueue;
 
     TCmdBldDb                  tDb;
     TSecurity                  tSecurity;
@@ -232,6 +349,7 @@ typedef struct
 #ifdef TI_DBG
     TI_UINT32                  uDbgTemplatesRateMask;
 #endif
+	TI_UINT8                   aInitSeqCmdsStatus[MAX_NUM_OF_CMDS_IN_SEQUENCE];
 
 } TCmdBld;
 
@@ -261,9 +379,8 @@ typedef struct
 #ifndef TNETW1283
 #define DB_EXT_RADIO(HCMDBLD)		(((TCmdBld *)HCMDBLD)->tDb.tExtRadioIniParams)
 #endif
-
+#define DB_PS(HCMDBLD)		(((TCmdBld *)HCMDBLD)->tDb.tPsParams)
 #define DB_GEN(HCMDBLD)    (((TCmdBld *)HCMDBLD)->tDb.tPlatformGenParams)
-#define DB_SR(HCMDBLD)    (((TCmdBld *)HCMDBLD)->tDb.tSmartReflex)
 #define DB_RM(HCMDBLD)    (((TCmdBld *)HCMDBLD)->tDb.tRateMngParams)
 
 

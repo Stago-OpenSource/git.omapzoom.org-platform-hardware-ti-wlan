@@ -76,6 +76,10 @@
 #include "TWDriver.h"
 #include "DrvMainModules.h"
 #include "GenSM.h"
+#include "rsnApi.h"
+
+#include "rrmMgr.h"
+#include "StaCap.h"
 
 /*----------------------*/
 /* Constants and macros */
@@ -214,9 +218,14 @@ typedef struct _apConn_t
     TI_HANDLE               hQos;
     TI_HANDLE               hEvHandler; 
     TI_HANDLE               hScr;   
-    TI_HANDLE               hAssoc;
     TI_HANDLE               hRegulatoryDomain;
     TI_HANDLE               hMlme;
+    TI_HANDLE               hRsn;
+    TI_HANDLE               hMeasurementMgr;
+    TI_HANDLE               hStaCap;
+
+
+
     
     /* Counters for statistics */
     TI_UINT32               roamingTriggerEvents[MAX_ROAMING_TRIGGERS];
@@ -225,6 +234,8 @@ typedef struct _apConn_t
     TI_UINT32               retainCurrAPNum;
     TI_UINT32               disconnectFromRoamMngrNum;
     TI_UINT32               stopFromSmeNum;
+
+   
     TI_HANDLE               hAPConnSM;
 	apConn_roamingTrigger_e	assocRoamingTrigger;
 } apConn_t;
@@ -296,6 +307,7 @@ TI_HANDLE apConn_create(TI_HANDLE hOs)
         if (pAPConnection->hAPConnSM == NULL)
         {
             WLAN_OS_REPORT(("FATAL ERROR: apConn_create(): Error allocating Connection StateMachine! - aborting\n"));
+            os_memoryFree(hOs, pAPConnection, sizeof(apConn_t));
             return NULL;
         }
 
@@ -305,7 +317,6 @@ TI_HANDLE apConn_create(TI_HANDLE hOs)
     else /* Failed to allocate control block */
     {
         WLAN_OS_REPORT(("FATAL ERROR: apConn_create(): Error allocating cb - aborting\n"));
-        os_memoryFree(hOs, pAPConnection, sizeof(apConn_t));
         return NULL;
     }
 }
@@ -479,9 +490,13 @@ void apConn_init (TStadHandlesList *pStadHandles)
     pAPConnection->hQos         = pStadHandles->hQosMngr;
     pAPConnection->hEvHandler   = pStadHandles->hEvHandler;
     pAPConnection->hScr         = pStadHandles->hSCR;
-    pAPConnection->hAssoc       = pStadHandles->hAssoc;
-    pAPConnection->hMlme        = pStadHandles->hMlmeSm;
+    pAPConnection->hMlme        = pStadHandles->hMlme;
+    pAPConnection->hRsn         = pStadHandles->hRsn;
     pAPConnection->hRegulatoryDomain = pStadHandles->hRegulatoryDomain;
+    pAPConnection->hMeasurementMgr  = pStadHandles->hMeasurementMgr;
+    pAPConnection->hStaCap  = pStadHandles->hStaCap;
+
+
     
     pAPConnection->currentState = AP_CONNECT_STATE_IDLE;
     pAPConnection->firstAttempt2Roam = TI_TRUE;
@@ -697,9 +712,9 @@ TI_STATUS apConn_registerRoamMngrCallb(TI_HANDLE hAPConnection,
     pAPConnection->reportStatusCallb = reportStatusCallb;
     if ((pAPConnection->roamingEnabled) && (pAPConnection->currentState != AP_CONNECT_STATE_IDLE))
     {
-        param.paramType   = ASSOC_ASSOCIATION_REQ_PARAM;
+        param.paramType   = MLME_ASSOCIATION_REQ_PARAM;
 
-        assoc_getParam(pAPConnection->hAssoc, &param);
+        mlme_getParam(pAPConnection->hMlme, &param);
         reportStatus.dataBuf = (char *)(param.content.assocReqBuffer.buffer);
         reportStatus.dataBufLength = param.content.assocReqBuffer.bufferSize;
 
@@ -1026,6 +1041,7 @@ TI_STATUS apConn_preAuthenticate(TI_HANDLE hAPConnection, bssList_t *listAPs)
             apList.bssidList[apListIndex].rsnIeLen = apList.bssidList[apListIndex].pRsnIEs->hdr[1] + 2;
         }
         apList.NumOfItems = apListIndex+1;
+
         rsn_startPreAuth(pAPConnection->hPrivacy, &apList);
     }
     return TI_OK;
@@ -1239,7 +1255,7 @@ TI_STATUS apConn_reportRoamingEvent(TI_HANDLE hAPConnection,
             /* Remove AP from candidate list for a specified amount of time */
             param.paramType = SITE_MGR_CURRENT_BSSID_PARAM;
         	siteMgr_getParam(pAPConnection->hSiteMgr, &param);
-            
+
             TRACE1(pAPConnection->hReport, REPORT_SEVERITY_INFORMATION, "current station is banned from the roaming candidates list for %d Ms\n", RSN_AUTH_FAILURE_TIMEOUT);
 
             rsn_banSite(pAPConnection->hPrivacy, param.content.siteMgrDesiredBSSID, RSN_SITE_BAN_LEVEL_FULL, RSN_AUTH_FAILURE_TIMEOUT);
@@ -1267,7 +1283,7 @@ TI_STATUS apConn_reportRoamingEvent(TI_HANDLE hAPConnection,
 		pAPConnection->roamReason = roamingEventType;
 	}
 
-    /* 3c. Check if Roaming Manager is available */
+    /* 3c. Check if Roaming Manager is not available and the roaming trigger is not in the low quality level  */
     if (((!pAPConnection->roamingEnabled) || (pAPConnection->roamEventCallb == NULL) ||
           (pAPConnection->currentState == AP_CONNECT_STATE_IDLE))
         && (roamingEventType > ROAMING_TRIGGER_MAX_TX_RETRIES))
@@ -1282,12 +1298,12 @@ TI_STATUS apConn_reportRoamingEvent(TI_HANDLE hAPConnection,
             de-auth arrived. */
         if (pAPConnection->currentState == AP_CONNECT_STATE_IDLE)
 		{
-			sme_ReportApConnStatus(pAPConnection->hSme, STATUS_DISCONNECT_DURING_CONNECT, pAPConnection->APDisconnect.uStatusCode);
+            conn_ReportApConnStatus(pAPConnection->hConnSm, STATUS_DISCONNECT_DURING_CONNECT, pAPConnection->APDisconnect.uStatusCode);
 		}
         else
         {
             /* Infra-structure BSS case - disconnect the link */
-            if (roamingEventType >= ROAMING_TRIGGER_AP_DISCONNECT && (roamingEventType != ROAMING_TRIGGER_TSPEC_REJECTED))
+            if (roamingEventType >= ROAMING_TRIGGER_AP_DISCONNECT)
             {
                 pAPConnection->removeKeys = TI_TRUE;
             }
@@ -1295,11 +1311,18 @@ TI_STATUS apConn_reportRoamingEvent(TI_HANDLE hAPConnection,
             {
                 pAPConnection->removeKeys = TI_FALSE;
             }
+
             UPDATE_SEND_DEAUTH_PACKET_FLAG(roamingEventType);
-			if (roamingEventType == ROAMING_TRIGGER_SECURITY_ATTACK)
-				pAPConnection->deauthPacketReasonCode = STATUS_MIC_FAILURE;
+
+            if (roamingEventType == ROAMING_TRIGGER_SECURITY_ATTACK)
+            {
+                pAPConnection->deauthPacketReasonCode = STATUS_MIC_FAILURE;
+            }
 			else
-				pAPConnection->deauthPacketReasonCode = STATUS_UNSPECIFIED;
+            {
+                pAPConnection->deauthPacketReasonCode = STATUS_UNSPECIFIED;
+            }
+			   
             apConn_smEvent(&(pAPConnection->currentState), AP_CONNECT_EVENT_STOP, pAPConnection);
         }
         return TI_OK;
@@ -1323,13 +1346,6 @@ TI_STATUS apConn_reportRoamingEvent(TI_HANDLE hAPConnection,
         }
         /* Report to Roaming Manager */
 
-#ifdef XCC_MODULE_INCLUDED
-        /* For XCC only - if the is reason is TSPEC reject - mark this as BssLoss - To be changed later */
-        if (roamingEventType == ROAMING_TRIGGER_TSPEC_REJECTED)
-        {
-            roamingEventType = ROAMING_TRIGGER_BSS_LOSS;
-        }
-#endif        
         pAPConnection->roamEventCallb(pAPConnection->hRoamMng, &roamingEventType, reasonCode);
     }
 
@@ -1677,9 +1693,9 @@ static void apConn_smStartWaitingForTriggers(void *pData)
     
     if ((pAPConnection->roamingEnabled) && (pAPConnection->reportStatusCallb != NULL))
     {
-        param.paramType   = ASSOC_ASSOCIATION_REQ_PARAM;
+        param.paramType   = MLME_ASSOCIATION_REQ_PARAM;
 
-        assoc_getParam(pAPConnection->hAssoc, &param);
+        mlme_getParam(pAPConnection->hMlme, &param);
         reportStatus.dataBuf = (char *)(param.content.assocReqBuffer.buffer);
         reportStatus.dataBufLength = param.content.assocReqBuffer.bufferSize;
 
@@ -1738,9 +1754,9 @@ static void apConn_smConnectedToNewAP(void *pData)
     /* Report Roaming Manager */
     if (pAPConnection->reportStatusCallb != NULL)
     {
-        param.paramType   = ASSOC_ASSOCIATION_REQ_PARAM;
+        param.paramType   = MLME_ASSOCIATION_REQ_PARAM;
 
-        assoc_getParam(pAPConnection->hAssoc, &param);
+        mlme_getParam(pAPConnection->hMlme, &param);
         reportStatus.dataBuf = (char *)(param.content.assocReqBuffer.buffer);
         reportStatus.dataBufLength = param.content.assocReqBuffer.bufferSize;
 
@@ -1897,9 +1913,9 @@ static void apConn_smRetainAP(void *data)
     /* Report Roaming Manager */
     if (pAPConnection->reportStatusCallb != NULL) 
     {
-        param.paramType   = ASSOC_ASSOCIATION_REQ_PARAM;
+        param.paramType   = MLME_ASSOCIATION_REQ_PARAM;
 
-        assoc_getParam(pAPConnection->hAssoc, &param);
+        mlme_getParam(pAPConnection->hMlme, &param);
         reportStatus.dataBuf = (char *)(param.content.assocReqBuffer.buffer);
         reportStatus.dataBufLength = param.content.assocReqBuffer.bufferSize;
 
@@ -2166,9 +2182,9 @@ static void apConn_smReportConnFail(void *data)
     /* Report to Roaming Manager */
     if (pAPConnection->reportStatusCallb != NULL)
     {
-        param.paramType   = ASSOC_ASSOCIATION_REQ_PARAM;
+        param.paramType   = MLME_ASSOCIATION_REQ_PARAM;
 
-        assoc_getParam(pAPConnection->hAssoc, &param);
+        mlme_getParam(pAPConnection->hMlme, &param);
         reportStatus.dataBuf = (char *)(param.content.assocReqBuffer.buffer);
         reportStatus.dataBufLength = param.content.assocReqBuffer.bufferSize;
 
@@ -2299,7 +2315,6 @@ static void apConn_smHandleTspecReneg (void *pData)
         {
             /* TSPEC is already configured, move to CONNECTED */
             apConn_smEvent(&(pAPConnection->currentState), AP_CONNECT_EVENT_FINISHED_OK, pAPConnection);
-            return;;
         }
         else
 #endif
@@ -2312,17 +2327,15 @@ static void apConn_smHandleTspecReneg (void *pData)
             {
                 /* Re-negotiation of TSPEC cannot be performed */
                 apConn_smEvent(&(pAPConnection->currentState), AP_CONNECT_EVENT_FINISHED_NOT_OK, pAPConnection);
-                return;
             }
-            return;
         }
     }
     else
     {
         /* No need to re-negotiate TSPEC, move to CONNECTED */
         apConn_smEvent(&(pAPConnection->currentState), AP_CONNECT_EVENT_FINISHED_OK, pAPConnection);
-        return;
     }
+	return;
 }
 
 
@@ -2424,3 +2437,35 @@ TI_STATUS apConn_getAssocRoamingTrigger(TI_HANDLE hAPConnection, apConn_roamingT
 
 	return TI_OK;
 }
+
+
+TI_STATUS apConn_NeighborAPsRequest(TI_HANDLE hAPConnection)
+{
+    apConn_t    *pAPConnection = (apConn_t *)hAPConnection;
+	paramInfo_t param;
+
+    
+    /* if STA supports the neighbor report capability */ 
+    if ((TI_TRUE == StaCap_IsRRMCapabilityEnabled(pAPConnection->hStaCap)) && (StaCap_IsCapabilitySupported(pAPConnection->hStaCap, RRM_NEIGHBOR_MEASURE_CAPABILITY))) 
+    {
+        /* Get Ap's RM Capabilities */
+        param.paramType = SITE_MGR_GET_RRM_ENABLED_CAPABILITIES;
+        siteMgr_getParam(pAPConnection->hSiteMgr, &param);
+
+        /* if AP supports the neighbor report capability */
+        if (*((TI_UINT32*)param.content.RRMEnabledCapabilities) & RRM_NEIGHBOR_MEASURE_CAPABILITY) 
+            {     
+                param.paramType = SITE_MGR_CURRENT_SSID_PARAM;
+                siteMgr_getParam(pAPConnection->hSiteMgr, &param);
+        
+                if (param.content.siteMgrCurrentSSID.len > 0) 
+                {
+                    rrmMgr_buildAndSendNeighborAPsRequest(pAPConnection->hMeasurementMgr, &(param.content.siteMgrCurrentSSID));
+                }            
+        }            
+    }
+
+        
+	return TI_OK;
+}
+

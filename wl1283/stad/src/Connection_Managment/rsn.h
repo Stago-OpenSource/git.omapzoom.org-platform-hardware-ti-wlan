@@ -56,13 +56,31 @@
 #define RSN_MAX_IDENTITY_LEN            64
 #define RSN_MAX_PASSWD_LEN              128
 
-#define RSN_MAX_NUMBER_OF_EVENTS        6
 #define RSN_MAX_NUMBER_OF_BANNED_SITES  16
 #define RSN_MIC_FAILURE_REPORT_TIMEOUT     500
 #define RSN_MIC_FAILURE_TIMEOUT         (60000 + RSN_MIC_FAILURE_REPORT_TIMEOUT)
 #define RSN_MAIN_KEYS_SESSION_TIMEOUT   RSN_AUTH_FAILURE_TIMEOUT 
 #define RSN_MIC_FAILURE_RE_KEY_TIMEOUT  3000
 
+#define RSN_WEP_KEY_TRANSMIT_MASK			0x80000000		/*< bit 31 of key index field */
+
+#define PMKID_VALUE_SIZE  16
+typedef TI_UINT8 pmkidValue_t[PMKID_VALUE_SIZE];
+#define PMKID_MAX_NUMBER 16
+typedef struct
+{
+   TMacAddr         bssId;
+   pmkidValue_t     pmkId;
+   TI_BOOL          preAuthenticate;
+} pmkidEntry_t;
+#define RSN_PMKID_CACHE_SIZE 32
+typedef struct
+{
+   TSsid               ssid;
+   TI_UINT8            entriesNumber;
+   TI_UINT8            nextFreeEntry;
+   pmkidEntry_t        pmkidTbl[RSN_PMKID_CACHE_SIZE];
+} pmkid_cache_t;
 /* Enumerations */
 typedef enum 
 {
@@ -83,6 +101,25 @@ typedef enum
 	PAIRWISE_KEY_UPDATE_TRUE
 } rsn_pairwiseKeyUpdate_e;
 
+
+typedef enum
+{
+	WPA_IE_KEY_MNG_NONE				= 0,		/**< no key management available */
+	WPA_IE_KEY_MNG_801_1X			= 1,		/**< "802.1X" key management - WPA default*/
+	WPA_IE_KEY_MNG_PSK_801_1X		= 2,		/**< "WPA PSK */
+	WPA_IE_KEY_MNG_CCKM			    = 3,		/**< WPA CCKM */
+	WPA_IE_KEY_MNG_NA			    = 4			/**< NA */
+} keyMngSuite_e;
+
+
+#define WPA2_IE_KEY_MNG_NONE             0
+#define WPA2_IE_KEY_MNG_801_1X           1
+#define WPA2_IE_KEY_MNG_PSK_801_1X       2
+#define WPA2_IE_KEY_MNG_CCKM			 3
+#define WPA2_IE_KEY_MNG_NA               4
+
+#define MAX_WPA_UNICAST_SUITES        (TWD_CIPHER_CKIP+1)
+#define	MAX_WPA_KEY_MNG_SUITES   	(WPA_IE_KEY_MNG_CCKM+1)
 
 /* Typedefs */
 typedef struct _rsn_t   rsn_t;
@@ -122,35 +159,39 @@ typedef struct
     TMacAddr                siteBssid;
 } rsn_siteBanEntry_t;
 
+/* WPA capabilities structure */
+typedef struct
+{
+    ECipherSuite 		broadcastSuite;
+    TI_UINT16 			unicastSuiteCnt;
+	ECipherSuite		unicastSuite[MAX_WPA_UNICAST_SUITES];
+	TI_UINT16 			KeyMngSuiteCnt;
+	ERsnKeyMngSuite	    KeyMngSuite[MAX_WPA_KEY_MNG_SUITES];
+    TI_UINT8			bcastForUnicatst;
+	TI_UINT8			replayCounters;
+    TI_BOOL             XCCKp;
+    TI_BOOL             XCCMic;
+
+} wpaIeData_t;
+
+
 struct _rsn_t
 {
-    rsn_eventStruct_t      events[RSN_MAX_NUMBER_OF_EVENTS];
-    TRsnPaeConfig          paeConfig;
-    TI_BOOL                PrivacyOptionImplemented;
-    
-    TSecurityKeys          keys[MAX_KEYS_NUM];
-    TI_BOOL                keys_en [MAX_KEYS_NUM];
-    TI_UINT8               defaultKeyId;
-    TI_BOOL                defaultKeysOn;
-    TI_BOOL                wepDefaultKeys[MAX_KEYS_NUM];
-    TI_BOOL                wepStaticKey;
     rsn_groupKeyUpdate_e   eGroupKeyUpdate;
     rsn_pairwiseKeyUpdate_e	ePairwiseKeyUpdate;
-    OS_802_11_EAP_TYPES    eapType;
-
-	rsnGenericIE_t         genericIE;
-    rsn_siteBanEntry_t     bannedSites[RSN_MAX_NUMBER_OF_BANNED_SITES];
-    TI_UINT8               numOfBannedSites;
-
     TI_HANDLE              hMicFailureReportWaitTimer;
 	TI_HANDLE			   hMicFailureGroupReKeyTimer;
 	TI_HANDLE              hMicFailurePairwiseReKeyTimer;
     TI_BOOL                bPairwiseMicFailureFilter;
 
-    struct _admCtrl_t      *pAdmCtrl;
-    struct _mainSec_t      *pMainSecSm;
+    rsn_siteBanEntry_t     bannedSites[RSN_MAX_NUMBER_OF_BANNED_SITES];
+    TI_UINT8               numOfBannedSites;
 
-    struct _keyParser_t    *pKeyParser;
+
+
+
+
+	rsnGenericIE_t         genericIE;
 
     TI_HANDLE              hTxCtrl;
     TI_HANDLE              hRx;
@@ -169,18 +210,27 @@ struct _rsn_t
     TI_HANDLE              hTimer;
     TI_HANDLE              hCurrBss;
     
-    rsn_setPaeConfig_t     setPaeConfig;
-    rsn_getNetworkMode_t   getNetworkMode;
-    rsn_setKey_t           setKey;
-    rsn_removeKey_t        removeKey;
-    rsn_setDefaultKeyId_t  setDefaultKeyId;
-    rsn_reportStatus_t     reportStatus;
-    rsn_setPortStatus_t    setPortStatus;
-    rsn_getPortStatus_t    getPortStatus;
+#ifdef XCC_MODULE_INCLUDED
+    OS_XCC_NETWORK_EAP      networkEapMode;
+    TI_BOOL                 XCCSupport;
+    TI_BOOL                 proxyArpEnabled;
+    TI_BOOL                 setSiteFirst;
+    TI_BOOL                 encrInSw;
+    TI_UINT8                aironetIeReserved[8];
+    TI_UINT8                AP_IP_Address[4];
+#endif
 
-    TI_UINT32              rsnStartedTs;
-    TI_UINT32              rsnCompletedTs;
-    TI_BOOL                bRsnExternalMode;
+    TI_BOOL				   bPortStatus;
+    TI_BOOL                bMixedMode;
+    ECipherSuite           unicastSuite;
+    ECipherSuite           broadcastSuite;
+    EExternalAuthMode      externalAuthMode;
+    TI_BOOL                 preAuthSupport;
+    TI_UINT32               preAuthTimeout;
+    TI_UINT8                MaxNumOfPMKIDs;
+    pmkid_cache_t           pmkid_cache;
+    TI_UINT8                numberOfPreAuthCandidates;
+    void                    *hPreAuthTimerWpa2;
 };
 
 /* Structures */
@@ -211,7 +261,10 @@ TI_STATUS rsn_setPortStatus(TI_HANDLE hRsn, TI_BOOL state);
 
 TI_STATUS rsn_getGenInfoElement(rsn_t *pRsn, TI_UINT8 *out_buff, TI_UINT32 *out_buf_length);
 
-void rsn_clearGenInfoElement(rsn_t *pRsn);
+TI_STATUS rsn_parseIe(rsn_t *pRsn, TRsnData *pRsnData, TI_UINT8 **pIe, TI_UINT8 IeId);
+#ifdef XCC_MODULE_INCLUDED
+void rsn_XCCSetSite(rsn_t *pRsn, TRsnData *pRsnData, TI_UINT8 *pAssocIe);
+#endif
 
 #endif
 

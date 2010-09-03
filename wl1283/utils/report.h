@@ -57,13 +57,12 @@
  * #define PRINTF_ROLLBACK
  */
 
-
 #include "osApi.h"
 #include "commonTypes.h"
     
 #define MAX_STRING_LEN         32 
-#ifdef TNETW1283
-//#define PRINTF_ROLLBACK
+#ifdef REPORT_LOG
+#define PRINTF_ROLLBACK
 #endif
 
 /*******************************/
@@ -136,7 +135,7 @@ typedef enum
 	FILE_ID_61	   ,    /*   txMgmtQueue              */
 	FILE_ID_62	   ,    /*   txPort                   */
 	FILE_ID_63	   ,    /*   assocSM                  */
-	FILE_ID_64	   ,    /*   authSm                   */
+	FILE_ID_64	   ,    /*   mlme                     */
 	FILE_ID_65	   ,    /*   currBss                  */
 	FILE_ID_66	   ,    /*   healthMonitor            */
 	FILE_ID_67	   ,    /*   mlmeBuilder              */
@@ -211,6 +210,8 @@ typedef enum
     FILE_ID_136	   ,    /*   roamingMngr_manualSM     */
 	FILE_ID_137	   ,    /*   cmdinterpretoid          */
     FILE_ID_138	   ,    /*   wlandrvif                */
+    FILE_ID_139	   ,    /*   rrmMgr                   */
+    
 	REPORT_FILES_NUM	/*   Number of files with trace reports   */
 
 } EReportFiles;

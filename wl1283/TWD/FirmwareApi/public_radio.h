@@ -58,7 +58,7 @@
 
 #include "public_types.h"
 #define MAC_ADDR_SIZE 6
-/* typedef uint8 TMacAddr[MAC_ADDR_SIZE]; */
+/*typedef uint8 TMacAddr[MAC_ADDR_SIZE];*/
 /*defined in tiDefs.h*/
 /************************************************************************/
 /*																		*/	
@@ -135,6 +135,9 @@ typedef enum RADIO_BAND_TYPE_ENMT
 #define GIGA_HZ_TO_MEGA_HZ									1000
 
 
+#ifdef TNETW1283
+#define NUM_OF_GAIN_STEPS_VGA_LNA			(42)
+#endif
 
 /* Radio sub-band types. */
 typedef enum RADIO_SUB_BAND_TYPE_ENMT
@@ -160,6 +163,7 @@ typedef enum RADIO_SUB_BAND_TYPE_ENMT
 }RADIO_SUB_BAND_TYPE_ENM;
 
 #define NUMBER_OF_SUB_BANDS_IN_5G_BAND_E	(LAST_SUB_BANDS_IN_5G_BAND_E - FIRST_SUB_BANDS_IN_5G_BAND_E + 1)	
+
 
 typedef struct
 {
@@ -437,9 +441,22 @@ typedef enum RADIO_CHANNEL_INDEX_ENMT
 
 #define NUMBER_OF_2_4_G_CHANNELS    	(NUMBER_OF_2_4_G_CHANNEL_INDICES_E + 1)
 #define NUMBER_OF_5G_CHANNELS       	(NUMBER_OF_RADIO_CHANNEL_INDEXS_E - NUMBER_OF_2_4_G_CHANNELS)
+#ifdef TNETW1273
 #define HALF_NUMBER_OF_2_4_G_CHANNELS 	(NUMBER_OF_2_4_G_CHANNELS / 2)
 #define HALF_NUMBER_OF_5G_CHANNELS  	((NUMBER_OF_5G_CHANNELS + 1) / 2)
-
+#endif
+#ifdef TNETW1283
+#define NUMBER_OF_2_4G_TX_TRACE_LOSS_CELLS		NUMBER_OF_2_4_G_CHANNELS	
+#define NUMBER_OF_2_4G_TX_IBIAS_RATE_GROUPS_E	(NUMBER_OF_RATE_GROUPS_E + 1) /* addional cell for channel 14 */
+#define NUMBER_OF_5G_TX_TRACE_LOSS_CELLS		NUMBER_OF_5G_CHANNELS	
+#define PD_VS_TEMPERATURE_RANGES				2 /* low and high temperatures*/
+#else
+#define NUMBER_OF_2_4G_TX_TRACE_LOSS_CELLS		1	/* sub-band */
+#define NUMBER_OF_2_4G_TX_IBIAS_RATE_GROUPS_E	NUMBER_OF_RATE_GROUPS_E
+#define NUMBER_OF_5G_TX_TRACE_LOSS_CELLS		NUMBER_OF_SUB_BANDS_IN_5G_BAND_E
+#endif
+#define HALF_NUMBER_OF_2_4_G_CHANNELS 	(NUMBER_OF_2_4_G_CHANNELS / 2)
+#define HALF_NUMBER_OF_5G_CHANNELS  	((NUMBER_OF_5G_CHANNELS + 1) / 2)
 
 typedef enum RADIO_RATE_GROUPS_ENMT
 {		
@@ -525,6 +542,10 @@ typedef enum CALIBRATION_COMMANDS_ENMT
 	CM_SMART_REFLEX_calibration_e,
 	CM_CHANNEL_RESPONSE_calibration_e,				/* 33 */
 	CM_DCO_ITRIM_calibration_e
+#ifdef TNETW1283
+	,
+    CM_RX_digital_DC_Correction_calibration_e		/* 35 */
+#endif
     
 }CALIBRATION_COMMANDS_ENM;
 
@@ -534,9 +555,15 @@ typedef enum CALIBRATIONS_ENMT
 	FIRST_CALIBRATION_TYPE_E,
 /*----------------------------------------------------------*/
 	/**** GENERAL ****/
+#ifdef TNETW1273
 	DRPW_RFCALIBFXN_RXTXLPF_TYPE_E = FIRST_CALIBRATION_TYPE_E,
 	DRPW_TUNE_TYPE_E,	/* TUNE will perform DCO_freq, AB/TB, KDCO, TDC_inverter */
 	DRPW_RFCALIBFXN_RTRIM_TYPE_E,
+#else
+	DRPW_RFCALIBFXN_RTRIM_TYPE_E = FIRST_CALIBRATION_TYPE_E,
+	DRPW_RFCALIBFXN_RXTXLPF_TYPE_E,
+	DRPW_TUNE_TYPE_E,	/* TUNE will perform DCO_freq, AB/TB, KDCO, TDC_inverter */
+#endif
 	/**** TX ****/
 	CM_TX_LO_LEAKAGE_CALIBRATION_TYPE_E,
 	DRPW_RFCALIBFXN_TXMIXERFREQ_TYPE_E,
@@ -550,6 +577,9 @@ typedef enum CALIBRATIONS_ENMT
 	RX_ANALOG_DC_CORRECTION_CALIBRATION_TYPE_E,
 	CM_RX_IQ_MM_CORRECTION_CALIBRATION_TYPE_E,
     SMART_REFLEX_CALIBRATION_TYPE_E,
+#ifdef TNETW1283
+	RX_DIGITAL_DC_CORRECTION_CALIBRATION_TYPE_E,
+#endif
 	/* ... */
 /*----------------------------------------------------------*/
 	NUMBER_OF_CALIBRATIONS_E,
@@ -717,7 +747,7 @@ typedef enum
 /*	0x23	*/	TEST_CMD_SMART_REFLEX,
 /*	0x24	*/	TEST_CMD_CHANNEL_RESPONSE,
 /*	0x25	*/	TEST_CMD_DCO_ITRIM_FEATURE,
-#ifndef TNETW1283
+#ifdef TNETW1273
 /*	0x26	*/	TEST_CMD_INI_FILE_RF_EXTENDED_PARAM,
 #endif
 
@@ -1409,7 +1439,9 @@ typedef enum
 
 
 #ifdef TNETW1283
-#define MAX_GENERAL_SETTINGS_PARAM  4
+#define MAX_SETTINGS_PARAM						4
+#else
+#define MAX_SETTINGS_PARAM						1
 #endif
 
 typedef struct 
@@ -1422,7 +1454,8 @@ typedef struct
 	uint8	TcxoSettlingTime;                                                                 
 	uint8	TcxoValidOnWakeup; 
 	uint8	TcxoLdoVoltage; 
-	uint8	pad1; 
+	uint8 	XTALItrimVal;
+	uint8 	Platform_configuration;
 #else
 	uint8	DC2DCMode;                               
 #endif
@@ -1430,12 +1463,7 @@ typedef struct
 	uint8	TXBiPFEMAutoDetect;
 	uint8	TXBiPFEMManufacturer;  
 /*	GeneralSettingsByte	Settings; */
-#ifdef TNETW1283
-    uint8   GeneralSettings[MAX_GENERAL_SETTINGS_PARAM];
-    uint8   pad2;
-#else
-    uint8   GeneralSettings;
-#endif
+    uint8   GeneralSettings[MAX_SETTINGS_PARAM];
 
     /* smart reflex state*/
     uint8 SRState; 
@@ -1472,11 +1500,21 @@ typedef enum
 
 typedef enum 
 {		
-	eREF_CLK_19_2_E,
-	eREF_CLK_26_E,
-	eREF_CLK_38_4_E,
-	eREF_CLK_52_E,
-	eREF_CLK_XTAL
+// old version	eREF_CLK_19_2_E,
+// old version	eREF_CLK_26_E,
+// old version	eREF_CLK_38_4_E,
+// old version	eREF_CLK_52_E,
+// old version	eREF_CLK_XTAL
+CLOCK_CONFIG_19_2_M,      /* 0 */
+	CLOCK_CONFIG_26_M,        /* 1 */
+	CLOCK_CONFIG_38_4_M,      /* 2 */
+	CLOCK_CONFIG_52_M,        /* 3 */
+	CLOCK_CONFIG_38_4_M_XTAL, /* 4 */
+	CLOCK_CONFIG_16_368_M = CLOCK_CONFIG_38_4_M_XTAL, /* 4 */
+  CLOCK_CONFIG_26_M_XTAL,   /* 5 */
+  CLOCK_CONFIG_32_736_M = CLOCK_CONFIG_26_M_XTAL,   /* 5 */
+  CLOCK_CONFIG_16_8_M,      /* 6 */
+  CLOCK_CONFIG_33_6_M       /* 7 */
 
 }REF_CLK_ENM;
 
@@ -1521,19 +1559,24 @@ typedef enum
 typedef struct 
 {
 	/* SECTION 1: 2.4G parameters */
-	uint8 RxTraceInsertionLoss_2_4G;																							
-	uint8 TXTraceLoss_2_4G;																							
+	uint8 RxTraceInsertionLoss_2_4G;
+
+	uint8 TXTraceLoss_2_4G[NUMBER_OF_2_4G_TX_TRACE_LOSS_CELLS];	
+
 	int8  RxRssiAndProcessCompensation_2_4G[RSSI_AND_PROCESS_COMPENSATION_TABLE_SIZE];						
 	
 	/* SECTION 2: 5G parameters */										 
 	uint8 RxTraceInsertionLoss_5G[NUMBER_OF_SUB_BANDS_IN_5G_BAND_E];																
-	uint8 TXTraceLoss_5G[NUMBER_OF_SUB_BANDS_IN_5G_BAND_E];																
+	uint8 TXTraceLoss_5G[NUMBER_OF_5G_TX_TRACE_LOSS_CELLS];																
 	int8  RxRssiAndProcessCompensation_5G[RSSI_AND_PROCESS_COMPENSATION_TABLE_SIZE];									
 
+#ifdef TNETW1283
+	uint8 FemVendorAndOptions;
+#endif
 }TStatRadioParams;  
 
 typedef struct 
-{  
+{
 	/* SECTION 1: 2.4G parameters */
 	uint16  TXBiPReferencePDvoltage_2_4G;								
 	uint8   TxBiPReferencePower_2_4G;		
@@ -1544,10 +1587,20 @@ typedef struct
 	int8  	TxPerChannelPowerLimits_2_4G_11b[NUMBER_OF_2_4_G_CHANNELS];	
 	int8    TxPerChannelPowerLimits_2_4G_OFDM[NUMBER_OF_2_4_G_CHANNELS];	
 	int8    TxPDVsRateOffsets_2_4G[NUMBER_OF_RATE_GROUPS_E];												
-	uint8   TxIbiasTable_2_4G[NUMBER_OF_RATE_GROUPS_E];														
+	uint8 TxIbiasTable_2_4G[NUMBER_OF_2_4G_TX_IBIAS_RATE_GROUPS_E];														
+#ifdef TNETW1283
+    /*
+     * “FEMX_TxPDVsChannelOffsets_2_4G”  - 14 byte values
+		“FEMX_TxPDVsTemperature_2_4G” – 2 values
+     *
+     * */
+	int8  TxPDVsChannelOffsets_2_4G[NUMBER_OF_2_4_G_CHANNELS];
+	int8  TxPDVsTemperature_2_4G[PD_VS_TEMPERATURE_RANGES]; //low and high
+#endif
 	uint8   RxFemInsertionLoss_2_4G;
-        uint8 	DegradedLowToNormalThr_2_4G;
-        uint8 	NormalToDegradedHighThr_2_4G;
+    uint8 	DegradedLowToNormalThr_2_4G;
+    uint8 	NormalToDegradedHighThr_2_4G;
+
 
 	/* SECTION 2: 5G parameters */
 	uint16 	TXBiPReferencePDvoltage_5G[NUMBER_OF_SUB_BANDS_IN_5G_BAND_E];
@@ -1555,21 +1608,30 @@ typedef struct
 	int8   	TxBiPOffsetdB_5G[NUMBER_OF_SUB_BANDS_IN_5G_BAND_E];								
 	int8   	TxPerRatePowerLimits_5G_Normal[NUMBER_OF_RATE_GROUPS_E];							
 	int8   	TxPerRatePowerLimits_5G_Degraded[NUMBER_OF_RATE_GROUPS_E];
-        int8   	TxPerRatePowerLimits_5G_Extreme[NUMBER_OF_RATE_GROUPS_E];
+    int8   	TxPerRatePowerLimits_5G_Extreme[NUMBER_OF_RATE_GROUPS_E];
 	int8   	TxPerChannelPowerLimits_5G_OFDM[NUMBER_OF_5G_CHANNELS];                         
 	int8   	TxPDVsRateOffsets_5G[NUMBER_OF_RATE_GROUPS_E];										
 	int8   	TxIbiasTable_5G[NUMBER_OF_RATE_GROUPS_E];											
 	uint8  	RxFemInsertionLoss_5G[NUMBER_OF_SUB_BANDS_IN_5G_BAND_E];	
-        uint8  	DegradedLowToNormalThr_5G;			
-        uint8   NormalToDegradedHighThr_5G;
- 
+#ifdef TNETW1283
+    /*
+		“FEMX_TxPDVsChannelOffsets_5G”  - 35 byte values. Missing on INI generator. Daniel
+		“FEMX_TxPDVsTemperature_5G” – 14 values. Missing on INI generator.
+    */
+	int8  TxPDVsChannelOffsets_5G[NUMBER_OF_5G_CHANNELS];
+	int8  TxPDVsTemperature_5G[NUMBER_OF_SUB_BANDS_IN_5G_BAND_E * PD_VS_TEMPERATURE_RANGES]; // reference in osRgstry.c, low and high for each sub band
+#endif
+    uint8 DegradedLowToNormalThr_5G;
+    uint8 NormalToDegradedHighThr_5G;
 }TDynRadioParams;  
 
 typedef struct 
 {
 	TStatRadioParams	tStatRadioParams;
 	TDynRadioParams		tDynRadioParams;
+#ifdef TNETW1273
 	uint8               Padding[2];
+#endif
 }IniFileRadioParam;
 
 #ifndef TNETW1283
@@ -1607,6 +1669,16 @@ typedef struct HDKModuleVersion_t
 
 #define FW_VERSION_LENGTH 5
 
+#ifdef TNETW1273
+typedef struct 
+{	
+	THDKModuleVersion	hdkVersion;
+	uint16				FWVersion[FW_VERSION_LENGTH];		
+    uint32               drpwVersion;
+	int16				oRadioStatus;
+	uint8				padding[2];		
+}TFWVerisons;
+#else
 typedef struct 
 {	
 	THDKModuleVersion	hdkVersion;
@@ -1615,6 +1687,7 @@ typedef struct
 	int16				oRadioStatus;
 	uint8				padding[3];		
 }TFWVerisons;
+#endif
 
 typedef struct
 {
@@ -1646,7 +1719,7 @@ typedef struct
 		TFWVerisons						fwVersions;
 		TTestCmdRunCalibration			RunCalibration;
         IniFileRadioParam				IniFileRadioParams;
-#ifndef TNETW1283
+#ifdef TNETW1273
 		IniFileExtendedRadioParam		IniFileExtendedRadioParams;
 #endif
 		IniFileGeneralParam				IniFileGeneralParams;

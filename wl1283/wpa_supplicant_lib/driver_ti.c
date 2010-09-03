@@ -1,25 +1,19 @@
-/* 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
+/*
+ * driver_ti.c
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * Copyright 2001-2010 Texas Instruments, Inc. - http://www.ti.com/
  *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "includes.h"
@@ -326,7 +320,7 @@ Return Value: pointer to BSSID
 const u8 *wpa_driver_tista_get_mac_addr( void *priv )
 {
 	struct wpa_driver_ti_data *drv = (struct wpa_driver_ti_data *)priv;
-	u8 mac[ETH_ALEN];
+	u8 mac[ETH_ALEN] = {0};
 
 	TI_CHECK_DRIVER( drv->driver_is_loaded, NULL );
 	if(0 != wpa_driver_tista_private_send(priv, CTRL_DATA_MAC_ADDRESS, NULL, 0,
@@ -351,6 +345,7 @@ static int wpa_driver_tista_get_rssi(void *priv, int *rssi_data, int *rssi_beaco
 	struct wpa_driver_ti_data *drv = (struct wpa_driver_ti_data *)priv;
 	TCuCommon_RoamingStatisticsTable buffer;
 
+	os_memset(&buffer, 0, sizeof(TCuCommon_RoamingStatisticsTable));
 	*rssi_data = 0;
 	*rssi_beacon = 0;
 	if (wpa_driver_tista_get_bssid(priv, bssid) == 0 &&
@@ -444,7 +439,7 @@ static int wpa_driver_tista_enable_bt_coe(void *priv, u32 mode)
 static int wpa_driver_tista_get_bt_coe_status(void *priv, u32 *mode)
 {
 	struct wpa_driver_ti_data *drv = (struct wpa_driver_ti_data *)priv;
-	u32 mode_get;
+	u32 mode_get = 0;
 
 	if(0 != wpa_driver_tista_private_send(priv, SOFT_GEMINI_GET_CONFIG, NULL, 0,
 		&mode_get, sizeof(u32)))
@@ -736,6 +731,7 @@ static int wpa_driver_tista_driver_cmd( void *priv, char *cmd, char *buf, size_t
 		u32 mode;
 		TPowerMgr_PowerMode tMode;
 
+		os_memset(&tMode, 0, sizeof(TPowerMgr_PowerMode));
 		ret = wpa_driver_tista_config_power_management( priv, &tMode, 0 );
 		if( ret == 0 ) {
 			ret = sprintf(buf, "powermode = %u\n", tMode.PowerMode);
@@ -774,6 +770,7 @@ static int wpa_driver_tista_driver_cmd( void *priv, char *cmd, char *buf, size_t
 		TCuCommon_RxDataFilteringStatistics stats;
 		int len, i;
 
+		os_memset(&stats, 0, sizeof(TCuCommon_RxDataFilteringStatistics));
 		wpa_printf(MSG_DEBUG,"Rx Data Filter Statistics command");
 		ret = wpa_driver_tista_driver_rx_data_filter_statistics( priv, &stats );
 		if( ret == 0 ) {
@@ -1386,12 +1383,13 @@ static int wpa_driver_tista_set_operstate(void *priv, int state)
 		   __func__, /*drv->operstate,*/ state, state ? "UP" : "DORMANT");
         TI_CHECK_DRIVER( drv->driver_is_loaded, -1 );		   
 	/* Dm: drv->operstate = state; */
+    wpa_driver_tista_private_send(priv, RSN_PORT_STATUS_PARAM, &state, sizeof(state), NULL, 0);
 	return wpa_driver_wext_set_operstate(drv->wext, state);
 }
 
 const struct wpa_driver_ops wpa_driver_custom_ops = {
 	.name = TIWLAN_DRV_NAME,
-	.desc = "TI Station Driver (1271)",
+	.desc = "TI Station Driver (1283)",
 	.get_bssid = wpa_driver_tista_get_bssid,
 	.get_ssid = wpa_driver_tista_get_ssid,
 	.set_wpa = wpa_driver_tista_set_wpa,

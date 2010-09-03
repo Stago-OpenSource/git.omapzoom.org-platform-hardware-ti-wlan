@@ -212,6 +212,7 @@ typedef enum
 #define TUs_TO_MSECs(x)     (((x) << 10) / 1000)
 
 #define TIME_STAMP_LEN  8
+#define BEACON_PROBRESP_FIXED_LENGTH_FIELDS  12
 
 /* SequenceControl field of the 802.11 header */
 /**/
@@ -346,7 +347,10 @@ NOTE: We only support packets coming from within the DS (i.e. From DS = 0)
 #define MAX_MGMT_BODY_LENGTH                2312
 /* maximal length of beacon body - note that actual beacons may actually be longer
    than this size, at least according to the spec, but so far no larger beacon was seen */
-#define MAX_BEACON_BODY_LENGTH              350
+#define MAX_BEACON_BODY_LENGTH              700
+
+#define ASSOC_RESP_FIXED_DATA_LEN           6
+#define ASSOC_RESP_AID_MASK                 0x3FFF  /* The AID is only in 14 LS bits. */
 
 /* general mgmt frame structure */
 typedef struct
@@ -391,7 +395,7 @@ typedef enum
   DOT11_CAPS_SHORT_SLOT_TIME = (1  << 10),
 
   DOT11_CAPS_APSD_SUPPORT    = ( 1 << 11),
-
+  DOT11_CAPS_RRM_ENABLED     = ( 1 << 12),
   DOT11_CAPS_DELAYED_BA      = ( 1 << 14),
   DOT11_CAPS_IMMEDIATE_BA    = ( 1 << 15)
 
@@ -919,6 +923,9 @@ typedef enum
 #define DELTS_ACTION                            0x02
 
 #define ADDTS_STATUS_CODE_SUCCESS               0x00
+#define ADDTS_STATUS_CODE_INVALID_PARAMS        0x01
+#define ADDTS_STATUS_CODE_REFUSED               0x03
+
 #define DELTS_CODE_SUCCESS                      0x00
  
 
@@ -1001,6 +1008,7 @@ typedef enum
     QOS_CAPABILITY_IE_ID                = 46,
     RSN_IE_ID                           = 48,
     EXT_SUPPORTED_RATES_IE_ID           = 50,
+	MOBILITY_DOMAIN_IE_ID               = 54,
     HT_INFORMATION_IE_ID                = 61,
     XCC_EXT_1_IE_ID                     = 133,
     XCC_EXT_2_IE_ID                     = 149,  
@@ -1019,14 +1027,38 @@ typedef enum
     CHANNEL_SWITCH_ANNOUNCEMENT     = 4
 } dot11ActionFrameTypes_e;
 
+
+typedef enum
+{
+    RRM_MEASUREMENT_REQUEST = 0,
+    RRM_MEASUREMENT_REPORT, 
+    LINK_MEASUREMENT_REQUEST,
+    LINK_MEASUREMENT_REPORT,
+    NEIGHBOR_MEASUREMENT_REQUEST,
+    NEIGHBOR_MEASUREMENT_REPORT
+} rrmActionFrameTypes_e;
+
+
+
 /* Category fields (such as apectrum management)*/
 typedef enum
 {
     CATAGORY_SPECTRUM_MANAGEMENT        = 0,
     CATAGORY_QOS                        = 1,
+    CATEGORY_RRM                        = 5, /* Radio Resource Measurements */
     WME_CATAGORY_QOS                    = 17,
     CATAGORY_SPECTRUM_MANAGEMENT_ERROR  = 128
 } dot11CategoryTypes_e;
+
+typedef struct 
+{
+    dot11_eleHdr_t  hdr;
+    TI_UINT8        OUI[3];
+    TI_UINT8        OUIType;
+    TI_UINT8        OUISubType;
+    TI_UINT8        transmitPower;
+    TI_UINT8        linkMargin;
+}  dot11_TPC_REPORT_VS_IE_t;
 
 
 /* 
@@ -1053,10 +1085,13 @@ typedef enum
     {
         dot11_mgmtHeader_t  hdr;
         char                infoElements[sizeof( dot11_SSID_t ) + 
+                                         
                                          sizeof( dot11_RATES_t ) +
                                          sizeof( dot11_RATES_t ) +
                                          sizeof( Tdot11HtCapabilitiesUnparse ) +
-                                         DOT11_WSC_PROBE_REQ_MAX_LENGTH
+                                         DOT11_WSC_PROBE_REQ_MAX_LENGTH +
+                                         sizeof( dot11_DS_PARAMS_t) +
+                                         sizeof( dot11_TPC_REPORT_VS_IE_t)
                                         ];
     } probeReqTemplate_t;
 
@@ -1102,6 +1137,9 @@ typedef struct
     TMacAddr  TargMac;
     TIpAddr   TargIp;
 } ArpRspTemplate_t; /* for auto ArpRsp sending by FW */
+
+
+
 
 typedef struct
 {
@@ -1159,6 +1197,70 @@ typedef struct
     dot11_TS_METRICS_IE_t       *tsMetrixParameter;
 } XCCv4IEs_t;
 
+
+#define MAX_NEIGHBOR_REPORT_SUB_ELEMENTS (50)
+#define NEIGHBOR_REPORT_ELE_ID           (52)
+#define RRM_ENABLED_CAPABILITIES_ELE_ID  (70)
+#define RRM_ENABLED_CAPABILITIES_ELE_LEN  5
+
+
+typedef struct 
+{
+    dot11_eleHdr_t  hdr;
+    TI_UINT8        capabilities[5];
+}  dot11_RM_ENABLED_CAPABILITIES_IE_t;
+
+
+typedef struct 
+{
+    dot11_eleHdr_t  hdr;
+    TMacAddr        bssid;
+    TI_UINT8        bssidInfo[4];
+    TI_UINT8        regulatoryClass;
+    TI_UINT8        channelNumber;
+    TI_UINT8        phyType;
+}  dot11_NEIGHBOR_REPORT_IE_t;
+
+
+
+/* Wi-Fi TPC Report Element  Information Element */
+#define DOT11_TPC_REPORT_VS_ELE_ID              (221)
+#define DOT11_TPC_REPORT_VS_ELE_LEN             (7)
+#define DOT11_TPC_REPORT_VS_ELE_OUI             {0x00, 0x50, 0xf2}
+#define DOT11_TPC_REPORT_VS_ELE_OUI_TYPE        (0x08)
+#define DOT11_TPC_REPORT_VS_ELE_OUI_SUB_TYPE    (0x00)                       
+
+#define DOT11_OUI_TYPE_LEN                      (3)
+
+
+
+typedef struct
+{
+    TI_UINT8        category;
+    TI_UINT8        action;
+    TI_UINT8        dialogToken;
+}  RadioMeasurementHdr_t;
+
+
+typedef struct
+{
+    RadioMeasurementHdr_t measHdr;
+    dot11_SSID_t          ssid;
+}  NeighborMeasurementRequest_t;
+
+
+/* 802.11k action frame Link measurement report template  - FW shall respond 
+with this frame upon receiving link measu request */
+typedef struct 
+{
+    dot11_mgmtHeader_t    hdr;
+    RadioMeasurementHdr_t hdrRRM;
+    dot11_TPC_REPORT_t    TPCIE;
+    TI_UINT8              recvAntennaID;
+    TI_UINT8              transmitAntennaID;
+    TI_UINT8              RCPI;
+    TI_UINT8              RSNI;
+} LinkMeasurementReportTemplate_t; /* for auto ArpRsp sending by FW */
 
 /* Measurement Report message frame structure */
 #define DOT11_MEASUREMENT_REPORT_ELE_ID     (39)

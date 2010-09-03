@@ -61,7 +61,8 @@ static void txDataQ_UpdateQueuesBusyState (TTxDataQ *pTxDataQ, TI_UINT32 uTidBit
 static void txDataQ_TxSendPaceTimeout (TI_HANDLE hTxDataQ, TI_BOOL bTwdInitOccured);
 extern void wlanDrvIf_StopTx (TI_HANDLE hOs);
 extern void wlanDrvIf_ResumeTx (TI_HANDLE hOs);
-
+static void runSchedulerOnPriorityList(TTxDataQ   *pTxDataQ, TI_UINT32 uSchList, TI_UINT32 numQueue);
+static inline TI_UINT32 convertTidMap(TI_UINT32 tidBitMap);
 
 
 /***************************************************************************
@@ -129,7 +130,8 @@ void txDataQ_Init (TStadHandlesList *pStadHandles)
 	pTxDataQ->bDataPortEnable = TI_FALSE;
 
 	/* Configures the LastQueId to zero => scheduler will strart from Queue 1*/
-	pTxDataQ->uLastQueId = 0;
+	pTxDataQ->uLastQueId[HIGH_PRIORITY_QUEUE_LIST] = 0;
+    pTxDataQ->uLastQueId[LOW_PRIORITY_QUEUE_LIST] = 0;
 	
 	/* init the number of the Data queue to be used */
 	pTxDataQ->uNumQueues = MAX_NUM_OF_AC;
@@ -158,11 +160,11 @@ void txDataQ_Init (TStadHandlesList *pStadHandles)
 		}
 
 		/* Configure the Queues default values */
-		pTxDataQ->aQueueBusy[uQueId] = TI_FALSE;   
         pTxDataQ->aNetStackQueueStopped[uQueId] = TI_FALSE;  
         pTxDataQ->aTxSendPaceThresh[uQueId] = 1;
     }
-
+    pTxDataQ->uQueueBusyBitMap = 0;
+    pTxDataQ->uQueuePriorityBitMap = 0;
     pTxDataQ->hTxSendPaceTimer = tmr_CreateTimer (pStadHandles->hTimer);
 	if (pTxDataQ->hTxSendPaceTimer == NULL)
 	{
@@ -238,9 +240,7 @@ TI_STATUS txDataQ_Destroy (TI_HANDLE hTxDataQ)
     TI_STATUS  status = TI_OK;
     TI_UINT32  uQueId;
 
-    /* Dequeue and free all queued packets */
-    txDataQ_ClearQueues (hTxDataQ);
-
+    
     /* Free Data queues */
     for (uQueId = 0 ; uQueId < pTxDataQ->uNumQueues ; uQueId++)
     {
@@ -284,17 +284,14 @@ void txDataQ_ClearQueues (TI_HANDLE hTxDataQ)
     /* Dequeue and free all queued packets */
     for (uQueId = 0 ; uQueId < pTxDataQ->uNumQueues ; uQueId++)
     {
-        while (1)
-        {
+        do {
             context_EnterCriticalSection (pTxDataQ->hContext);
             pPktCtrlBlk = (TTxCtrlBlk *) que_Dequeue (pTxDataQ->aQueues[uQueId]);
             context_LeaveCriticalSection (pTxDataQ->hContext);
-            if (pPktCtrlBlk == NULL) 
-            {
-                break;
-            }
+            if (pPktCtrlBlk != NULL) {
             txCtrl_FreePacket (pTxDataQ->hTxCtrl, pPktCtrlBlk, TI_NOK);
         }
+        } while (pPktCtrlBlk != NULL);
     }
 }
 
@@ -361,7 +358,7 @@ TI_STATUS txDataQ_InsertPacket (TI_HANDLE hTxDataQ, TTxCtrlBlk *pPktCtrlBlk, TI_
     uQueSize = que_Size (pTxDataQ->aQueues[uQueId]);
 
     /* If the current queue is not stopped */
-    if (pTxDataQ->aQueueBusy[uQueId] == TI_FALSE)
+    if (((pTxDataQ->uQueueBusyBitMap >> uQueId) & 1) == TI_FALSE)
     {
         /* If the queue has the desired number of packets, request switch to driver context for handling them */
         if (uQueSize == pTxDataQ->aTxSendPaceThresh[uQueId])
@@ -477,6 +474,26 @@ void txDataQ_UpdateBusyMap (TI_HANDLE hTxDataQ, TI_UINT32 tidBitMap)
 
 
 /** 
+ * \fn     txDataQ_UpdatePriorityMap
+ * \brief  Set queue's queue priority change indication
+ * 
+ * This function is called by the txCtrl if the queue priority
+ * map per TID is changed. This could be as a result of
+ * Tx-Complete, admission change or association. The function
+ * modifies the internal queue's priority indication (0 - high,
+ *  1 - low priority)
+ *
+ * \note   
+ * \param  hTxDataQ - The object                                          
+ * \param  uTidBitMap   - The changed TIDs priority bitmap
+ * \return void \sa     txDataQ_StopQueue
+ */ 
+void txDataQ_UpdatePriorityMap (TI_HANDLE hTxDataQ, TI_UINT32 tidBitMap)
+{
+    TTxDataQ *pTxDataQ = (TTxDataQ *)hTxDataQ;
+     pTxDataQ->uQueuePriorityBitMap = convertTidMap(tidBitMap);
+}
+/** 
  * \fn     txDataQ_StopAll
  * \brief  Disable Data-Queue module access to Tx path.
  * 
@@ -548,12 +565,13 @@ void txDataQ_PrintModuleParams (TI_HANDLE hTxDataQ)
 	WLAN_OS_REPORT(("bStopNetStackTx = %d\n",pTxDataQ->bStopNetStackTx));
 	WLAN_OS_REPORT(("bDataPortEnable = %d\n",pTxDataQ->bDataPortEnable));
 	WLAN_OS_REPORT(("uNumQueues      = %d\n",pTxDataQ->uNumQueues));
-	WLAN_OS_REPORT(("uLastQueId      = %d\n",pTxDataQ->uLastQueId));
+	WLAN_OS_REPORT(("uLastQueId      = %d, %d\n",pTxDataQ->uLastQueId[0], pTxDataQ->uLastQueId[1]));
 	WLAN_OS_REPORT(("uContextId      = %d\n",pTxDataQ->uContextId));
 
-	for (qIndex = 0; qIndex < pTxDataQ->uNumQueues; qIndex++)
+	/*for (qIndex = 0; qIndex < pTxDataQ->uNumQueues; qIndex++)*/
     {
-		WLAN_OS_REPORT(("aQueueBusy[%d]            = %d\n", qIndex, pTxDataQ->aQueueBusy[qIndex]));
+		WLAN_OS_REPORT(("uQueueBusyBitMap            = 0x%x\n", pTxDataQ->uQueueBusyBitMap));
+        WLAN_OS_REPORT(("uQueuePriority            = 0x%x\n", pTxDataQ->uQueuePriorityBitMap));
     }
 	for (qIndex = 0; qIndex < pTxDataQ->uNumQueues; qIndex++)
     {
@@ -592,6 +610,7 @@ void txDataQ_PrintModuleParams (TI_HANDLE hTxDataQ)
  */ 
 void txDataQ_PrintQueueStatistics (TI_HANDLE hTxDataQ)
 {
+#ifdef REPORT_LOG
 	TTxDataQ *pTxDataQ = (TTxDataQ *)hTxDataQ;
 	TI_UINT32      qIndex;
 
@@ -621,6 +640,7 @@ void txDataQ_PrintQueueStatistics (TI_HANDLE hTxDataQ)
         WLAN_OS_REPORT(("Que[%d]: = %d\n",qIndex, pTxDataQ->aQueueCounters[qIndex].uDroppedPacket));
 
 	WLAN_OS_REPORT(("--------------------------------------------------\n\n"));
+#endif
 }
 
 
@@ -670,79 +690,119 @@ void txDataQ_ResetQueueStatistics (TI_HANDLE hTxDataQ)
  * \return void 
  * \sa     
  */ 
+
+
 static void txDataQ_RunScheduler (TI_HANDLE hTxDataQ)
 {
-	TTxDataQ   *pTxDataQ = (TTxDataQ *)hTxDataQ;
-	TI_UINT32  uIdleIterationsCount = 0;  /* Count iterations without packet transmission (for exit criteria) */
-	TI_UINT32  uQueId = pTxDataQ->uLastQueId;  /* The last iteration queue */
-	EStatusXmit eStatus;  /* The return status of the txCtrl_xmitData function */
+    TTxDataQ   *pTxDataQ = (TTxDataQ *)hTxDataQ;
+    TI_UINT32  uNumLowPriorityQueues = 0;
+    TI_UINT32  uQueuePriorityBitMap = pTxDataQ->uQueuePriorityBitMap;
+
+    /* Find Number of Low priority queues*/
+    while(uQueuePriorityBitMap)
+    {
+        if(uQueuePriorityBitMap & 1)
+        {
+            uNumLowPriorityQueues++;
+        }
+        uQueuePriorityBitMap >>= 1;
+    }
+    /* Run scheduler over high priority queues*/
+    runSchedulerOnPriorityList(pTxDataQ, HIGH_PRIORITY_QUEUE_LIST, pTxDataQ->uNumQueues - uNumLowPriorityQueues);
+    if(uNumLowPriorityQueues)
+    {
+        /* Run scheduler over low priority queues */
+        runSchedulerOnPriorityList(pTxDataQ, LOW_PRIORITY_QUEUE_LIST, uNumLowPriorityQueues);
+    }
+    TWD_txXfer_EndOfBurst (pTxDataQ->hTWD);
+}
+
+/** 
+ * \fn     runSchedulerOnPriorityList
+ * \brief  The module's Tx scheduler on specific list
+ * 
+ * This function is the Data-Queue scheduler on specific
+ * priority list. It selects a packet to transmit from the tx
+ * queues and sends it to the TxCtrl. The queues are selected in
+ * a round-robin order. The function is called by one of:
+ *     txDataQ_RunScheduler
+ *
+ * \note   
+ * \param  hTxDataQ - The object                                          
+ * \param  uSchList - Priority List id
+ * \param  uNumQueues - number of queue in list
+ * \return void \sa
+ */ 
+static void runSchedulerOnPriorityList(TTxDataQ   *pTxDataQ, TI_UINT32 uSchList, TI_UINT32 uNumQueues)
+{
+    TI_UINT32  uIdleIterationsCount = 0;  /* Count iterations without packet transmission (for exit criteria) */
+    TI_UINT32  uQueId = pTxDataQ->uLastQueId[uSchList];  /* The last iteration queue */
+    EStatusXmit eStatus;  /* The return status of the txCtrl_xmitData function */
     TTxCtrlBlk *pPktCtrlBlk; /* Pointer to the packet to be dequeued and sent */
 
-	while(1)
-	{
-		/* If the Data port is closed or the scheduler couldn't send packets from 
-		     all queues, indicate end of current packets burst and exit */
-		if ( !pTxDataQ->bDataPortEnable  ||  (uIdleIterationsCount >= pTxDataQ->uNumQueues) )
-		{
-            TWD_txXfer_EndOfBurst (pTxDataQ->hTWD);
-			return;
-		}
 
-		/* Selecting the next queue */
-		uQueId++;
-		if (uQueId == pTxDataQ->uNumQueues)
-        {
-			uQueId = 0;
-        }
-		pTxDataQ->uLastQueId = uQueId;
-		
-		/* Increment the idle iterations counter */
-		uIdleIterationsCount++;
-
-		/* If the queue is busy (AC is full), continue to next queue. */
-		if (pTxDataQ->aQueueBusy[uQueId])
-        {
-			continue;
+    while (1) {
+        /* If the Data port is closed or the scheduler couldn't send packets from 
+             all queues, indicate end of current packets burst and exit */
+        if ( !pTxDataQ->bDataPortEnable  ||  (uIdleIterationsCount >= uNumQueues) ) {
+            /*TWD_txXfer_EndOfBurst (pTxDataQ->hTWD);*/
+            return;
         }
 
-		/* Dequeue a packet in a critical section */
+        /* Selecting the next queue */
+        uQueId++;
+        if (uQueId == pTxDataQ->uNumQueues) {
+            uQueId = 0;
+        }
+        pTxDataQ->uLastQueId[uSchList] = uQueId;
+
+        /* Increment the idle iterations counter */
+        uIdleIterationsCount++;
+
+        /* If the queue is busy (AC is full), continue to next queue. */
+        if ((pTxDataQ->uQueueBusyBitMap >> uQueId) & 1) {
+            continue;
+        }
+        /* if the queue doesn't belong to list, continue to next queue*/
+        if(((pTxDataQ->uQueuePriorityBitMap >> uQueId) & 1)!= uSchList)
+        {
+            uIdleIterationsCount--;
+            continue;
+        }
+        /* Dequeue a packet in a critical section */
         context_EnterCriticalSection (pTxDataQ->hContext);
-		pPktCtrlBlk = (TTxCtrlBlk *) que_Dequeue (pTxDataQ->aQueues[uQueId]);
+        pPktCtrlBlk = (TTxCtrlBlk *) que_Dequeue (pTxDataQ->aQueues[uQueId]);
         context_LeaveCriticalSection (pTxDataQ->hContext);
 
-		/* If the queue was empty, continue to the next queue */
-		if (pPktCtrlBlk == NULL)
-        {
-			if ((pTxDataQ->bStopNetStackTx) && pTxDataQ->aNetStackQueueStopped[uQueId])
-			{
-				pTxDataQ->aNetStackQueueStopped[uQueId] = TI_FALSE;
-				/*Resume the TX process as our date queues are empty*/
-				wlanDrvIf_ResumeTx (pTxDataQ->hOs);
-			}
+        /* If the queue was empty, continue to the next queue */
+        if (pPktCtrlBlk == NULL) {
+            if ((pTxDataQ->bStopNetStackTx) && pTxDataQ->aNetStackQueueStopped[uQueId]) {
+                pTxDataQ->aNetStackQueueStopped[uQueId] = TI_FALSE;
+                /*Resume the TX process as our date queues are empty*/
+                wlanDrvIf_ResumeTx (pTxDataQ->hOs);
+            }
 
-			continue;
+            continue;
         }
 
 #ifdef TI_DBG
-		pTxDataQ->aQueueCounters[uQueId].uDequeuePacket++;
+        pTxDataQ->aQueueCounters[uQueId].uDequeuePacket++;
 #endif /* TI_DBG */
 
-		/* Send the packet */
-		eStatus = txCtrl_XmitData (pTxDataQ->hTxCtrl, pPktCtrlBlk);
+        /* Send the packet */
+        eStatus = txCtrl_XmitData (pTxDataQ->hTxCtrl, pPktCtrlBlk);
 
-		/* 
+        /* 
          * If the return status is busy it means that the packet was not sent
          *   so we need to requeue it for future try.
          */
-		if(eStatus == STATUS_XMIT_BUSY)
-		{
+        if (eStatus == STATUS_XMIT_BUSY) {
             TI_STATUS eQueStatus;
 
             /* Requeue the packet in a critical section */
             context_EnterCriticalSection (pTxDataQ->hContext);
-			eQueStatus = que_Requeue (pTxDataQ->aQueues[uQueId], (TI_HANDLE)pPktCtrlBlk);
-            if (eQueStatus != TI_OK) 
-            {
+            eQueStatus = que_Requeue (pTxDataQ->aQueues[uQueId], (TI_HANDLE)pPktCtrlBlk);
+            if (eQueStatus != TI_OK) {
                 /* If the packet can't be queued drop it */
                 /* Note: may happen only if this thread was preempted between the   
                    dequeue and requeue and new packets were inserted into this quque */
@@ -754,25 +814,24 @@ static void txDataQ_RunScheduler (TI_HANDLE hTxDataQ)
             context_LeaveCriticalSection (pTxDataQ->hContext);
 
 #ifdef TI_DBG
-			pTxDataQ->aQueueCounters[uQueId].uRequeuePacket++;
+            pTxDataQ->aQueueCounters[uQueId].uRequeuePacket++;
 #endif /* TI_DBG */
 
-			continue;
-		}
+            continue;
+        }
 
-		/* If we reach this point, a packet was sent successfully so reset the idle iterations counter. */
-		uIdleIterationsCount = 0;
+        /* If we reach this point, a packet was sent successfully so reset the idle iterations counter. */
+        uIdleIterationsCount = 0;
 
 #ifdef TI_DBG
-		pTxDataQ->aQueueCounters[uQueId].uXmittedPacket++;
+        pTxDataQ->aQueueCounters[uQueId].uXmittedPacket++;
 #endif /* TI_DBG */
 
-	} /* End of while */
+    } /* End of while */
 
-	/* Unreachable code */
+    /* Unreachable code */
+
 }
-
-
 /** 
  * \fn     txDataQ_UpdateQueuesBusyState
  * \brief  Update queues' busy state
@@ -788,20 +847,7 @@ static void txDataQ_RunScheduler (TI_HANDLE hTxDataQ)
  */ 
 static void txDataQ_UpdateQueuesBusyState (TTxDataQ *pTxDataQ, TI_UINT32 uTidBitMap)
 {
-	TI_UINT32 uTidIdx;
-	
-	/* Go over the TidBitMap and update the related queue busy state */
-	for (uTidIdx = 0; uTidIdx < MAX_NUM_OF_802_1d_TAGS; uTidIdx++, uTidBitMap >>= 1)
-	{
-		if (uTidBitMap & 0x1) /* this Tid is busy */
-        {
-			pTxDataQ->aQueueBusy[aTidToQueueTable[uTidIdx]] = TI_TRUE;
-        }
-		else
-        {
-			pTxDataQ->aQueueBusy[aTidToQueueTable[uTidIdx]] = TI_FALSE;
-        }
-	}
+    pTxDataQ->uQueueBusyBitMap = convertTidMap(uTidBitMap);
 }
 
 
@@ -825,6 +871,31 @@ static void txDataQ_TxSendPaceTimeout (TI_HANDLE hTxDataQ, TI_BOOL bTwdInitOccur
 
     txDataQ_RunScheduler (hTxDataQ);
 }
+/*
+ * \brief   Fast translation from TID bit Map to AC bitmap
+ * 
+ * \param  tidBitMap        - TID bit map
+ * \return return AC bitmap
+ * 
+ * \par Description
+ * Convert 8 bit TID to 4 bits AC map according to
+ *   the following rule {0,1,1,0,2,2,3,3}
+ *   AC[0] = TID[0] | TID[3]
+ *   AC[1] = TID[1] | TID[2]
+ *   AC[2] = TID[4] | TID[5]
+ *   AC[3] = TID[6] | TID[7]
+ * \sa 
+ */
+static inline TI_UINT32 convertTidMap(TI_UINT32 tidBitMap)
+{
+    TI_UINT32 b0 = tidBitMap;
+    TI_UINT32 b1 = tidBitMap >> 1;
+    TI_UINT32 b2 = tidBitMap >> 2;
+    TI_UINT32 b3 = tidBitMap >> 3;
+    TI_UINT32 b4 = tidBitMap >> 4;
 
+    return  ((b0 | b3) & 1) | ((b0 | b1) & 2) | ((b2 | b3) & 4) | ((b3 | b4) & 8);
+
+}
 
 

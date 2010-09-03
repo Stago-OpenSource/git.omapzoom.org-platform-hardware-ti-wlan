@@ -62,7 +62,7 @@ TI_STATUS cmdBld_CmdIeNoiseHistogram    (TI_HANDLE hCmdBld, TNoiseHistogram *pNo
 TI_STATUS cmdBld_CmdIeSwitchChannel     (TI_HANDLE hCmdBld, TSwitchChannelParams *pSwitchChannelCmd, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdIeSwitchChannelCancel (TI_HANDLE hCmdBld, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdIeSetKey            (TI_HANDLE hCmdBld, TI_UINT32 uAction, TI_UINT8 *pMacAddr, TI_UINT32 uKeySize, TI_UINT32 uKeyType, TI_UINT32 uKeyId, TI_UINT8 *pKey, TI_UINT32 uSecuritySeqNumLow, TI_UINT32 SecuritySeqNumHigh, void *fCb, TI_HANDLE hCb);
-TI_STATUS cmdBld_CmdIeSetPsMode         (TI_HANDLE hCmdBld, TPowerSaveParams *pPowerSaveParams, void *fCb, TI_HANDLE hCb);
+TI_STATUS cmdBld_CmdIeSetPsMode 		(TI_HANDLE hCmdBld, TI_BOOL psEnable, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdIeStartNewScan      (TI_HANDLE hCmdBld, TScanParams *pScanParams, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdIeFwDisconnect      (TI_HANDLE hCmdBld, TI_UINT32 uConfigOptions, TI_UINT32 uFilterOptions, DisconnectType_e uDisconType, TI_UINT16 uDisconReason, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CmdIeMeasurement       (TI_HANDLE hCmdBld, TMeasurementParams *pMeasurementParams, void* fMeasureCommandResponseCb, TI_HANDLE hCb);

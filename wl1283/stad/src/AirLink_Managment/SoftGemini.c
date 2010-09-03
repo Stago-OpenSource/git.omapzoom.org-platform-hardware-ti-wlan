@@ -122,9 +122,9 @@ void SoftGemini_SetPSmode(TI_HANDLE hSoftGemini)
 		}
 	}
 	else 
-        {
-          TRACE0(pSoftGemini->hReport, REPORT_SEVERITY_ERROR, "  SoftGemini_SetPSmode() - Error hSoftGemini= NULL \n");
-        }
+    {
+        os_printf("  SoftGemini_SetPSmode() - Error hSoftGemini= NULL \n");
+    }
 }
 
 /************************************************************************
@@ -162,7 +162,7 @@ void SoftGemini_unSetPSmode(TI_HANDLE hSoftGemini)
 	}
     else
     {
-		TRACE0(pSoftGemini->hReport, REPORT_SEVERITY_ERROR, " SoftGemini_unSetPSmode() - Error hSoftGemini= NULL \n");
+		os_printf("SoftGemini_unSetPSmode() - Error hSoftGemini= NULL \n");
     }
 }
 
@@ -690,25 +690,18 @@ static TI_STATUS SoftGemini_SetPS(SoftGemini_t	*pSoftGemini)
 
 	if (pBssInfo)
 	{
-		if ((pBssInfo->band == RADIO_BAND_2_4_GHZ))
-		{
-            TRACE0(pSoftGemini->hReport, REPORT_SEVERITY_INFORMATION, " SG-setPS: band == RADIO_BAND_2_4_GHZ");
+        TRACE0(pSoftGemini->hReport, REPORT_SEVERITY_INFORMATION, " SG-setPS: band == RADIO_BAND_2_4_GHZ");
 
-	        /* Set Params to Power Mgr for SG priority */
-	        param.paramType = POWER_MGR_POWER_MODE;
-	        param.content.powerMngPowerMode.PowerMode = POWER_MODE_PS_ONLY;
-	        param.content.powerMngPowerMode.PowerMngPriority = POWER_MANAGER_SG_PRIORITY;
-	        powerMgr_setParam(pSoftGemini->hPowerMgr,&param);
+        /* Set Params to Power Mgr for SG priority */
+        param.paramType = POWER_MGR_POWER_MODE;
+        param.content.powerMngPowerMode.PowerMode = POWER_MODE_PS_ONLY;
+        param.content.powerMngPowerMode.PowerMngPriority = POWER_MANAGER_SG_PRIORITY;
+        powerMgr_setParam(pSoftGemini->hPowerMgr,&param);
 
-	        /* enable SG priority for Power Mgr */
-	        param.paramType = POWER_MGR_ENABLE_PRIORITY;
-	        param.content.powerMngPriority = POWER_MANAGER_SG_PRIORITY;
-	        return powerMgr_setParam(pSoftGemini->hPowerMgr,&param);
-        }
-        else
-        {
-            TRACE0(pSoftGemini->hReport, REPORT_SEVERITY_INFORMATION, " SG-setPS: band == RADIO_BAND_5_GHZ");
-        }
+        /* enable SG priority for Power Mgr */
+        param.paramType = POWER_MGR_ENABLE_PRIORITY;
+        param.content.powerMngPriority = POWER_MANAGER_SG_PRIORITY;
+        return powerMgr_setParam(pSoftGemini->hPowerMgr,&param);
 	}
 	return TI_OK;
 }

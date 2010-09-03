@@ -57,9 +57,12 @@
  */
 typedef enum
 {
-	CONN_TYPE_FIRST_CONN = 0,  /* Standart 802.11 association */
-	CONN_TYPE_ROAM             /* Perform roaming connection. (Re Association) */ 
-
+	CONN_TYPE_FIRST_CONN = 0,      /* Standart 802.11 association */
+	CONN_TYPE_ROAM,                /* Perform roaming connection. (Re Association) */ 
+    CONN_TYPE_FT_INITIAL_ASSOC,    /* Association to a new MD, standard 802.11r */
+    CONN_TYPE_FT_INITIAL_BSS_ROAM, /* Reassociation to a new MD, standard 802.11r */
+    CONN_TYPE_FT_OVER_THE_AIR      /* Reassociation within the current Mobility Domain, standard 802.11r */
+    /*CONN_TYPE_FT_OVER_THE_DS*/       /* stanard 802.11r - Not supported yet*/
 } EConnType;
 
 
@@ -111,12 +114,16 @@ void conn_timeout (TI_HANDLE hConn, TI_BOOL bTwdInitOccured);
 TI_STATUS conn_ibssStaJoined (TI_HANDLE hConn);
 TI_STATUS conn_ibssMerge (TI_HANDLE hConn);
 
-TI_STATUS conn_reportMlmeStatus(TI_HANDLE			hConn, 
-							mgmtStatus_e		status,
-							TI_UINT16				uStatusCode);
+TI_STATUS conn_reportMlmeStatus(TI_HANDLE hConn,
+                                mgmtStatus_e status,
+                                TI_UINT16 uStatusCode);
 
-TI_STATUS conn_reportRsnStatus(TI_HANDLE			hConn, 
-							mgmtStatus_e		status);
+TI_STATUS conn_ReportApConnStatus(TI_HANDLE hConn, 
+                                  mgmtStatus_e status,
+                                  TI_UINT16	uStatusCode);
+
+TI_STATUS conn_reportRsnStatus(TI_HANDLE hConn, 
+                               mgmtStatus_e status);
 
 #ifdef REPORT_LOG
 void conn_ibssPrintStatistics (TI_HANDLE hConn);

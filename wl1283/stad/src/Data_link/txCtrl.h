@@ -44,6 +44,7 @@
 
 #include "paramOut.h"
 #include "DataCtrl_Api.h"
+#include "timer.h"
 
 
 extern void wlanDrvIf_FreeTxPacket (TI_HANDLE hOs, TTxCtrlBlk *pPktCtrlBlk, TI_STATUS eStatus);
@@ -54,6 +55,7 @@ extern void wlanDrvIf_FreeTxPacket (TI_HANDLE hOs, TTxCtrlBlk *pPktCtrlBlk, TI_S
 #define DEF_EAPOL_ENCRYPTION_STATUS     TI_FALSE
 #define HEADER_PAD_SIZE                 2       /* 2-byte pad before header with QoS, for 4-byte alignment */
 #define MGMT_PKT_LIFETIME_TU            2000    /* Mgmt pkts lifetime in TUs (1024 usec). */
+#define DOWNGRADE_DURATION              1000    /* If medium time is exceeded for an admitted AC downgrade for 1 second */
 
 /* defined in qosMngr.c - standard WMM translation from TID to AC. */
 extern int WMEQosTagToACTable[MAX_NUM_OF_802_1d_TAGS];
@@ -83,6 +85,30 @@ typedef struct
 } txDataDbgCounters_t;
 
 
+typedef struct
+{
+    TI_HANDLE       hRequestTimer; 
+    TI_BOOL         bRequestTimerRunning;  
+    TI_UINT8        tid;
+    TTimerCbFunc    fExpiryCbFunc;
+} TSMTimerData_t;
+
+/* 
+ * TokenCalculationParams_t - struct used for the tokens calculation
+ *                           of the WMM-AC 
+*/
+typedef struct
+{
+	TI_UINT16	allocatedMediumTime;
+	TI_INT16    tokens;
+	TI_UINT32   timeDiffMinThreshold;
+	TI_UINT32   defTimeDiffMinThreshold;
+	TI_UINT32   lastCalcTimeStamp;
+	TI_UINT32	usedTokensReminder;
+	TI_UINT32	unusedTokensReminder;
+	TI_UINT16	maxTokensThreshold;
+	TI_UINT16	minTokensThreshold;
+} TokenCalculationParams_t;
 
 /* 
  *  Module object structure. 
@@ -104,7 +130,10 @@ typedef struct
     TI_HANDLE           hXCCMngr;
     TI_HANDLE           hQosMngr;
     TI_HANDLE           hRxData;
+    TI_HANDLE           hMeasurementMgr;
+    TI_HANDLE           hSiteMgr;
 
+    
     TI_HANDLE           hCreditTimer;   /* The medium-usage credit timer handle */
 
     /* External parameters */
@@ -126,6 +155,7 @@ typedef struct
     EAcTrfcType         highestAdmittedAc[MAX_NUM_OF_AC]; /* Provide highest admitted AC equal or below given AC. */
     ETrafficAdmState    admissionState[MAX_NUM_OF_AC];    /* AC is allowed to transmit or not. */
     EAdmissionState     admissionRequired[MAX_NUM_OF_AC]; /* AC requires AP's admission or not. */
+	TI_BOOL             acDowngraded[MAX_NUM_OF_AC];      /* AC is downgraded due to exceeded meduim time */
 
     /* Tx Attributes */
     TI_UINT32           mgmtRatePolicy[MAX_NUM_OF_AC];  /* Current rate policy for mgmt packets per AC. */
@@ -153,6 +183,17 @@ typedef struct
     TI_UINT32           mediumTime[MAX_NUM_OF_AC];
     TI_UINT32           totalUsedTime[MAX_NUM_OF_AC];
 
+	TokenCalculationParams_t tokenCalcParams[MAX_NUM_OF_AC];
+	
+    /* TSM (802.11k measurements) */
+    TSMReportData_t     TSMReportStat[TSM_REPORT_NUM_OF_TID_MAX]; 
+    TI_UINT32           TSMInProgressBitmap;
+    /*  Timers to be used for regular TSM (not triggered one) */
+    TSMTimerData_t      tTSMTimers[TSM_REPORT_NUM_OF_MEASUREMENT_IN_PARALLEL_MAX];                  
+    tTriggerTSMReport   fTriggerReportCB;
+
+    
+    
 #ifdef TI_DBG
     txDataDbgCounters_t dbgCounters;    /* debug counters */
 #endif

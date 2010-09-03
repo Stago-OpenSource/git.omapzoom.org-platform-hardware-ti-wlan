@@ -60,8 +60,6 @@
 typedef enum
 {
     MSR_SRV_EVENT_MEASURE_START_REQUEST       = 0,
-    MSR_SRV_EVENT_DRIVER_MODE_SUCCESS,
-    MSR_SRV_EVENT_DRIVER_MODE_FAILURE,
     MSR_SRV_EVENT_START_SUCCESS,
     MSR_SRV_EVENT_START_FAILURE,
     MSR_SRV_EVENT_ALL_TYPES_COMPLETE,
@@ -76,7 +74,6 @@ typedef enum
 typedef enum
 {
     MSR_SRV_STATE_IDLE                      =0,
-    MSR_SRV_STATE_WAIT_FOR_DRIVER_MODE,
     MSR_SRV_STATE_WAIT_FOR_MEASURE_START,
     MSR_SRV_STATE_MEASURE_IN_PROGRESS,
     MSR_SRV_STATE_WAIT_FOR_MEASURE_STOP,
@@ -137,17 +134,6 @@ TI_STATUS measurementSRVSM_SMEvent( TI_HANDLE hMeasurementSrv, measurements_SRVS
 /**
  * \\n
  * \date 08-November-2005\n
- * \brief Handle a MEASURE_START_REQUEST event by requesting driver mode.\n
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSrv - handle to the Measurement SRV object.\n
- * \return always TI_OK.\n
- */
-TI_STATUS measurementSRVSM_requestDriverMode( TI_HANDLE hMeasurementSRV );
-
-/**
- * \\n
- * \date 08-November-2005\n
  * \brief Handle a DRIVER_MODE_SUCCESS event by sending start measure command to the FW.\n
  *
  * Function Scope \e Public.\n
@@ -191,17 +177,6 @@ TI_STATUS measurementSRVSM_completeMeasure( TI_HANDLE hMeasurementSRV );
 
 /**
  * \\n
- * \date 08-November-2005\n
- * \brief Handle a STOP_REQUEST event when in WAIT_FOR_DRIVER_MODE state by exiting driver mode.
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSrv - handle to the Measurement SRV object.\n
- * \return always TI_OK.\n
- */
-TI_STATUS measurementSRVSM_stopFromWaitForDriverMode( TI_HANDLE hMeasurementSRV );
-
-/**
- * \\n
  * \date 27-November-2005\n
  * \brief handle a STOP_REQUEST event when in WAIT_FOR_DRIVER_MODE by marking negative result status
  * \brief and callin the ordinary stop function
@@ -223,17 +198,6 @@ TI_STATUS measurementSRVSM_stopFromWaitForMeasureStart( TI_HANDLE hMeasurementSR
  * \return always TI_OK.\n
  */
 TI_STATUS measurementSRVSM_stopFromMeasureInProgress( TI_HANDLE hMeasurementSRV );
-
-/**
- * \\n
- * \date 08-November-2005\n
- * \brief handle a DRIVER_MODE_FAILURE event by calling the response CB.\n
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSrv - handle to the Measurement SRV object.\n
- * \return always TI_OK.\n
- */
-TI_STATUS measurementSRVSM_DriverModeFailure( TI_HANDLE hMeasurementSRV );
 
 /**
  * \\n

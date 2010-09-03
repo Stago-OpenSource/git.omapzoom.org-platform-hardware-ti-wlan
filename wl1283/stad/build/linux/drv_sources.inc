@@ -85,11 +85,6 @@ UTIL_SRCS = \
 
 #start of TNETW_SRCS#   do not remove or change this comment
 TNETW_SRCS = \
-    $(TWD)/MacServices/MacServices.c \
-    $(TWD)/MacServices/ScanSrv.c \
-    $(TWD)/MacServices/ScanSrvSM.c \
-    $(TWD)/MacServices/PowerSrv.c \
-    $(TWD)/MacServices/PowerSrvSM.c \
     $(TWD)/MacServices/MeasurementSrv.c \
     $(TWD)/MacServices/MeasurementSrvSM.c \
     $(TWD)/MacServices/measurementSrvDbgPrint.c \
@@ -162,11 +157,8 @@ CORE_SRCS = \
     $(COMSRC)/Sta_Management/templates.c \
     $(COMSRC)/Sta_Management/mlmeBuilder.c \
     $(COMSRC)/Sta_Management/mlmeParser.c \
+    $(COMSRC)/Sta_Management/mlme.c \
     $(COMSRC)/Sta_Management/mlmeSm.c \
-    $(COMSRC)/Sta_Management/assocSM.c \
-    $(COMSRC)/Sta_Management/authSm.c \
-    $(COMSRC)/Sta_Management/openAuthSm.c \
-    $(COMSRC)/Sta_Management/sharedKeyAuthSm.c \
     $(COMSRC)/Sta_Management/scr.c \
     $(COMSRC)/Sta_Management/ScanCncn.c \
     $(COMSRC)/Sta_Management/ScanCncnSm.c \
@@ -180,7 +172,7 @@ CORE_SRCS = \
     $(COMSRC)/AirLink_Managment/SwitchChannel.c \
     $(COMSRC)/AirLink_Managment/measurementMgr.c \
     $(COMSRC)/AirLink_Managment/measurementMgrSM.c \
-    $(COMSRC)/AirLink_Managment/spectrumMngmntMgr.c \
+    $(COMSRC)/AirLink_Managment/rrmMgr.c \
     $(COMSRC)/AirLink_Managment/requestHandler.c \
     $(COMSRC)/AirLink_Managment/SoftGemini.c \
     $(COMSRC)/AirLink_Managment/regulatoryDomain.c \
@@ -191,30 +183,7 @@ CORE_SRCS = \
     $(COMSRC)/Connection_Managment/smeSm.c \
     $(COMSRC)/Connection_Managment/smeSelect.c \
     $(COMSRC)/Connection_Managment/rsn.c \
-    $(COMSRC)/Connection_Managment/mainSecSm.c \
-    $(COMSRC)/Connection_Managment/mainSecNull.c \
-    $(COMSRC)/Connection_Managment/mainSecKeysOnly.c \
-    $(COMSRC)/Connection_Managment/admCtrl.c \
-    $(COMSRC)/Connection_Managment/admCtrlWep.c \
-    $(COMSRC)/Connection_Managment/admCtrlNone.c \
-    $(COMSRC)/Connection_Managment/admCtrlWpa.c \
-    $(COMSRC)/Connection_Managment/admCtrlWpa2.c \
     $(COMSRC)/Connection_Managment/apConn.c \
-    $(COMSRC)/Connection_Managment/keyDerive.c \
-    $(COMSRC)/Connection_Managment/keyDeriveWep.c \
-    $(COMSRC)/Connection_Managment/keyParser.c \
-    $(COMSRC)/Connection_Managment/keyDeriveAes.c \
-    $(COMSRC)/Connection_Managment/keyDeriveTkip.c \
-    $(COMSRC)/Connection_Managment/broadcastKeySM.c \
-    $(COMSRC)/Connection_Managment/unicastKeySM.c \
-    $(COMSRC)/Connection_Managment/broadcastKey802_1x.c \
-    $(COMSRC)/Connection_Managment/unicastKey802_1x.c \
-    $(COMSRC)/Connection_Managment/broadcastKeyNone.c \
-    $(COMSRC)/Connection_Managment/unicastKeyNone.c \
-    $(COMSRC)/Connection_Managment/keyParserExternal.c \
-    $(COMSRC)/Connection_Managment/keyParserWep.c \
-    $(COMSRC)/Connection_Managment/mainKeysSm.c \
-    $(COMSRC)/Connection_Managment/externalSec.c \
     $(COMSRC)/Application/scanMngr.c \
     $(COMSRC)/Application/roamingMngr.c \
     $(COMSRC)/Application/roamingMngr_manualSM.c \
@@ -232,10 +201,8 @@ ifeq ($(DEBUG),y)
         $(TESTSRC)/rsnDbg.c \
         $(TESTSRC)/TWD_Debug.c \
         $(TESTSRC)/measurementDbg.c \
-        $(TESTSRC)/scanCncnDbg.c \
         $(TESTSRC)/qosMngrDbg.c \
         $(TESTSRC)/ScanMngrDbg.c \
-        $(TESTSRC)/scanCncnDbg.c \
         $(TESTSRC)/roamingMgrDebug.c \
         $(TESTSRC)/scrDbg.c \
         $(TESTSRC)/SoftGeminiDbg.c \
@@ -249,7 +216,6 @@ endif
 #start of CORE_SRCS_XCC#   do not remove or change this comment
 ifeq ($(XCC),y)
     CORE_SRCS_XCC += \
-        $(COMSRC)/Connection_Managment/keyDeriveCkip.c \
         $(COMSRC)/XCC/admCtrlXCC.c \
         $(COMSRC)/XCC/XCCRMMngr.c \
         $(COMSRC)/XCC/XCCTSMngr.c \

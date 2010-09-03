@@ -204,5 +204,12 @@ TI_STATUS mlmeParser_readHtInformationIE (mlme_t *pMlme,
                                           Tdot11HtInformationUnparse *pHtInformation);
 
 
+
+TI_STATUS mlmeParser_readRMEnabledCapIE(mlme_t *pMlme,
+                                        TI_UINT8 *pData, 
+                                        TI_UINT32 dataLen, 
+                                        TI_UINT32 *pReadLen, 
+                                        dot11_RM_ENABLED_CAPABILITIES_IE_t *pRMEnabledCap);
+
 #endif
 

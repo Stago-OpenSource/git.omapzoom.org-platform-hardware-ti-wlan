@@ -132,8 +132,8 @@ TI_UINT32 EvHandlerRegisterEvent(TI_HANDLE hEvHandler, TI_UINT8* pData, TI_UINT3
 
     ModuleIndex = 0;
 
-    while ( (pEvHandler->RegistrationArray[pEvParams->uEventType][ModuleIndex].uEventID != NULL )
-            && ( ModuleIndex < MAX_REGISTERED_MODULES)    )
+    while ((ModuleIndex < MAX_REGISTERED_MODULES) &&
+       (pEvHandler->RegistrationArray[pEvParams->uEventType][ModuleIndex].uEventID != NULL))
     {
         ModuleIndex++; 
     }
@@ -193,8 +193,8 @@ TI_UINT32 EvHandlerUnRegisterEvent(TI_HANDLE hEvHandler, TI_HANDLE uEventID)
 
     ModuleIndex = 0;
 
-    while ( (pEvHandler->RegistrationArray[pEvParams->uEventType][ModuleIndex].uEventID != pEvParams->uEventID )
-            && ( ModuleIndex < MAX_REGISTERED_MODULES)    )
+    while ((ModuleIndex < MAX_REGISTERED_MODULES) &&
+           (pEvHandler->RegistrationArray[pEvParams->uEventType][ModuleIndex].uEventID != pEvParams->uEventID))
     {
         ModuleIndex++; 
     }

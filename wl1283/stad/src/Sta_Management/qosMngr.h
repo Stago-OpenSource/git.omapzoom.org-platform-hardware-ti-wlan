@@ -65,6 +65,9 @@
 
 #define MAX_ENABLED_PS_RX_STREAMS          4
 
+#define PS_TRAFFIC_RATE_DISABLE				0
+#define PS_TRAFFIC_RATE_MIN					10
+#define PS_TRAFFIC_RATE_MAX					50
 #if 0
 #define PS_PARAMETERS_LEGACY                    (0)
 #define PS_PARAMETERS_UPSD_TRIGGER_ENABLE_MASK  (0x01)
@@ -164,12 +167,14 @@ typedef struct
 
     /* PS Rx streaming parameters */
     TPsRxStreaming      aTidPsRxStreaming[MAX_NUM_OF_802_1d_TAGS];/* Per TID PS-Rx-Streaming configured parameters */
+	TPsRxStreaming		AutoRxStreaming;					/* auto rx streaming configured parameters*/
     TI_UINT32           uNumEnabledPsRxStreams;             /* the number of enabled TID-PS-Rx-Streams */
 
     /* traffic admission control parameters */
     TI_BOOL             trafficAdmCtrlEnable;                /* driver supports Admission control  */   
     trafficAdmCtrl_t    *pTrafficAdmCtrl;                    /* adm ctrl object */
     resourceMgmt_t      resourceMgmtTable;
+    TI_HANDLE           hTimerDowngrade[MAX_NUM_OF_AC];      /* timer used for AC downgrade */
     TI_UINT8            QosNullDataTemplateUserPriority;     /* Holds the last User Priority set into the firmware in the QOS Null data template */
 
     TI_BOOL             performTSPECRenegotiation;

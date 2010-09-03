@@ -156,7 +156,7 @@ static const TEventEntry eventTable [TWD_OWN_EVENT_MAX] =
 /* 6*/{ RSSI_SNR_TRIGGER_6_EVENT_ID,            "RSSI SNR TRIGGER 6 "     		, 1},
 /* 7*/{ RSSI_SNR_TRIGGER_7_EVENT_ID,            "RSSI SNR TRIGGER 7 "     		, 1},
 /* 8*/{ MEASUREMENT_START_EVENT_ID,             "MEASUREMENT START "      		, 0},    
-/* 9*/{ MEASUREMENT_COMPLETE_EVENT_ID,          "BSS LOSE "               		, 0},
+/* 9*/{ MEASUREMENT_COMPLETE_EVENT_ID,          "MEASUREMENT COMPLETE "    		, 8},
 /*10*/{ SCAN_COMPLETE_EVENT_ID ,                "SCAN CMPLT "             		, 8},    
 /*11*/{ SCHEDULED_SCAN_COMPLETE_EVENT_ID,       "SPS SCAN CMPLT "         		, 3},
 /*12*/{ AP_DISCOVERY_COMPLETE_EVENT_ID,         "MAX TX RETRY "           		, 0},
@@ -319,14 +319,16 @@ static void eventMbox_ConfigCbTable(TI_HANDLE hEventMbox)
 		pEventMbox->CbTable[EvID].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, RSSISNRTriggerMetric[EvID]);
 	}
 	pEventMbox->CbTable[TWD_DBG_EVENT                       ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, dbgEventRep);
-	pEventMbox->CbTable[TWD_OWN_EVENT_SCAN_CMPLT            ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t,scanCompleteResults);
-	pEventMbox->CbTable[TWD_OWN_EVENT_SPS_SCAN_CMPLT        ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t,scheduledScanAttendedChannels);
+	pEventMbox->CbTable[TWD_OWN_EVENT_SCAN_CMPLT            ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, scanCompleteResults);
+	pEventMbox->CbTable[TWD_OWN_EVENT_SPS_SCAN_CMPLT        ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, scheduledScanAttendedChannels);
     pEventMbox->CbTable[TWD_OWN_EVENT_PERIODIC_SCAN_COMPLETE].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, scanCompleteResults);
     pEventMbox->CbTable[TWD_OWN_EVENT_PERIODIC_SCAN_REPORT  ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, scanCompleteResults);
-	pEventMbox->CbTable[TWD_OWN_EVENT_SOFT_GEMINI_SENSE     ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t,softGeminiSenseInfo);
-	pEventMbox->CbTable[TWD_OWN_EVENT_SOFT_GEMINI_PREDIC    ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t,softGeminiProtectiveInfo);
-	pEventMbox->CbTable[TWD_OWN_EVENT_SWITCH_CHANNEL_CMPLT  ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t,channelSwitchStatus);
-	pEventMbox->CbTable[TWD_OWN_EVENT_PS_REPORT             ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t,psStatus);
+	pEventMbox->CbTable[TWD_OWN_EVENT_SOFT_GEMINI_SENSE     ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, softGeminiSenseInfo);
+	pEventMbox->CbTable[TWD_OWN_EVENT_SOFT_GEMINI_PREDIC    ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, softGeminiProtectiveInfo);
+	pEventMbox->CbTable[TWD_OWN_EVENT_SWITCH_CHANNEL_CMPLT  ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, channelSwitchStatus);
+	pEventMbox->CbTable[TWD_OWN_EVENT_PS_REPORT             ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, psStatus);
+	pEventMbox->CbTable[TWD_OWN_EVENT_MEASUREMENT_COMPLETE  ].pDataOffset += TI_FIELD_OFFSET (EventMailBox_t, scanCompleteResults);
+
 }
     
 
@@ -677,6 +679,8 @@ static void eventMbox_ReadCompleteCB(TI_HANDLE hEventMbox, TTxnStruct *pTxnStruc
     TEventMbox *pEventMbox = (TEventMbox *)hEventMbox;
 	pTxn = &pEventMbox->iTxnGenRegSize.tTxnReg;
 
+	
+
 TRACE1(pEventMbox->hReport, REPORT_SEVERITY_INFORMATION, "eventMbox_ReadCompleteCB : event vector -- 0x%x\n",pEventMbox->iTxnEventMbox.iEventMboxBuf.eventsVector);
     
 	pEventMbox->iTxnGenRegSize.iRegBuffer = INTR_TRIG_EVENT_ACK;
@@ -684,14 +688,14 @@ TRACE1(pEventMbox->hReport, REPORT_SEVERITY_INFORMATION, "eventMbox_ReadComplete
     for (EvID = 0; EvID < TWD_OWN_EVENT_ALL; EvID++)
     {
         if (pEventMbox->iTxnEventMbox.iEventMboxBuf.eventsVector & eventTable[EvID].bitMask)
-                {                  
-                    if (eventTable[EvID].dataLen)
-                    {
-                ((TEventMboxDataCb)pEventMbox->CbTable[EvID].fCb)(pEventMbox->CbTable[EvID].hCb,(TI_CHAR*)pEventMbox->CbTable[EvID].pDataOffset,eventTable[EvID].dataLen);
+		{
+			if (eventTable[EvID].dataLen)
+			{
+				((TEventMboxDataCb)pEventMbox->CbTable[EvID].fCb)(pEventMbox->CbTable[EvID].hCb,(TI_CHAR*)pEventMbox->CbTable[EvID].pDataOffset,eventTable[EvID].dataLen);
             }
             else
             {
-                ((TEventMboxEvCb)pEventMbox->CbTable[EvID].fCb)(pEventMbox->CbTable[EvID].hCb);
+				((TEventMboxEvCb)pEventMbox->CbTable[EvID].fCb)(pEventMbox->CbTable[EvID].hCb);
             }
         }
     }     

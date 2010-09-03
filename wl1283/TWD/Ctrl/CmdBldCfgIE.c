@@ -79,6 +79,11 @@ TI_STATUS cmdBld_CfgIeConfigMemory (TI_HANDLE hCmdBld, TDmaParams *pDmaParams, v
     pCfg->numSsidProfiles         = 1;
     pCfg->totalTxDescriptors      = ENDIAN_HANDLE_LONG(NUM_TX_DESCRIPTORS);
 
+    pCfg->dynMemEnable            = pDmaParams->uDynMemEnable;
+    pCfg->txFreeReq               = pDmaParams->uTxFreeReq;
+    pCfg->rxFreeReq               = pDmaParams->uRxFreeReq;
+    pCfg->txMin                   = pDmaParams->uTxMin;
+
     return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_CONFIGURE, pCfg, sizeof(*pCfg), fCb, hCb, NULL);
 }
 
@@ -2020,8 +2025,6 @@ TI_STATUS cmdBld_CfgPlatformGenParams (TI_HANDLE hCmdBld, IniFileGeneralParam *p
 }
 
 
-
-
 /****************************************************************************
  *                      cmdBld_CfgIeBurstMode()
  ****************************************************************************
@@ -2053,74 +2056,6 @@ TI_STATUS cmdBld_CfgIeBurstMode (TI_HANDLE hCmdBld, TI_BOOL bEnabled, void *fCb,
 	return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_CONFIGURE, pCfg, sizeof(*pCfg), fCb, hCb, NULL);
 }
 
-/****************************************************************************
- *                      cmdBld_CfgIeSRstate()
- ****************************************************************************
- * DESCRIPTION: Configure sart reflex state
- *
- * INPUTS:  hCmdBld     - handle to command builder object
- *          bEnabled    - is enabled flag
- *          fCB         - callback function for command complete
- *          hCb         - handle to be apssed to callback function    
- *
- * OUTPUT:  None
- *
- * RETURNS: OK or NOK
- ****************************************************************************/
-
-TI_STATUS cmdBld_CfgIeSRState (TI_HANDLE hCmdBld, uint8 SRstate, void *fCb, TI_HANDLE hCb)
-{
-    TCmdBld *pCmdBld = (TCmdBld *)hCmdBld;
-    ACXSmartReflexState_t tSmartReflexState;
-    ACXSmartReflexState_t *pCfg = &tSmartReflexState;
-           
-    /* set IE header */
-    pCfg->EleHdr.id = ACX_SET_SMART_REFLEX_STATE;
-    pCfg->EleHdr.len = sizeof(*pCfg) - sizeof(EleHdrStruct);
-
-    /* set smart refelx state */
-    pCfg->enable = SRstate;
-
-    /* send the command to the FW */
-    return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_CONFIGURE, pCfg, sizeof(*pCfg), fCb, hCb, NULL);
-       
-}
-
-/****************************************************************************
- *                      cmdBld_CfgIeSRDebug()
- ****************************************************************************
- * DESCRIPTION: Send debug param just if it's configured in ini file
- * INPUTS:  hCmdBld     - handle to command builder object
- *          bEnabled    - is enabled flag
- *          fCB         - callback function for command complete
- *          hCb         - handle to be apssed to callback function    
- *
- * OUTPUT:  None
- *
- * RETURNS: OK or NOK
- ****************************************************************************/
-TI_STATUS cmdBld_CfgIeSRDebug (TI_HANDLE hCmdBld, ACXSmartReflexDebugParams_t *pSRDebug, void *fCb, TI_HANDLE hCb)
-{
-    TCmdBld *pCmdBld = (TCmdBld *)hCmdBld;
-    ACXSmartReflexDebugParams_t tSmartReflexDebug;
-    ACXSmartReflexDebugParams_t *pCfg = &tSmartReflexDebug;
-   
-   /* send this command to FW just in case it's initialize in ini file */
-    if (pSRDebug->senNRN == 0) {
-        return TI_NOK;
-    }
-
-    /* copy smart reflex debug params*/
-    os_memoryCopy(pCmdBld->hOs, pCfg, pSRDebug, sizeof(ACXSmartReflexDebugParams_t));
-
-   /* set IE header */
-    pCfg->EleHdr.id = ACX_SET_SMART_REFLEX_DEBUG;
-    pCfg->EleHdr.len = sizeof(*pCfg) - sizeof(EleHdrStruct);
-   
-    /* send the command to the FW */
-    return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_CONFIGURE, pCfg, sizeof(*pCfg), fCb, hCb, NULL);
-
-}
 
 /****************************************************************************
  *                      cmdBld_CfgIeDcoItrimParams()
@@ -2149,6 +2084,83 @@ TI_STATUS cmdBld_CfgIeDcoItrimParams (TI_HANDLE hCmdBld, TI_BOOL enable, TI_UINT
     TRACE3(pCmdBld->hReport, REPORT_SEVERITY_INFORMATION , "ID=%u: enable=%u, moderation_timeout_usec=%u\n", pCfg->EleHdr.id, enable, moderationTimeoutUsec);
 
     return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_CONFIGURE, pCfg, sizeof(ACXDCOItrimParams_t), fCb, hCb, NULL);
+}
+
+/****************************************************************************
+ *                      cmdBld_CmdIeConfigurePsParams()
+ ****************************************************************************
+ * DESCRIPTION: Configure General PS parameters
+ *
+ * INPUTS:  hCmdBld     - handle to command builder object
+ *          psParams    - Paramtaers value to configure
+ *          fCB         - callback function for command complete
+ *          hCb         - handle to be apssed to callback function    
+ *
+ * OUTPUT:  None
+ *
+ * RETURNS: OK or NOK
+ ****************************************************************************/
+TI_STATUS cmdBld_CmdIeConfigurePsParams (TI_HANDLE hCmdBld, TPsParams *psParams, void *fCb, TI_HANDLE hCb)
+{
+    TCmdBld *pCmdBld = (TCmdBld *)hCmdBld;
+    ACXConfigPsParams_t ACXPsParams;
+
+    /* set IE header */
+    ACXPsParams.EleHdr.id = ACX_CONFIG_PS;
+    ACXPsParams.EleHdr.len = sizeof (ACXConfigPsParams_t) - sizeof (EleHdrStruct);
+
+    /* set PS values */
+    ACXPsParams.numOfEnterPsRetries = psParams->numOfEnterPsRetries;
+	ACXPsParams.numOfExitPsRetries = psParams->numOfExitPsRetries;
+	cmdBld_ConvertAppRatesBitmap (psParams->nullPktRateModulation,
+								  0,
+								  &ACXPsParams.RequestedRateForNullDataTx);
+
+    TRACE3(pCmdBld->hReport, REPORT_SEVERITY_INFORMATION, ": Sending info elem to firmware, numOfEnterPsRetries=%d, numOfExitPsRetries=%d, RequestedRateForNullDataTx=%d\n", (TI_UINT32)ACXPsParams.numOfEnterPsRetries, (TI_UINT32)ACXPsParams.numOfExitPsRetries, (TI_UINT32)ACXPsParams.RequestedRateForNullDataTx);
+
+    /* send the command to the FW */
+    return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_CONFIGURE, &ACXPsParams, sizeof(ACXConfigPsParams_t), fCb, hCb, NULL);
+}
+
+/****************************************************************************
+ *                      cmdBld_CmdIeConfigureHangOverParams()
+ ****************************************************************************
+ * DESCRIPTION: Configure PS Hang Over parameters
+ *
+ * INPUTS:  hCmdBld     - handle to command builder object
+ *          psParams    - Paramtaers value to configure
+ *          fCB         - callback function for command complete
+ *          hCb         - handle to be apssed to callback function    
+ *
+ * OUTPUT:  None
+ *
+ * RETURNS: OK or NOK
+ ****************************************************************************/
+TI_STATUS cmdBld_CmdIeConfigureHangOverParams (TI_HANDLE hCmdBld, TPsParams *psParams, void *fCb, TI_HANDLE hCb)
+{
+    TCmdBld *pCmdBld = (TCmdBld *)hCmdBld;
+    ACXConfigHangOverParams_t ACXHangOverParams;
+
+    /* set IE header */
+    ACXHangOverParams.EleHdr.id = ACX_CONFIG_HANGOVER;
+    ACXHangOverParams.EleHdr.len = sizeof (ACXConfigHangOverParams_t) - sizeof (EleHdrStruct);
+
+    /* set Hang Over values */
+	ACXHangOverParams.bDynamicHangoverMode = psParams->bDynamicHangoverMode;
+	ACXHangOverParams.bEarlyTerminationMode = psParams->bEarlyTerminationMode;
+	ACXHangOverParams.decreaseDelatTimeFromHangover = psParams->decreaseDelatTimeFromHangover;
+	ACXHangOverParams.hangOverPeriod = psParams->hangOverPeriod;
+	ACXHangOverParams.increaseDelatTimeFromHangover = psParams->increaseDelatTimeFromHangover;
+	ACXHangOverParams.increaseHangoverTime = psParams->increaseHangoverTime;
+	ACXHangOverParams.maxHangOverPeriod = psParams->maxHangOverPeriod;
+	ACXHangOverParams.minHangOverPeriod = psParams->minHangOverPeriod;
+	ACXHangOverParams.quietTimeForEarlyTermination = psParams->quietTimeForEarlyTermination;
+	ACXHangOverParams.recoverTime = psParams->recoverTime;
+	ACXHangOverParams.slidingWindowSize = psParams->slidingWindowSize;
+    
+    /* send the command to the FW */
+    return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_CONFIGURE, &ACXHangOverParams,
+								 sizeof(ACXConfigHangOverParams_t), fCb, hCb, NULL);
 }
 
 							   

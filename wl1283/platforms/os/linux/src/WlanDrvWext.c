@@ -62,7 +62,6 @@ extern int wlanDrvIf_LoadFiles (TWlanDrvIfObj *drv, TLoaderFilesData *pInitInfo)
 extern int wlanDrvIf_Start (struct net_device *dev);
 extern int wlanDrvIf_Stop (struct net_device *dev);
 
-
 /* callbacks for WEXT commands */
 static const iw_handler aWextHandlers[] = {
 	(iw_handler) NULL,				            /* SIOCSIWCOMMIT */
@@ -80,7 +79,7 @@ static const iw_handler aWextHandlers[] = {
 	(iw_handler) NULL,		                    /* SIOCSIWPRIV - not used */
 	(iw_handler) NULL,                    		/* SIOCGIWPRIV - kernel code */
 	(iw_handler) NULL,                          /* SIOCSIWSTATS - not used */
-	(iw_handler) wlanDrvWext_GetWirelessStats,           /* SIOCGIWSTATS - kernel code */
+	(iw_handler) wlanDrvWext_GetWirelessStats,  /* SIOCGIWSTATS - kernel code */
 	(iw_handler) NULL,		                    /* SIOCSIWSPY */
 	(iw_handler) NULL,		                    /* SIOCGIWSPY */
 	(iw_handler) NULL,		                    /* SIOCSIWTHRSPY */
@@ -113,7 +112,7 @@ static const iw_handler aWextHandlers[] = {
 	(iw_handler) NULL,		        			/* SIOCGIWPOWER */
 	(iw_handler) NULL,				            /* -- hole -- */
 	(iw_handler) NULL,				            /* -- hole -- */
-        (iw_handler) wlanDrvWext_Handler,                       /* SIOCSIWGENIE */
+    (iw_handler) wlanDrvWext_Handler,           /* SIOCSIWGENIE */
 	(iw_handler) NULL,		        			/* SIOCGIWGENIE */
 	(iw_handler) wlanDrvWext_Handler,		    /* SIOCSIWAUTH */
 	(iw_handler) wlanDrvWext_Handler,		    /* SIOCGIWAUTH */
@@ -145,6 +144,7 @@ static struct iw_handler_def tWextIf = {
 void wlanDrvWext_Init (struct net_device *dev)
 {
 	dev->wireless_handlers = &tWextIf;
+
 }
 
 /* Return driver statistics */
@@ -166,10 +166,12 @@ int wlanDrvWext_Handler (struct net_device *dev,
    TWlanDrvIfObj   *drv = (TWlanDrvIfObj *)NETDEV_GET_PRIVATE(dev);
    ti_private_cmd_t my_command; 
    struct iw_mlme   mlme;
+   struct iw_scan_req scanreq;
    void             *copy_to_buf=NULL, *param3=NULL; 
 
    os_memoryZero(drv, &my_command, sizeof(ti_private_cmd_t));
    os_memoryZero(drv, &mlme,       sizeof(struct iw_mlme));
+   os_memoryZero(drv, &scanreq, sizeof(struct iw_scan_req));
    
    switch (info->cmd)
    {
@@ -188,7 +190,7 @@ int wlanDrvWext_Handler (struct net_device *dev,
            switch (my_command.cmd)
            {
            case DRIVER_INIT_PARAM:
-               return wlanDrvIf_LoadFiles (drv, my_command.in_buffer);
+                return wlanDrvIf_LoadFiles (drv, my_command.in_buffer);
                 
            case DRIVER_START_PARAM:
                return wlanDrvIf_Start (dev);
@@ -207,17 +209,33 @@ int wlanDrvWext_Handler (struct net_device *dev,
 	   if ((my_command.in_buffer) && (my_command.in_buffer_len))
        {
 		 copy_from_buf        = my_command.in_buffer;
-		 my_command.in_buffer = os_memoryAlloc(drv, my_command.in_buffer_len);
+		 my_command.in_buffer = os_memoryAlloc(drv, my_command.in_buffer_len);           
+         if (my_command.in_buffer == NULL)
+         {
+             os_printf ("wlanDrvWext_Handler() os_memoryAlloc 1 FAILED !!!\n");
+             return TI_NOK;
+         }
+
 		 if (os_memoryCopyFromUser(drv, my_command.in_buffer, copy_from_buf, my_command.in_buffer_len))
 		 {
-		   os_printf ("wlanDrvWext_Handler() os_memoryCopyFromUser 1 FAILED !!!\n");
-		   return TI_NOK;
+		    os_printf ("wlanDrvWext_Handler() os_memoryCopyFromUser 1 FAILED !!!\n");
+            os_memoryFree (drv, my_command.in_buffer, my_command.in_buffer_len);
+		    return TI_NOK;
 		 }
 	   }
 	   if ((my_command.out_buffer) && (my_command.out_buffer_len))
 	   {
 		 copy_to_buf          = my_command.out_buffer;
 		 my_command.out_buffer = os_memoryAlloc(drv, my_command.out_buffer_len);
+         if (my_command.out_buffer == NULL)
+         {
+             os_printf ("wlanDrvWext_Handler() os_memoryAlloc 2 FAILED !!!\n");
+             if (my_command.in_buffer)
+             {
+                 os_memoryFree (drv, my_command.in_buffer, my_command.in_buffer_len);
+             }
+             return TI_NOK;
+         }
 	   }
 	   param3 = &my_command;
      }
@@ -229,6 +247,17 @@ int wlanDrvWext_Handler (struct net_device *dev,
 		param3 = &mlme;
      }
 	 break;
+
+	 case SIOCSIWSCAN:
+	 {
+		 if (((union iwreq_data *)iw_req)->data.pointer)
+	     {
+			 os_memoryCopyFromUser(drv, &scanreq, ((union iwreq_data *)iw_req)->data.pointer, sizeof(struct iw_scan_req));
+			 param3 = &scanreq;
+		 }
+	 }
+	 break; 
+
      case SIOCSIWGENIE:
      {
          TI_UINT16 ie_length = ((union iwreq_data *)iw_req)->data.length;
@@ -239,6 +268,11 @@ int wlanDrvWext_Handler (struct net_device *dev,
          } else if ((ie_content != NULL) && (ie_length <= RSN_MAX_GENERIC_IE_LENGTH) && (ie_length > 0)) { 
                  /* One IE cannot be larger than RSN_MAX_GENERIC_IE_LENGTH bytes */
                  my_command.in_buffer = os_memoryAlloc(drv, ie_length);
+                 if (my_command.in_buffer == NULL)
+                 {
+                     os_printf ("wlanDrvWext_Handler() os_memoryAlloc 3 FAILED !!!\n");
+                     return TI_NOK;
+                 }
                  os_memoryCopyFromUser(drv, my_command.in_buffer, ie_content, ie_length );
                  param3 = my_command.in_buffer;
          } else {
@@ -247,14 +281,18 @@ int wlanDrvWext_Handler (struct net_device *dev,
      }
 	 break;
    }
-   /* If the friver is not running, return NOK */
+   /* If the driver is not running, return NOK */
    if (drv->tCommon.eDriverState != DRV_STATE_RUNNING)
    {
+       if (my_command.in_buffer)
+           os_memoryFree (drv, my_command.in_buffer, my_command.in_buffer_len);
+       if (my_command.out_buffer)
+           os_memoryFree (drv, my_command.out_buffer, my_command.out_buffer_len);
        return TI_NOK;
    }
 
    /* Call the Cmd module with the given user paramters */
-   rc = (cmdHndlr_InsertCommand (drv->tCommon.hCmdHndlr, 
+   rc = cmdHndlr_InsertCommand (drv->tCommon.hCmdHndlr, 
                                    info->cmd, 
                                    info->flags, 
                                    iw_req, 
@@ -262,11 +300,11 @@ int wlanDrvWext_Handler (struct net_device *dev,
                                    extra, 
                                    0, 
                                    param3, 
-                                   NULL));
+                                   NULL);
    /* Here we are after the command was completed */
    if (my_command.in_buffer)
    {
-	 os_memoryFree (drv, my_command.in_buffer, my_command.in_buffer_len);
+	 	os_memoryFree (drv, my_command.in_buffer, my_command.in_buffer_len);
    }
    if (my_command.out_buffer)
    {
@@ -277,6 +315,5 @@ int wlanDrvWext_Handler (struct net_device *dev,
 	 }
 	 os_memoryFree (drv, my_command.out_buffer, my_command.out_buffer_len);
    }
-
    return rc;
 }

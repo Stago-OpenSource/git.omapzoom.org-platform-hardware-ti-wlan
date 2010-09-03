@@ -65,7 +65,7 @@
 #include "TransmitPowerXCC.h"
 #include "XCCRMMngr.h"
 #endif
-
+#include "rsn.h"
 #include "qosMngr_API.h"
 #include "StaCap.h"
 
@@ -132,6 +132,7 @@ typedef enum
 } matric_e;
 
 #define MAX_GB_MODE_CHANEL		14
+#define MAX_RSN_DATA_SIZE       256
 
 /* RSSI values boundaries and metric values for best, good, etc  signals */
 #define SELECT_RSSI_BEST_LEVEL      (-22)
@@ -403,12 +404,7 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
 { 
 	paramInfo_t *pParam;
 	siteEntry_t *pPrimarySite = pSiteMgr->pSitesMgmtParams->pPrimarySite;
-	TRsnData	rsnData;
-	TI_UINT8	rsnAssocIeLen;
-    dot11_RSN_t *pRsnIe;
-    TI_UINT8    rsnIECount=0;
     TI_UINT8    *curRsnData;
-    TI_UINT16   length;
     TI_UINT16   capabilities;
     TI_UINT16   PktLength=0;
     TI_UINT8	*pIeBuffer=NULL;
@@ -417,6 +413,10 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
 
 #ifdef XCC_MODULE_INCLUDED
     TI_UINT8     ExternTxPower;
+    dot11_RSN_t *pRsnIe;
+    TI_UINT16   length;
+    TI_UINT8    rsnIECount=0;
+    TRsnData	rsnData;
 #endif
 	TI_STATUS	status;
 	ESlotTime	slotTime;
@@ -424,13 +424,13 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
 	dot11_ACParameters_t *p_ACParametersDummy = NULL;
     TtxCtrlHtControl tHtControl;
 
-    curRsnData = os_memoryAlloc(pSiteMgr->hOs, 256);
+    curRsnData = os_memoryAlloc(pSiteMgr->hOs, MAX_RSN_DATA_SIZE);
     if (!curRsnData)
         return TI_NOK;
 
     pParam = (paramInfo_t *)os_memoryAlloc(pSiteMgr->hOs, sizeof(paramInfo_t));
     if (!pParam) {
-        os_memoryFree(pSiteMgr->hOs, curRsnData, 256);
+        os_memoryFree(pSiteMgr->hOs, curRsnData, MAX_RSN_DATA_SIZE);
         return TI_NOK;
     }
 
@@ -633,35 +633,37 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
          txCtrlParams_SetHtControl (pSiteMgr->hTxCtrl, &tHtControl);
      }
 
-	/***************** Config RSN *************************/
-    /* Get the RSN IE data */
-    pRsnIe = pPrimarySite->pRsnIe;
-	length = 0;
-    rsnIECount = 0;
-    while ((length < pPrimarySite->rsnIeLen) && (pPrimarySite->rsnIeLen < 255) 
-           && (rsnIECount < MAX_RSN_IE))
-    {
-        curRsnData[0+length] = pRsnIe->hdr[0];
-        curRsnData[1+length] = pRsnIe->hdr[1];
-        os_memoryCopy(pSiteMgr->hOs, &curRsnData[2+length], (void *)pRsnIe->rsnIeData, pRsnIe->hdr[1]); 
-        length += pRsnIe->hdr[1]+2;
-        pRsnIe += 1;
-        rsnIECount++;
-    }
-    if (length<pPrimarySite->rsnIeLen) 
-    {
-        TRACE2(pSiteMgr->hReport, REPORT_SEVERITY_ERROR, "siteMgr_selectSiteFromTable, RSN IE is too long: rsnIeLen=%d, MAX_RSN_IE=%d\n", pPrimarySite->rsnIeLen, MAX_RSN_IE);
-    }
 
-	rsnData.pIe = (pPrimarySite->rsnIeLen==0) ? NULL : curRsnData;
-	rsnData.ieLen = pPrimarySite->rsnIeLen;
-    rsnData.privacy = pPrimarySite->privacy; 
-    
-    rsn_setSite(pSiteMgr->hRsn, &rsnData, NULL, &rsnAssocIeLen);
-
-	/***************** Config RegulatoryDomain **************************/
-	
 #ifdef XCC_MODULE_INCLUDED
+     /***************** Config RSN/XCC *************************/
+     /* Get the RSN IE data */
+     pRsnIe = pPrimarySite->pRsnIe;
+     length = 0;
+     rsnIECount = 0;
+     while ((length < pPrimarySite->rsnIeLen) && (pPrimarySite->rsnIeLen < 255)
+    		 && (rsnIECount < MAX_RSN_IE))
+     {
+    	 curRsnData[0+length] = pRsnIe->hdr[0];
+    	 curRsnData[1+length] = pRsnIe->hdr[1];
+    	 os_memoryCopy(pSiteMgr->hOs, &curRsnData[2+length], (void *)pRsnIe->rsnIeData, pRsnIe->hdr[1]);
+    	 length += pRsnIe->hdr[1]+2;
+    	 pRsnIe += 1;
+    	 rsnIECount++;
+     }
+     if (length<pPrimarySite->rsnIeLen)
+     {
+    	 TRACE2(pSiteMgr->hReport, REPORT_SEVERITY_ERROR, "siteMgr_selectSiteFromTable, RSN IE is too long: rsnIeLen=%d, MAX_RSN_IE=%d\n", pPrimarySite->rsnIeLen, MAX_RSN_IE);
+     }
+
+     rsnData.pIe = (pPrimarySite->rsnIeLen==0) ? NULL : curRsnData;
+     rsnData.ieLen = pPrimarySite->rsnIeLen;
+     rsnData.privacy = pPrimarySite->privacy;
+
+     rsn_XCCSetSite(pSiteMgr->hRsn, &rsnData, NULL);
+
+
+     /***************** Config RegulatoryDomain **************************/
+
 	/* set XCC TPC if present */
 	if(XCC_ParseClientTP(pSiteMgr->hOs,pPrimarySite,(TI_INT8 *)&ExternTxPower,pIeBuffer,PktLength) == TI_OK)
     {
@@ -691,7 +693,7 @@ TI_STATUS systemConfig(siteMgr_t *pSiteMgr)
     measurementMgr_setMeasurementMode(pSiteMgr->hMeasurementMgr, capabilities, 
 									pIeBuffer, PktLength);
 
-    os_memoryFree(pSiteMgr->hOs, curRsnData, 256);
+    os_memoryFree(pSiteMgr->hOs, curRsnData, MAX_RSN_DATA_SIZE);
     os_memoryFree(pSiteMgr->hOs, pParam, sizeof(paramInfo_t));
     
 	return TI_OK;

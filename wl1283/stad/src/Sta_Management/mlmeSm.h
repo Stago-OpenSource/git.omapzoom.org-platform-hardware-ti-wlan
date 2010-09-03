@@ -48,8 +48,9 @@
 #ifndef _MLME_SM_H
 #define _MLME_SM_H
 
-#include "fsm.h"
+#include "GenSM.h"
 #include "mlmeApi.h"
+#include "mlme.h"
 
 /* Constants */
 
@@ -59,82 +60,31 @@
 
 /* Enumerations */
 
-/* state machine states */
+/* State machine states */
 typedef enum 
 {
-    MLME_SM_STATE_IDLE          = 0,
-    MLME_SM_STATE_AUTH_WAIT     = 1,
-    MLME_SM_STATE_ASSOC_WAIT    = 2,
-    MLME_SM_STATE_ASSOC         = 3,
-    MLME_SM_NUM_STATES
+	MLME_SM_STATE_IDLE			= 0,
+	MLME_SM_STATE_AUTH_WAIT		= 1,
+	MLME_SM_STATE_SHARED_WAIT	= 2,
+	MLME_SM_STATE_ASSOC_WAIT	= 3,
+	MLME_SM_NUMBER_OF_STATES
 } mlme_smStates_t;
 
-/* State machine inputs */
+/* State machine events */
 typedef enum 
 {
-    MLME_SM_EVENT_START             = 0,
-    MLME_SM_EVENT_STOP              = 1,
-    MLME_SM_EVENT_AUTH_SUCCESS      = 2,
-    MLME_SM_EVENT_AUTH_FAIL         = 3,
-    MLME_SM_EVENT_ASSOC_SUCCESS     = 4,
-    MLME_SM_EVENT_ASSOC_FAIL        = 5,
-    MLME_SM_NUM_EVENTS          
+	MLME_SM_EVENT_START				= 0,
+	MLME_SM_EVENT_STOP				= 1,
+	MLME_SM_EVENT_FAIL				= 2,
+	MLME_SM_EVENT_SUCCESS    		= 3,
+	MLME_SM_EVENT_SHARED_RECV	 	= 4,
+	MLME_SM_EVENT_AUTH_TIMEOUT		= 5,
+	MLME_SM_EVENT_SHARED_TIMEOUT	= 6,
+	MLME_SM_EVENT_ASSOC_TIMEOUT		= 7,
+	MLME_SM_NUMBER_OF_EVENTS
 } mlme_smEvents_t;
 
-
-
 /* Typedefs */
-
-typedef struct
-{
-    mgmtStatus_e mgmtStatus;
-    TI_UINT16        uStatusCode;
-} mlmeData_t;
-
-
-typedef struct
-{
-    fsm_stateMachine_t  *pMlmeSm;
-    TI_UINT8            currentState;
-    mlmeData_t          mlmeData;
-    legacyAuthType_e    legacyAuthType;
-    TI_BOOL             reAssoc;
-    DisconnectType_e    disConnType;
-    mgmtStatus_e        disConnReason;
-    TI_BOOL             bParseBeaconWSC;
-
-    /* temporary frame info */
-    mlmeIEParsingParams_t tempFrameInfo;
-    
-    /* debug info - start */
-    TI_UINT32           debug_lastProbeRspTSFTime;
-    TI_UINT32           debug_lastDtimBcnTSFTime;
-    TI_UINT32           debug_lastBeaconTSFTime;
-    TI_BOOL             debug_isFunctionFirstTime;
-    TI_UINT32           totalMissingBeaconsCounter;
-    TI_UINT32           totalRcvdBeaconsCounter;
-    TI_UINT32           maxMissingBeaconSequence;
-    TI_UINT32           BeaconsCounterPS;
-    /* debug info - end */
-
-    TI_HANDLE           hAuth;
-    TI_HANDLE           hAssoc;
-    TI_HANDLE           hSiteMgr;
-    TI_HANDLE           hCtrlData;
-    TI_HANDLE           hConn;
-    TI_HANDLE           hTxMgmtQ;
-    TI_HANDLE           hMeasurementMgr;
-    TI_HANDLE           hSwitchChannel;
-    TI_HANDLE           hRegulatoryDomain;
-    TI_HANDLE           hReport;
-    TI_HANDLE           hOs;
-    TI_HANDLE           hCurrBss;
-    TI_HANDLE           hApConn;
-    TI_HANDLE           hScanCncn;
-    TI_HANDLE           hQosMngr;
-    TI_HANDLE           hTWD;
-    TI_HANDLE           hTxCtrl;
-} mlme_t;
 
 /* Structures */
 
@@ -148,20 +98,22 @@ void mlme_smTimeout(TI_HANDLE hMlme);
 
 /* local functions */
 
-TI_STATUS mlme_smEvent(TI_UINT8 *currentState, TI_UINT8 event, TI_HANDLE hMlme);
+void mlme_smEvent(TI_HANDLE hGenSm, TI_UINT32 uEvent, void* pData);
 
-/* state machine functions */
-TI_STATUS mlme_smStartIdle(mlme_t *pMlme);
-TI_STATUS mlme_smAuthSuccessAuthWait(mlme_t *pMlme);
-TI_STATUS mlme_smAuthFailAuthWait(mlme_t *pMlme);
-TI_STATUS mlme_smStopAssocWait(mlme_t *pMlme);
-TI_STATUS mlme_smAssocSuccessAssocWait(mlme_t *pMlme);
-TI_STATUS mlme_smAssocFailAssocWait(mlme_t *pMlme);
-TI_STATUS mlme_smStopAssoc(mlme_t *pMlme);
-TI_STATUS mlme_smActionUnexpected(mlme_t *pMlme);
-TI_STATUS mlme_smNOP(mlme_t *pMlme);
+void mlme_smToIdle(mlme_t *pMlme);
+
 
 TI_STATUS mlme_smReportStatus(mlme_t *pMlme);
+
+/* Timer expirey callbacks */
+void mlme_authTmrExpiry (TI_HANDLE hMlme, TI_BOOL bTwdInitOccured);
+void mlme_sharedTmrExpiry (TI_HANDLE hMlme, TI_BOOL bTwdInitOccured);
+void mlme_assocTmrExpiry (TI_HANDLE hMlme, TI_BOOL bTwdInitOccured);
+
+/* State Machine variables */
+extern TGenSM_actionCell mlmeMatrix[ MLME_SM_NUMBER_OF_STATES ][ MLME_SM_NUMBER_OF_EVENTS ];
+extern TI_INT8* uMlmeStateDescription[];
+extern TI_INT8* uMlmeEventDescription[]; 
 
 #endif
 

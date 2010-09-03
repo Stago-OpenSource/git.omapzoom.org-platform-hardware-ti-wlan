@@ -41,6 +41,7 @@
 #define __FILE_ID__  FILE_ID_76
 #include "ScanCncn.h"
 #include "report.h"
+#include "timer.h"
 #include "scrApi.h"
 #include "regulatoryDomainApi.h"
 #include "siteMgrApi.h"
@@ -55,11 +56,15 @@
 #include "apConnApi.h"
 #include "EvHandler.h"
 
+
+
+
 /* static functions */
 void scanCncn_SGupdateScanParams (TI_HANDLE hScanCncn, UScanParams *puScanParams, TI_BOOL bPeriodicScan) ;
 static void scanCncn_VerifyChannelsWithRegDomain (TI_HANDLE hScanCncn, UScanParams *puScanParams, TI_BOOL bPeriodicScan);
 static void scanCncn_Mix1ShotScanChannels (TScanChannelEntry *pChannelArray, TI_UINT32 uValidChannelsCount);
 static void scanCncn_MixPeriodicScanChannels (TPeriodicChannelEntry *pChannelArray, TI_UINT32 uValidChannelsCount);
+static void scanCncn_ScanCompleteCB( TI_HANDLE hScanCncn, char* str, TI_UINT32 strLen );
 
 #define SCAN_CLIENT_FROM_TAG( tag )  tag2Client[ tag ];
 static EScanCncnClient tag2Client[ SCAN_RESULT_TAG_MAX_NUMBER ] = 
@@ -147,6 +152,12 @@ void scanCncn_Destroy (TI_HANDLE hScanCncn)
     TScanCncn   *pScanCncn = (TScanCncn*)hScanCncn;
     TI_UINT32   uIndex;
 
+    /* destroy the scan guard timer */
+	if (pScanCncn->hScanGuardTimer)
+    {
+		tmr_DestroyTimer (pScanCncn->hScanGuardTimer);
+    }
+
     /* destory the app scan result table */
     scanResultTable_Destroy (pScanCncn->hScanResultTable);
 
@@ -185,9 +196,10 @@ void scanCncn_Init (TStadHandlesList *pStadHandles)
     pScanCncn->hSCR = pStadHandles->hSCR;
     pScanCncn->hAPConn = pStadHandles->hAPConnection;
     pScanCncn->hEvHandler = pStadHandles->hEvHandler;
-    pScanCncn->hMlme = pStadHandles->hMlmeSm;
+    pScanCncn->hMlme = pStadHandles->hMlme;
     pScanCncn->hHealthMonitor = pStadHandles->hHealthMonitor;
     pScanCncn->hSme = pStadHandles->hSme;
+	pScanCncn->hTimer = pStadHandles->hTimer;
 
     /* nullify other parameters */
     pScanCncn->eConnectionStatus = STA_NOT_CONNECTED;
@@ -195,34 +207,51 @@ void scanCncn_Init (TStadHandlesList *pStadHandles)
     pScanCncn->eCurrentRunningAppScanClient = SCAN_SCC_NO_CLIENT;
     pScanCncn->uOSScanLastTimeStamp = 0;
     pScanCncn->bOSScanRunning = TI_FALSE;
+	pScanCncn->numOfConsTimerExpiry = 0;
+	pScanCncn->bScanCompleteFlag = TI_TRUE;
+    pScanCncn->hScanGuardTimer = NULL;
 
     /* initialize client objects */
     scanCncnSm_Init (pScanCncn->pScanClients[ SCAN_SCC_ROAMING_IMMED ], pScanCncn->hReport, pScanCncn->hTWD,
                      pScanCncn->hSCR, pScanCncn->hAPConn, pScanCncn->hMlme, (TI_HANDLE)pScanCncn,
                      scanCncnSmImmed1Shot_ScrRequest, scanCncnSmImmed1Shot_ScrRelease, scanCncnSmImmed1Shot_StartScan,
-                     scanCncnSmImmed1Shot_StopScan, scanCncnSmImmed1Shot_Recovery, "Immediate scan SM");
+                     scanCncnSmImmed1Shot_StopScan, scanCncnSm_NoOp, "Immediate scan SM");
     scanCncnSm_Init (pScanCncn->pScanClients[ SCAN_SCC_ROAMING_CONT ], pScanCncn->hReport, pScanCncn->hTWD,
                      pScanCncn->hSCR, pScanCncn->hAPConn, pScanCncn->hMlme, (TI_HANDLE)pScanCncn,
                      scanCncnSmCont1Shot_ScrRequest, scanCncnSmCont1Shot_ScrRelease, scanCncnSmCont1Shot_StartScan,
-                     scanCncnSmCont1Shot_StopScan, scanCncnSmCont1Shot_Recovery, "Continuous scan SM");
+                     scanCncnSmCont1Shot_StopScan, scanCncnSm_NoOp, "Continuous scan SM");
     scanCncnSm_Init (pScanCncn->pScanClients[ SCAN_SCC_DRIVER ], pScanCncn->hReport, pScanCncn->hTWD,
                      pScanCncn->hSCR, pScanCncn->hAPConn, pScanCncn->hMlme, (TI_HANDLE)pScanCncn, 
                      scanCncnSmDrvP_ScrRequest, scanCncnSmDrvP_ScrRelease, scanCncnSmDrvP_StartScan,
-                     scanCncnSmDrvP_StopScan, scanCncnSmDrvP_Recovery, "Driver scan SM");
+                     scanCncnSmDrvP_StopScan, scanCncnSm_NoOp, "Driver scan SM");
     scanCncnSm_Init (pScanCncn->pScanClients[ SCAN_SCC_APP_PERIODIC ], pScanCncn->hReport, pScanCncn->hTWD,
                      pScanCncn->hSCR, pScanCncn->hAPConn, pScanCncn->hMlme, (TI_HANDLE)pScanCncn,
                      scanCncnSmAppP_ScrRequest, scanCncnSmAppP_ScrRelease, scanCncnSmAppP_StartScan,
-                     scanCncnSmAppP_StopScan, scanCncnSmAppP_Recovery, "Periodic application scan SM");
+                     scanCncnSmAppP_StopScan, scanCncnSm_NoOp, "Periodic application scan SM");
     scanCncnSm_Init (pScanCncn->pScanClients[ SCAN_SCC_APP_ONE_SHOT ], pScanCncn->hReport, pScanCncn->hTWD,
                      pScanCncn->hSCR, pScanCncn->hAPConn, pScanCncn->hMlme, (TI_HANDLE)pScanCncn,
                      scanCncnSmApp1Shot_ScrRequest, scanCncnSmApp1Shot_ScrRelease, scanCncnSmApp1Shot_StartScan,
-                     scanCncnSmApp1Shot_StopScan, scanCncnSmApp1Shot_Recovery, "One-shot application scan SM");
+                     scanCncnSmApp1Shot_StopScan, scanCncnSm_NoOp, "One-shot application scan SM");
 
     /* Initialize the OS scan SM */
     scanCncnOsSm_Init ((TI_HANDLE)pScanCncn);
 
     /* initlaize the application scan result table */
     scanResultTable_Init (pScanCncn->hScanResultTable, pStadHandles, SCAN_RESULT_TABLE_DONT_CLEAR);
+}
+
+/** 
+ * \fn     scanCncn_Recover
+ * \brief  Recover the scan concentartor module
+ * 
+ * \param  hScanCncn - module handle
+ * \return None
+ */ 
+void scanCncn_Recover (TI_HANDLE hScanCncn)
+{
+    TScanCncn   *pScanCncn = (TScanCncn*)hScanCncn;
+
+    tmr_StopTimer(pScanCncn->hScanGuardTimer);
 }
 
 /** 
@@ -236,7 +265,7 @@ void scanCncn_Init (TStadHandlesList *pStadHandles)
  * \return None
  * \sa     scanCncn_Create, scanCncn_Init
  */ 
-void scanCncn_SetDefaults (TI_HANDLE hScanCncn, TScanCncnInitParams *pScanCncnInitParams)
+TI_STATUS scanCncn_SetDefaults (TI_HANDLE hScanCncn, TScanCncnInitParams *pScanCncnInitParams)
 {
     TScanCncn   *pScanCncn = (TScanCncn*)hScanCncn;
 
@@ -246,6 +275,14 @@ void scanCncn_SetDefaults (TI_HANDLE hScanCncn, TScanCncnInitParams *pScanCncnIn
                    pScanCncnInitParams,
                    sizeof (TScanCncnInitParams));
 
+    /* create scan guard timer */
+	pScanCncn->hScanGuardTimer = tmr_CreateTimer(pScanCncn->hTimer);
+    if ( pScanCncn->hScanGuardTimer == NULL)
+    {
+		TRACE0(pScanCncn->hReport, REPORT_SEVERITY_INIT, "scanCncn_SetDefaults - ERROR creating timer - ABROTING init!\n");
+		return TI_NOK;
+    }
+
     /* register SCR callbacks */
     scr_registerClientCB (pScanCncn->hSCR, SCR_CID_APP_SCAN, scanCncn_ScrAppCB, (TI_HANDLE)pScanCncn);
     scr_registerClientCB (pScanCncn->hSCR, SCR_CID_DRIVER_FG_SCAN, scanCncn_ScrDriverCB, (TI_HANDLE)pScanCncn);
@@ -253,8 +290,17 @@ void scanCncn_SetDefaults (TI_HANDLE hScanCncn, TScanCncnInitParams *pScanCncnIn
     scr_registerClientCB (pScanCncn->hSCR, SCR_CID_IMMED_SCAN, scanCncn_ScrRoamingImmedCB, (TI_HANDLE)pScanCncn);
 
     /* register TWD scan complete CB */
-    TWD_RegisterScanCompleteCb (pScanCncn->hTWD, scanCncn_ScanCompleteNotificationCB,
-                                (TI_HANDLE)pScanCncn);
+	TWD_RegisterEvent (pScanCncn->hTWD,
+					   TWD_OWN_EVENT_SCAN_CMPLT,
+					   (void *)scanCncn_ScanCompleteCB,
+					   (TI_HANDLE)pScanCncn); 
+
+    TWD_RegisterEvent (pScanCncn->hTWD,
+					   TWD_OWN_EVENT_SPS_SCAN_CMPLT, 
+					   (void *)scanCncn_ScanCompleteCB, 
+					   (TI_HANDLE)pScanCncn);
+
+
     /* register and enable periodic scan complete event with TWD */
     TWD_RegisterEvent (pScanCncn->hTWD, TWD_OWN_EVENT_PERIODIC_SCAN_COMPLETE,
                        (void *)scanCncn_PeriodicScanCompleteCB, (TI_HANDLE)pScanCncn);
@@ -274,6 +320,56 @@ void scanCncn_SetDefaults (TI_HANDLE hScanCncn, TScanCncnInitParams *pScanCncnIn
 
     /* set to the sme the handler of the scan concentrator Scan Result Table */
     sme_SetScanResultTable(pScanCncn->hSme, pScanCncn->hScanResultTable);
+
+	return TI_OK;
+}
+
+/** 
+ * \fn     scanCncn_TimerExpired
+ * \brief  CB function to handle Scan guard timer expiration.
+ * 
+ * If Max time of consecutive expirations - trigger recovery.
+ * 
+ * \param  hScanCncn - handle to the scan concentrator object
+ * \param  bTwdInitOccured - Indicates if TWDriver recovery
+ * occured since timer started \return None
+ */ 
+void scanCncn_TimerExpired (TI_HANDLE hScanCncn, TI_BOOL bTwdInitOccured)
+{
+	TScanCncn   *pScanCncn = (TScanCncn*)hScanCncn;
+
+    
+	pScanCncn->numOfConsTimerExpiry++;
+	pScanCncn->bScanCompleteFlag = TI_FALSE;
+    
+	/* 
+     No scan complete event will trigger recovery only after a consecutive configurable number of 
+	 no scan complete events occurred.
+     */
+    if (pScanCncn->numOfConsTimerExpiry >= pScanCncn->tInitParams.numberOfNoScanCompleteToRecovery)
+    {
+        TRACE0( pScanCncn->hReport, REPORT_SEVERITY_ERROR, "Scan Timer expired. Starting recovery process.\n");
+
+        pScanCncn->numOfConsTimerExpiry = 0;
+
+        /* call the recovery module */
+		healthMonitor_sendFailureEvent(pScanCncn->hHealthMonitor, NO_SCAN_COMPLETE_FAILURE);
+    }
+    else
+    {
+        TRACE2( pScanCncn->hReport, REPORT_SEVERITY_ERROR, "Scan Timer expired. consecutive failures: %d, threshold:%d, still not calling recovery.\n", pScanCncn->numOfConsTimerExpiry, pScanCncn->tInitParams.numberOfNoScanCompleteToRecovery);
+
+        /* send Stop scan command */
+		TWD_StopScan (pScanCncn->hTWD, pScanCncn->eLatestScanTag, pScanCncn->eLatestScanType, NULL, NULL);
+                      
+        /* Call the Scan complete CB to handle unsuccessful completion */
+        scanCncn_ScanCompleteNotification (hScanCncn,
+										   pScanCncn->eLatestScanTag,
+										   0,
+										   0xffff,
+										   TI_FALSE, 
+										   TI_OK);
+	}
 }
 
 /** 
@@ -428,12 +524,6 @@ void scanCncn_StopScan (TI_HANDLE hScanCncn, EScanCncnClient eClient)
 
     TRACE1( pScanCncn->hReport, REPORT_SEVERITY_INFORMATION, "scanCncn_StopScan: Received stop scan request from client %d\n", eClient);
 
-    /* 
-     * mark that null data should be sent (different from abort, where null dats is not sent
-     * to reduce abort time)
-     */
-    pScanCncn->pScanClients[ eClient ]->bSendNullDataOnStop = TI_TRUE;
-
     /* if no previous error has occurred, change the state to stopped */
     if (SCAN_CRS_SCAN_COMPLETE_OK == pScanCncn->pScanClients[ eClient ]->eScanResult)
     {
@@ -557,7 +647,7 @@ void scanCncn_RegisterScanResultCB (TI_HANDLE hScanCncn, EScanCncnClient eClient
 }
 
 /**
- * \fn     scanCncn_ScanCompleteNotificationCB
+ * \fn     scanCncn_ScanCompleteNotification
  * \brief  Called when a scan is complete
  * 
  * Update scan status and send a complete event to the SM
@@ -571,15 +661,15 @@ void scanCncn_RegisterScanResultCB (TI_HANDLE hScanCncn, EScanCncnClient eClient
  * \param  scanStatus - scan SRV status (OK / NOK)
  * \return None
  */ 
-void scanCncn_ScanCompleteNotificationCB (TI_HANDLE hScanCncn, EScanResultTag eTag,
-                                          TI_UINT32 uResultCount, TI_UINT16 SPSStatus,
-                                          TI_BOOL bTSFError, TI_STATUS scanStatus,
-                                          TI_STATUS PSMode)
+void scanCncn_ScanCompleteNotification (TI_HANDLE hScanCncn, EScanResultTag eTag,
+										TI_UINT32 uResultCount, TI_UINT16 SPSStatus,
+										TI_BOOL bTSFError, TI_STATUS scanStatus)
+										
 {
     TScanCncn           *pScanCncn = (TScanCncn*)hScanCncn;
     EScanCncnClient     eClient;
 
-    TRACE6(pScanCncn->hReport, REPORT_SEVERITY_INFORMATION , "scanCncn_ScanCompleteNotificationCB: tag: %d, result count: %d, SPS status: %d, TSF Error: %d, scan status: %d, PS mode: %d\n", eTag, uResultCount, SPSStatus, bTSFError, scanStatus, PSMode);
+    TRACE5(pScanCncn->hReport, REPORT_SEVERITY_INFORMATION , "scanCncn_ScanCompleteNotificationCB: tag: %d, result count: %d, SPS status: %d, TSF Error: %d, scan status: %d\n", eTag, uResultCount, SPSStatus, bTSFError, scanStatus);
 
     /* get the scan client value from the scan tag */
     eClient = SCAN_CLIENT_FROM_TAG (eTag);
@@ -936,9 +1026,7 @@ void scanCncn_ScrRoamingContCB (TI_HANDLE hScanCncn, EScrClientRequestStatus eRe
 
 
     case SCR_CRS_ABORT:
-        /* mark not to send NULL data when scan is stopped */
-        pScanCncn->pScanClients[ SCAN_SCC_ROAMING_CONT ]->bSendNullDataOnStop = TI_FALSE;
-
+        
         /* if no previous error has occurred, change the result to abort */
         if (SCAN_CRS_SCAN_COMPLETE_OK == pScanCncn->pScanClients[ SCAN_SCC_ROAMING_CONT ]->eScanResult)
         {
@@ -1014,9 +1102,7 @@ void scanCncn_ScrAppCB (TI_HANDLE hScanCncn, EScrClientRequestStatus eRequestSta
         break;
 
     case SCR_CRS_ABORT:  
-        /* mark not to send NULL data when scan is stopped */
-        pScanCncn->pScanClients[ eClient ]->bSendNullDataOnStop = TI_FALSE;
-
+        
         /* if no previous error has occurred, change the result to abort */
         if (SCAN_CRS_SCAN_COMPLETE_OK == pScanCncn->pScanClients[ eClient ]->eScanResult)
         {
@@ -1505,3 +1591,77 @@ static void scanCncn_MixPeriodicScanChannels (TPeriodicChannelEntry *pChannelArr
         pChannelArray[i] = tTempArray[i];
     }
 }
+
+/** 
+ * \fn     scanCncn_ScanCompleteCB
+ * \brief  CB to be called upon ScanComplete event reception.
+ * 
+ * \param hScanCncn - handle to the scan concentrator object.
+ * \param  str      - Buffer containing the event result
+ * \param  strLen   - Event result length
+ * 
+ * \return None
+ */ 
+static void scanCncn_ScanCompleteCB( TI_HANDLE hScanCncn, char* str, TI_UINT32 strLen )
+{
+	TScanCncn *pScanCncn = (TScanCncn*)hScanCncn;
+    scanCompleteResults_t *pResult = (scanCompleteResults_t*)str;
+	EScanResultTag      eScanTag;
+	TI_UINT32           uResultCount = 0;
+	TI_BOOL             bTSFError = TI_FALSE;
+	TI_UINT16           SPSScanResult = 0xffff;
+
+
+    TRACE0( pScanCncn->hReport, REPORT_SEVERITY_INFORMATION, "Scan complete event received\n");
+
+    tmr_StopTimer(pScanCncn->hScanGuardTimer);
+    
+	/* nullify the consecutive no scan complete events counter  - only if this is a scan complete that
+       does not happen afetr a stop scan (due to a timer expiry) */
+	if ( TI_TRUE == pScanCncn->bScanCompleteFlag )
+    {
+		pScanCncn->numOfConsTimerExpiry = 0;
+    }
+
+    /* Check Result of Scan to distinguish PS failure*/
+	if (SCHEDULED_SCAN_COMPLETED_OK != pResult->scheduledScanStatus)
+	{
+		/* Failed to enter PS - Scan didn't start*/
+		return scanCncn_ScanCompleteNotification (hScanCncn, pScanCncn->eLatestScanTag, uResultCount,
+												  SPSScanResult, bTSFError, TI_NOK);
+	}
+
+
+    /* copy result counter and scan tag */
+    uResultCount = pResult->numberOfScanResults;
+    eScanTag = (EScanResultTag)pResult->scanTag;
+
+    /* copy scan SPS addmitted channels and SPS result */
+    if (TI_FALSE == pScanCncn->eLatestScanType) 
+    {
+		/* normal scan - no result is available */
+        bTSFError = TI_FALSE;
+        TRACE0( pScanCncn->hReport, REPORT_SEVERITY_INFORMATION, "Normal scan completed.\n");
+    }
+    else
+    {
+        /* SPS scan - first byte indicates whether a TSF error (AP recovery) occured */
+        if ( 0 != (pResult->scheduledScanStatus >> 24))
+        {
+            bTSFError = TI_TRUE;
+        }
+        else
+        {
+			bTSFError = TI_FALSE;
+        }
+
+        /* next two bytes indicates on which channels scan was attempted */
+        SPSScanResult = (TI_UINT16)(pResult->scheduledScanStatus >> 16) | 0xff;
+        SPSScanResult = ENDIAN_HANDLE_WORD( SPSScanResult );
+        TRACE1( pScanCncn->hReport, REPORT_SEVERITY_INFORMATION, "SPS scan completed. TSF error: , SPS result: %x\n", SPSScanResult);
+    }
+
+	scanCncn_ScanCompleteNotification (hScanCncn, eScanTag, uResultCount, SPSScanResult,
+									   bTSFError, TI_OK);
+}
+

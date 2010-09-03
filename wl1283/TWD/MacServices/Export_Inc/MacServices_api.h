@@ -79,292 +79,6 @@
  *	External functions definitions
  ***********************************************************************
  */
-/**
- * \\n
- * \date 6-Oct-2004\n
- * \brief Creates MacServices module
- *
- * Function Scope \e Public.\n
- * \param hOS - handle to the OS object.\n
- */
-TI_HANDLE MacServices_create( TI_HANDLE hOS );
-
-/**
- * \\n
- * \date 6-Oct-2004\n
- * \brief Destroys MacServices module
- *
- * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
- */
-void MacServices_destroy( TI_HANDLE hMacServices );
-
-/**
- * \\n
- * \date  6-Oct-2004\n
- * \brief Initializes the MacServices module
- *
- * Function Scope \e Public.\n
- * \param hMacServices - handle to the Mac Services object.\n
- * \param hReport - handle to the report object.\n
- * \param hTWD - handle to the HAL ctrl object.\n
- * \param hCmdBld - handle to the HAL ctrl object.\n
- * \param hEventMbpx - handle to the HAL ctrl object.\n
- */
-void MacServices_init (TI_HANDLE hMacServices, 
-                       TI_HANDLE hReport, 
-                       TI_HANDLE hTWD, 
-                       TI_HANDLE hCmdBld, 
-                       TI_HANDLE hEventMbox, 
-                       TI_HANDLE hTimer);
-void MacServices_config (TI_HANDLE hMacServices, TTwdInitParams *pInitParams);
-void MacServices_restart (TI_HANDLE hMacServices);
-
-void MacServices_registerFailureEventCB (TI_HANDLE hMacServices, void * failureEventCB, TI_HANDLE hFailureEventObj);
-
-
-/***********************************************************************
- *	Scan SRV API functions
- ***********************************************************************/
-
-
-/**
- * \\n
- * \date 29-Dec-2004\n
- * \brief Registers a complete callback for scan complete notifications.
- *
- * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
- * \param scanCompleteCB - the complete callback function.\n
- * \param hScanCompleteObj - handle to the object passed to the scan complete callback function.\n
- */
-void MacServices_scanSRV_registerScanCompleteCB( TI_HANDLE hMacServices, 
-                                     TScanSrvCompleteCb scanCompleteCB, TI_HANDLE hScanCompleteObj );
-
-
-
-/**
- * \\n
- * \date 29-Dec-2004\n
- * \brief Performs a scan
- *
- * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
- * \param scanParams - the scan specific parameters.\n
- * \param eScanTag - tag used for result and scan complete tracking
- * \param bHighPriority - whether to perform a high priority (overlaps DTIM) scan.\n
- * \param bDriverMode - whether to try to enter driver mode (with PS on) before issuing the scan command.\n
- * \param bScanOnDriverModeError - whether to proceed with the scan if requested to enter driver mode and failed.\n
- * \param bSendNullData - whether to send Null data when exiting driver mode on scan complete.\n
- * \param psRequest - Parameter sent to PowerSaveServer on PS request to indicate PS on or "keep current" 
- * \param commandResponseFunc - CB function which called after downloading the command. \n
- * \param commandResponseObj -  The CB function Obj (Notice : last 2 params are NULL in Legacy run). \n
-  * \return TI_OK if successful (various, TBD codes if not).\n
- */
-TI_STATUS MacServices_scanSRV_scan( TI_HANDLE hMacServices, TScanParams *scanParams, EScanResultTag eScanTag,
-                                    TI_BOOL bHighPriority, TI_BOOL bDriverMode, TI_BOOL bScanOnDriverModeError, 
-						E80211PsMode psRequest, TI_BOOL bSendNullData,
-						TCmdResponseCb commandResponseFunc, TI_HANDLE commandResponseObj );
-
-/**
- * \\n
- * \date 29-Dec-2004\n
- * \brief Stops a scan in progress
- *
- * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
- * \param eScanTag - scan tag, used for scan complete and result tracking
- * \param bSendNullData - indicates whether to send Null data when exiting driver mode.\n
- * \param commandResponseFunc - CB function which called after downloading the command. \n
- * \param commandResponseObj -  The CB function Obj (Notice : last 2 params are NULL in Legacy run). \n
- * \return TI_OK if successful (various, TBD codes if not).\n
- */
-TI_STATUS MacServices_scanSRV_stopScan( TI_HANDLE hMacServices, EScanResultTag eScanTag, TI_BOOL bSendNullData,
-                                        TCmdResponseCb commandResponseFunc, TI_HANDLE commandResponseObj );
-
-/**
- * \\n
- * \date 17-Jan-2005\n
- * \brief Notifies the scan SRV of a FW reset (that had originally been reported by a different module).\n
- *
- * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
- * \return TI_OK if successful (various, TBD codes if not).\n
- */
-TI_STATUS MacServices_scanSRV_stopOnFWReset( TI_HANDLE hMacServices );
-
-/**
- * \\n
- * \date 29-Dec-2004\n
- * \brief callback function used by the power manager to notify driver mode result
- *
- * Function Scope \e Public.\n
- * \param hScanSRV - handle to the scan SRV object.\n
- * \param psStatus - the power save request status.\n
- */
-void MacServices_scanSRV_powerSaveCB( TI_HANDLE hScanSRV, TI_UINT8 PSMode,TI_UINT8 psStatus );
-
-/**
- * \\n
- * \date 29-Dec-2004\n
- * \brief Callback function used by the HAL ctrl to notify scan complete
- *
- * Function Scope \e Public.\n
- * \param hScanSRV - handle to the scan SRV object.\n
- * \param str - pointer to scan result buffer (holding SPS status for SPS scan only!).\n
- * \param strLen - scan result buffer length (should ALWAYS be 2, even for non SPS scans).\n
- */
-void MacServices_scanSRV_scanCompleteCB( TI_HANDLE hScanSRV, char* str, TI_UINT32 strLen );
-
-/**
- * \\n
- * \date 29-Dec-2004\n
- * \brief called when a scan timer expires. Completes the scan and starts a recovery process.
- *
- * Function Scope \e Public.\n
- * \param hScanSRV - handle to the scan SRV object.\n
- */
-void MacServices_scanSRV_scanTimerExpired (TI_HANDLE hScanSRV, TI_BOOL bTwdInitOccured);
-
-void MacServices_scanSrv_UpdateDtimTbtt (TI_HANDLE hMacServices, 
-                                         TI_UINT8  uDtimPeriod, 
-                                         TI_UINT16 uBeaconInterval);
-
-#ifdef TI_DBG
-/**
- * \\n
- * \date God knows when...\n
- * \brief Prints Scan Server SM status.\n
- *
- * Function Scope \e Public.\n
- * \param hMacServices - handle to the Mac Services object.\n
- */
-void MacServices_scanSrv_printDebugStatus(TI_HANDLE hMacServices);
-#endif
-
-/*Power server API*/
-
-
-/**
-  * \
- * \date 24-Oct-2005\n
- * \brief request PS by User
- *
- * Function Scope \e Public.\n
- * Parameters:\n
- * 1) hPowerSrv 						- handle to the PowerSrv object.\n		
- * 2) psMode							- Power save/Active request.\n
- * 3) sendNullDataOnExit				- \n
- * 4) powerSaveCompleteCBObject		- handle to the Callback functin module.\n
- * 5) powerSaveCompleteCB				- Calback function - for success/faild notification.\n
- * 6) powerSavecmdResponseCB			- Calback function - for GWSI success/faild notification.\n
- * Return Value: TI_STATUS - TI_OK / PENDING / TI_NOK.\n
- * \b Description:\n
- * This function is a user mode request from the Power Save Server./n
- * it will create a Request from typ "USER_REQUEST" and will try to perform the user request for PS/Active./n
- * this will be done in respect of priority to Driver request./n
- */
-TI_STATUS MacServices_powerSrv_SetPsMode(TI_HANDLE 	                hMacServices,
-                                		 E80211PsMode	            psMode,
- 									     TI_BOOL  						sendNullDataOnExit,
- 						        		 void * 					powerSaveCompleteCBObject,
- 						        		 TPowerSaveCompleteCb  		powerSaveCompleteCB,
- 						        		 TPowerSaveResponseCb	    powerSavecmdResponseCB);
-
-
-/**
-  * \
- * \date 24-Oct-2005\n
- * \brief SW configure, use to override the current PowerMode (what ever it will be) to
- *        active/PS combined with awake/power-down. use for temporary change the system policy.
- *
- * Function Scope \e Public.\n
- * Parameters:\n
- * 1) TI_HANDLE - handle to the powerSrv object.\n
- * 2) powerSrv_RequestFor_802_11_PS_e - the driver mode obliged to be in 802.11 PS or not change.\n
- * 3) PowerCtrl_PowerLevel_e - the desired driver power level (allowed: AWAKE or POWER DOWN).\n
- * 4) TI_HANDLE theObjectHandle - the handle the object that need the PS success/fail notification.\n
- * 5) ps802_11_NotificationCB_t - the callback function.\n
- * 6) char* - the clinet name that ask for driver mode.\n
- * Return Value: TI_STATUS - if success (already in power save) then TI_OK,\n
- *                           if pend (wait to ACK form AP for the null data frame) then PENDING\n
- *                           if PS isn't enabled then POWER_SAVE_802_11_NOT_ALLOWED\n
- *                           else TI_NOK.\n
- * \b Description:\n
- * enter in to configuration of the driver that in higher priority from the user.\n
- * the configuration is:\n
- *  - to enter to802.11 PS or not (if not this isn't a request to get out from 802.11 PS).\n
- *  - to change the HW power level to awake or power-down if not already there.
- *    this is a must request.\n
-*/
-TI_STATUS MacServices_powerSrv_ReservePS(	TI_HANDLE 	                hMacServices,
-                                            E80211PsMode 	            psMode,
-                                            TI_BOOL  						sendNullDataOnExit,
-                                            void * 						powerSaveCBObject,
-                                            TPowerSaveCompleteCb 		powerSaveCompleteCB);
-
-
-/**
- * \
- * \date 24-Oct-2005\n
- * \brief end the temporary change of system policy, and returns to the user system policy.
- *
- * Function Scope \e Public.\n
- * Parameters:\n
- * 1) TI_HANDLE - handle to the powerSrv object.\n
- * 2) char* - the clinet name that ask for driver mode.\n
- * Return Value: TI_STATUS - TI_OK on success else TI_NOK.\n
- * \b Description:\n
- * enter in to configuration of the driver that in higher priority from the user.\n
- * the configuration is:\n
- * end the user mode configuration (driver mode priority) and returns the user configuration
- * (user mode priority).
-*/
-TI_STATUS MacServices_powerSrv_ReleasePS( 	TI_HANDLE 	hMacServices,
-									TI_BOOL  						sendNullDataOnExit,
- 						 			void *  						powerSaveCBObject,
- 									TPowerSaveCompleteCb  			powerSaveCompleteCB);
-
-
-/**
- * \
- * \date 24-Oct-2005\n
- * \brief reflects the actual state of the state machine
- *
- * Function Scope \e Public.\n
- * Parameters:\n
- * 1) TI_HANDLE - handle to the powerSrv object.\n
- * Return Value:\n 
- * TI_BOOL - thre is in PS false otherwise.\n
-*/
-TI_BOOL MacServices_powerSrv_getPsStatus(TI_HANDLE hMacServices);
-
-
-/**
- * \
- * \date 24-Oct-2005\n
- * \sets the rate as got from user else sets default value.\n
- *
- * Function Scope \e Public.\n
- * Parameters:\n
- * 1) TI_HANDLE 	- handle to the powerSrv object.\n
- * 2) TI_UINT16		- desierd rate .\n
- * Return Value:\n 
- * void.\n
-*/
-void MacServices_powerSrv_SetRateModulation(TI_HANDLE hMacServices, TI_UINT16  rate);
-/**
- * \Return the alrweady seted rate.\n
- *
- * Function Scope \e Public.\n
- * Parameters:\n
- * TI_HANDLE 	- handle to the powerSrv object.\n
- * Return Value: TI_UINT16		- desierd rate .\n
- * void.\n
-*/
-TI_UINT32 MacServices_powerSrv_GetRateModulation(TI_HANDLE hMacServices);
-
-
 
 
 /***********************************************************************
@@ -372,21 +86,55 @@ TI_UINT32 MacServices_powerSrv_GetRateModulation(TI_HANDLE hMacServices);
  ***********************************************************************/
 
 /**
+ * \date 08-November-2005\n
+ * \brief Creates the measurement SRV object
+ *
+ * Function Scope \e Public.\n
+ * \param hOS - handle to the OS object.\n
+ * \return a handle to the measurement SRV object, NULL if an error occurred.\n
+ */
+TI_HANDLE MacServices_measurementSRV_create( TI_HANDLE hOS );
+
+/**
+ * \date 08-November-2005\n
+ * \brief Initializes the measurement SRV object
+ *
+ * Function Scope \e Public.\n
+ * \param hMeasurementSRV - handle to the measurement SRV object.\n
+ * \param hReport - handle to the report object.\n
+ * \param hCmdBld - handle to the Command Builder object.\n
+ */
+TI_STATUS MacServices_measurementSRV_init (TI_HANDLE hMeasurementSRV, 
+                                           TI_HANDLE hReport, 
+                                           TI_HANDLE hCmdBld,
+                                           TI_HANDLE hEventMbox,
+                                           TI_HANDLE hTimer);
+
+/**
+ * \date 08-November-2005\n
+ * \brief Destroys the measurement SRV object
+ *
+ * Function Scope \e Public.\n
+ * \param hMeasurementSRV - handle to the measurement SRV object.\n
+ */
+void MacServices_measurementSRV_destroy( TI_HANDLE hMeasurementSRV );
+
+/**
  * \\n
  * \date 09-November-2005\n
  * \brief Starts a measurement operation.\n
  *
  * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
+ * \param hMeasurementSRV - handle to the MeasurementSRV object.\n
  * \param pMsrRequest - a structure containing measurement parameters.\n
- * \param timeToRequestExpiryMs - the time (in milliseconds) the measurement SRV has to start the request.\n
+ * \param timeToRequestexpiryMs - the time (in milliseconds) the measurement SRV has to start the request.\n
  * \param cmdResponseCBFunc - callback function to used for command response.\n
  * \param cmdResponseCBObj - handle to pass to command response CB.\n
  * \param cmdCompleteCBFunc - callback function to be used for command complete.\n
  * \param cmdCompleteCBObj - handle to pass to command complete CB.\n
  * \return TI_OK if successful (various, TBD codes if not).\n
  */ 
-TI_STATUS MacServices_measurementSRV_startMeasurement( TI_HANDLE hMacServices, 
+TI_STATUS MacServices_measurementSRV_startMeasurement( TI_HANDLE hMeasurementSRV, 
                                                        TMeasurementRequest* pMsrRequest,
 													   TI_UINT32 timeToRequestExpiryMs,
                                                        TCmdResponseCb cmdResponseCBFunc,
@@ -400,13 +148,13 @@ TI_STATUS MacServices_measurementSRV_startMeasurement( TI_HANDLE hMacServices,
  * \brief Stops a measurement operation in progress.\n
  *
  * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
+ * \param hMeasurementSRV - handle to the MeasurementSRV object.\n
  * \param bSendNullData - whether to send NULL data when exiting driver mode.\n
  * \param cmdResponseCBFunc - callback function to used for command response.\n
  * \param cmdResponseCBObj - handle to pass to command response CB.\n
  * \return TI_OK if successful (various, TBD codes if not).\n
  */
-TI_STATUS MacServices_measurementSRV_stopMeasurement( TI_HANDLE hMacServices,
+TI_STATUS MacServices_measurementSRV_stopMeasurement( TI_HANDLE hMeasurementSRV,
 													  TI_BOOL bSendNullData,
                                                       TCmdResponseCb cmdResponseCBFunc,
                                                       TI_HANDLE cmdResponseCBObj );
@@ -417,21 +165,9 @@ TI_STATUS MacServices_measurementSRV_stopMeasurement( TI_HANDLE hMacServices,
  * \brief Notifies the measurement SRV of a FW reset (recovery).\n
  *
  * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
+ * \param hMeasurementSRV - handle to the MeasurementSRV object.\n
  */
-void MacServices_measurementSRV_FWReset( TI_HANDLE hMacServices );
-
-/** 
- * \\n
- * \date 09-November-2005\n
- * \brief callback function used by the power manager to notify driver mode result
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSRV - handle to the measurement SRV object.\n
- * \param PSMode - the power save mode the STA is currently in.\n
- * \param psStatus - the power save request status.\n
- */
-void MacServices_measurementSRV_powerSaveCB( TI_HANDLE hMeasurementSRV, TI_UINT8 PSMode,TI_UINT8 psStatus );
+void MacServices_measurementSRV_FWReset( TI_HANDLE hMeasurementSRV );
 
 /** 
  * \\n
@@ -453,7 +189,7 @@ void MacServices_measurementSRV_measureStartCB( TI_HANDLE hMeasurementSRV );
  * Function Scope \e Public.\n
  * \param hMeasurementSRV - handle to the measurement SRV object.\n
  */
-void MacServices_measurementSRV_measureCompleteCB( TI_HANDLE hMeasurementSRV );
+void MacServices_measurementSRV_measureCompleteCB( TI_HANDLE hMeasurementSRV, char* str, TI_UINT32 strLen );
 
 /** 
  * \\n
@@ -520,5 +256,30 @@ void MacServices_measurementSRV_startStopTimerExpired (TI_HANDLE hMeasurementSRV
  * \param hMeasuremntSRV - handle to the measurement SRV object.\n
  */
 void MacServices_measurementSRV_requestTimerExpired (TI_HANDLE hMeasurementSRV, TI_BOOL bTwdInitOccured);
+
+/**
+ * \\n
+ * \date 15-November-2005\n
+ * \brief Registers a failure event callback for scan error notifications.\n
+ *
+ * Function Scope \e Public.\n
+ * \param hMeasuremntSRV - handle to the measurement SRV object.\n
+ * \param failureEventCB - the failure event callback function.\n
+ * \param hFailureEventObj - handle to the object passed to the failure event callback function.\n
+ */
+void MacServices_measurementSRV_registerFailureEventCB( TI_HANDLE hMeasurementSRV,
+														void * failureEventCB,
+														TI_HANDLE hFailureEventObj );
+
+/**
+ * \\n
+ * \date 15-November-2005\n
+ * \brief Restart the measurement SRV object upon recover.\n
+ *
+ * Function Scope \e Public.\n
+ * \param hMeasuremntSRV - handle to the measurement SRV object.
+ */
+void MacServices_measurementSRV_restart( TI_HANDLE hMeasurementSRV);
+
 
 #endif /* __MACSERVICESAPI_H__ */

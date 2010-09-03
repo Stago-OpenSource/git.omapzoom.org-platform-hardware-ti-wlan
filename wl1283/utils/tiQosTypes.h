@@ -191,17 +191,21 @@ typedef struct _OS_802_11_AP_QOS_CAPABILITIES_PARAMS
 
 typedef struct _OS_802_11_QOS_TSPEC_PARAMS
 {
-    TI_UINT32               uUserPriority;
-    TI_UINT32               uNominalMSDUsize; /* in bytes */
-    TI_UINT32               uMeanDataRate;        /* bits per second */
-    TI_UINT32               uMinimumPHYRate;  /* 1,2,5,6,9,11,12,18,......*/
-    TI_UINT32               uSurplusBandwidthAllowance;
-    TI_UINT32               uAPSDFlag;
-    TI_UINT32               uMediumTime;
-    TI_UINT32               uReasonCode;
-    TI_UINT32               uMinimumServiceInterval;
-    TI_UINT32               uMaximumServiceInterval;
-
+	TI_UINT32 uTid;
+	TI_UINT32 eDirection;
+	TI_UINT32 uAPSDFlag;
+	TI_UINT32 uUserPriority;
+	TI_UINT32 uNominalMSDUsize; /* in bytes */
+	TI_UINT32 bFixedMsduSize; /* boolean (0 – No, 1 – Yes) */
+	TI_UINT32 uMeanDataRate; /* bits per second */
+	TI_UINT32 uMinimumPHYRate; /* 1,2,5,6,9,11,12,18,......*/
+	TI_UINT32 uSurplusBandwidthAllowance;
+	TI_UINT32 uMaxiMsduSize; /* optional */
+	TI_UINT32 uMaxBurstSize; /* optional */
+	TI_UINT32 uMinDataRate; /* optional */
+	TI_UINT32 uPeakDataRate; /* optional */
+	TI_UINT32 uMediumTime;
+	TI_UINT32 uReasonCode;
 } OS_802_11_QOS_TSPEC_PARAMS;
 
 

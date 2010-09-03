@@ -71,6 +71,9 @@
 #define NVS_FILE_TX_PARAMETERS_UPDATE	0
 #define NVS_FILE_RX_PARAMETERS_UPDATE	1
 
+#define SDIO_VALIDATION_TXN_SIZE_DEFAULT	(8000)
+#define SDIO_VALIDATION_NUM_LOOPS_DEFAULT	(1)
+
 
 /* local types */
 /***************/
@@ -127,6 +130,7 @@ static named_value_t BeaconFilter_use[] =
     { 0,        (PS8)"INACTIVE" },
     { 1,        (PS8)"ACTIVE" },
 };
+
 
 static named_value_t event_type[] = {
     { IPC_EVENT_ASSOCIATED,             (PS8)"Associated" },
@@ -227,14 +231,14 @@ static named_value_t report_module[] =
     { FILE_ID_60  ,  (PS8)"txDataQueue             " },
     { FILE_ID_61  ,  (PS8)"txMgmtQueue             " },
     { FILE_ID_62  ,  (PS8)"txPort                  " },
-    { FILE_ID_63  ,  (PS8)"assocSM                 " },
-    { FILE_ID_64  ,  (PS8)"authSm                  " },
+    { FILE_ID_63  ,  (PS8)"NA                      " },
+    { FILE_ID_64  ,  (PS8)"mlme                    " },
     { FILE_ID_65  ,  (PS8)"currBss                 " },
     { FILE_ID_66  ,  (PS8)"healthMonitor           " },
     { FILE_ID_67  ,  (PS8)"mlmeBuilder             " },
     { FILE_ID_68  ,  (PS8)"mlmeParser              " },
     { FILE_ID_69  ,  (PS8)"mlmeSm                  " },
-    { FILE_ID_70  ,  (PS8)"openAuthSm              " },
+    { FILE_ID_70  ,  (PS8)"NA                      " },
     { FILE_ID_71  ,  (PS8)"PowerMgr                " },
     { FILE_ID_72  ,  (PS8)"PowerMgrDbgPrint        " },
     { FILE_ID_73  ,  (PS8)"PowerMgrKeepAlive       " },
@@ -247,7 +251,7 @@ static named_value_t report_module[] =
     { FILE_ID_80  ,  (PS8)"ScanCncnSmSpecific      " },
     { FILE_ID_81  ,  (PS8)"scanResultTable         " },
     { FILE_ID_82  ,  (PS8)"scr                     " },
-    { FILE_ID_83  ,  (PS8)"sharedKeyAuthSm         " },
+    { FILE_ID_83  ,  (PS8)"NA                      " },
     { FILE_ID_84  ,  (PS8)"siteHash                " },
     { FILE_ID_85  ,  (PS8)"siteMgr                 " },
     { FILE_ID_86  ,  (PS8)"StaCap                  " },
@@ -302,7 +306,8 @@ static named_value_t report_module[] =
 	{ FILE_ID_135 ,  (PS8)"roamingMngr_autoSM      " },
 	{ FILE_ID_136 ,  (PS8)"roamingMngr_manualSM    " },
 	{ FILE_ID_137 ,  (PS8)"cmdinterpretoid         " },
-	{ FILE_ID_138 ,  (PS8)"WlanDrvIf               " }
+	{ FILE_ID_138 ,  (PS8)"WlanDrvIf               " },
+    { FILE_ID_139 ,  (PS8)"rrmMgr                  " }
 };
 
 static named_value_t report_severity[] = {
@@ -458,7 +463,7 @@ static U8 CuCmd_atox(U8 c)
     }
     else /* assuming input is valid */
     {
-        return c - 'A' + 10;
+    	return c - 'A' + 10;
     }
 }
 
@@ -495,6 +500,40 @@ static void CuCmd_xtoa_string (U8* srcBuffer, U32 srcBufferLength, U8* dstString
     }
 }
 
+static VOID CuCmd_set_DefPeriodic_Scan_Params(CuCmd_t* pCuCmd)
+{
+    U8 i;
+    /* init periodic application scan params */
+    pCuCmd->tPeriodicAppScanParams.uSsidNum = 0;
+    pCuCmd->tPeriodicAppScanParams.uSsidListFilterEnabled = 1;
+    pCuCmd->tPeriodicAppScanParams.uCycleNum = 0; /* forever */
+    pCuCmd->tPeriodicAppScanParams.uCycleIntervalMsec[ 0 ] = 3;
+    for (i = 1; i < PERIODIC_SCAN_MAX_INTERVAL_NUM; i++)
+    {
+        pCuCmd->tPeriodicAppScanParams.uCycleIntervalMsec[ i ] = 30000;
+    }
+    pCuCmd->tPeriodicAppScanParams.iRssiThreshold = -80;
+    pCuCmd->tPeriodicAppScanParams.iSnrThreshold = 0;
+    pCuCmd->tPeriodicAppScanParams.uFrameCountReportThreshold = 1;
+    pCuCmd->tPeriodicAppScanParams.bTerminateOnReport = TRUE;
+    pCuCmd->tPeriodicAppScanParams.eBssType = BSS_ANY;
+    pCuCmd->tPeriodicAppScanParams.uProbeRequestNum = 3;
+    pCuCmd->tPeriodicAppScanParams.uChannelNum = 14;
+    for ( i = 0; i < 14; i++ )
+    {
+        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].eBand = RADIO_BAND_2_4_GHZ;
+        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uChannel = i + 1;
+        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].eScanType = SCAN_TYPE_NORMAL_ACTIVE;
+        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uMinDwellTimeMs = 5;
+        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uMaxDwellTimeMs = 20;
+        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uTxPowerLevelDbm = DEF_TX_POWER;
+    }
+
+   
+}
+
+
+
 static VOID CuCmd_Init_Scan_Params(CuCmd_t* pCuCmd)
 {
     U8 i,j;
@@ -521,30 +560,7 @@ static VOID CuCmd_Init_Scan_Params(CuCmd_t* pCuCmd)
     }
 
     /* init periodic application scan params */
-    pCuCmd->tPeriodicAppScanParams.uSsidNum = 0;
-    pCuCmd->tPeriodicAppScanParams.uSsidListFilterEnabled = 1;
-    pCuCmd->tPeriodicAppScanParams.uCycleNum = 0; /* forever */
-    pCuCmd->tPeriodicAppScanParams.uCycleIntervalMsec[ 0 ] = 3;
-    for (i = 1; i < PERIODIC_SCAN_MAX_INTERVAL_NUM; i++)
-    {
-        pCuCmd->tPeriodicAppScanParams.uCycleIntervalMsec[ i ] = 30000;
-    }
-    pCuCmd->tPeriodicAppScanParams.iRssiThreshold = -80;
-    pCuCmd->tPeriodicAppScanParams.iSnrThreshold = 0;
-    pCuCmd->tPeriodicAppScanParams.uFrameCountReportThreshold = 1;
-    pCuCmd->tPeriodicAppScanParams.bTerminateOnReport = TRUE;
-    pCuCmd->tPeriodicAppScanParams.eBssType = BSS_ANY;
-    pCuCmd->tPeriodicAppScanParams.uProbeRequestNum = 3;
-    pCuCmd->tPeriodicAppScanParams.uChannelNum = 14;
-    for ( i = 0; i < 14; i++ )
-    {
-        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].eBand = RADIO_BAND_2_4_GHZ;
-        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uChannel = i + 1;
-        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].eScanType = SCAN_TYPE_NORMAL_ACTIVE;
-        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uMinDwellTimeMs = 5;
-        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uMaxDwellTimeMs = 20;
-        pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uTxPowerLevelDbm = DEF_TX_POWER;
-    }
+     CuCmd_set_DefPeriodic_Scan_Params(pCuCmd);
 
     /* init default scan policy */
     pCuCmd->scanPolicy.normalScanInterval = 10000;
@@ -586,8 +602,6 @@ static VOID CuCmd_Init_Scan_Params(CuCmd_t* pCuCmd)
     pCuCmd->scanPolicy.bandScanPolicy[ 0 ].immediateScanMethod.method.basicMethodParams.probReqParams.numOfProbeReqs = 3;
     pCuCmd->scanPolicy.bandScanPolicy[ 0 ].immediateScanMethod.method.basicMethodParams.probReqParams.txPowerDbm = DEF_TX_POWER;
 }
-
-
 
 char* PrintSSID(OS_802_11_SSID* ssid)
 {
@@ -1109,7 +1123,11 @@ VOID CuCmd_FullBssidList(THandle hCuCmd, ConParm_t parm[], U16 nParms)
     }
     else
     {
-        if(OK != CuOs_GetBssidList(pCuCmd->hCuWext, bssidList) ) return;
+        if(OK != CuOs_GetBssidList(pCuCmd->hCuWext, bssidList) )
+        {
+         os_MemoryFree(bssidList);
+         return;
+        }
     }
 
     /* get currently connected bssid */
@@ -1122,7 +1140,7 @@ VOID CuCmd_FullBssidList(THandle hCuCmd, ConParm_t parm[], U16 nParms)
     os_MemoryFree(bssidList);
 }
 
-#if defined(CONFIG_EAP_WSC) && !defined(NO_WPA_SUPPL)
+#if defined(CONFIG_WPS) && !defined(NO_WPA_SUPPL)
 VOID CuCmd_StartEnrolleePIN(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 {
     CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
@@ -1178,7 +1196,7 @@ VOID CuCmd_SetPin(THandle hCuCmd, ConParm_t parm[], U16 nParms)
     os_error_printf(CU_MSG_INFO2, (PS8)"WPS PIN set %s\n", parm[0].value);
 }
 
-#endif /* CONFIG_EAP_WSC */
+#endif /* CONFIG_WPS */
 
 VOID CuCmd_Connect(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 {
@@ -1210,6 +1228,18 @@ VOID CuCmd_Connect(THandle hCuCmd, ConParm_t parm[], U16 nParms)
             /* 
              *  Both SSID & BSSID are set -
              *  Use CLI's SSID & BSSID.
+             */
+            if(!CuCmd_Str2MACAddr( (PS8)parm[1].value, bssid) )
+                return;
+            ssid.SsidLength = os_strlen((PS8) parm[0].value);
+            os_memcpy((PVOID)ssid.Ssid, (PVOID) parm[0].value, ssid.SsidLength);
+            ssid.Ssid[ssid.SsidLength] = '\0';
+            break;
+        default:
+            /* 
+             *  Both SSID & BSSID are set -
+             *  Use CLI's SSID & BSSID.
+             *  Ignore other parameters.
              */
             if(!CuCmd_Str2MACAddr( (PS8)parm[1].value, bssid) )
                 return;
@@ -1966,6 +1996,7 @@ VOID CuCmd_GetRxDataFiltersStatistics(THandle hCuCmd, ConParm_t parm[], U16 nPar
     os_error_printf(CU_MSG_INFO2, (PS8)"Packets matching filter #4: %u\n", MatchedPacketsCount[3]);
 }
 
+
 VOID CuCmd_ShowStatistics(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 {
     CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
@@ -2509,9 +2540,12 @@ VOID CuCmd_ConfigurePeriodicScanChannel (THandle hCuCmd, ConParm_t parm[], U16 n
 VOID CuCmd_ClearPeriodicScanConfiguration (THandle hCuCmd, ConParm_t parm[], U16 nParms)
 {
     CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
-
     os_memset (&(pCuCmd->tPeriodicAppScanParams), 0, sizeof (TPeriodicScanParams));
-    os_error_printf(CU_MSG_INFO2, (PS8)"Periodic application scan parameters cleared.\n");
+
+	/* Set scan default preiodic Scan commands */
+    CuCmd_set_DefPeriodic_Scan_Params(pCuCmd);
+
+    os_error_printf(CU_MSG_INFO2, (PS8)"Periodic application scan parameters restarted.\n");
 }
 
 VOID CuCmd_DisplayPeriodicScanConfiguration (THandle hCuCmd, ConParm_t parm[], U16 nParms)
@@ -3096,20 +3130,35 @@ VOID CuCmd_AddTspec(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 {
     CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
     OS_802_11_QOS_TSPEC_PARAMS TspecParams;
+	os_memset(&TspecParams, 0 , sizeof(OS_802_11_QOS_TSPEC_PARAMS));
     
-    TspecParams.uUserPriority = parm[0].value;
-    TspecParams.uNominalMSDUsize = parm[1].value;
-    TspecParams.uMeanDataRate = parm[2].value;
-    TspecParams.uMinimumPHYRate = parm[3].value * 1000 * 1000;
-    TspecParams.uSurplusBandwidthAllowance = parm[4].value << 13;
-    TspecParams.uAPSDFlag = parm[5].value;
-    TspecParams.uMinimumServiceInterval = parm[6].value;
-    TspecParams.uMaximumServiceInterval = parm[7].value;
+    TspecParams.uTid = parm[0].value;
+    TspecParams.uAPSDFlag = parm[1].value;
+    TspecParams.uUserPriority = parm[2].value;
+    TspecParams.uNominalMSDUsize =  parm[3].value;
+	TspecParams.bFixedMsduSize = parm[4].value;
+	TspecParams.uMeanDataRate = parm[5].value;
+	TspecParams.uMinimumPHYRate = parm[6].value * 1000 * 1000;
+    TspecParams.uSurplusBandwidthAllowance = parm[7].value;
+	TspecParams.eDirection = BI_DIRECTIONAL; /* support only bi-dirictional */
+	if (nParms >= 9) {
+		TspecParams.uMaxiMsduSize = parm[8].value;
+		}
+	if (nParms >= 10) {
+		TspecParams.uMaxBurstSize = parm[9].value;
+		}
+	if (nParms >= 11) {
+		TspecParams.uMinDataRate = parm[10].value;
+		}
 
+	if (nParms >= 12) {
+		TspecParams.uPeakDataRate = parm[11].value;
+	}
     if(OK != CuCommon_SetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_ADD_TSPEC, 
         &TspecParams, sizeof(OS_802_11_QOS_TSPEC_PARAMS))) return;
 
-    os_error_printf(CU_MSG_INFO2, (PS8)"TSpec request sent to driver...\n uUserPriority = %d\n uNominalMSDUsize = %d\n uMeanDataRate = %d\n uMinimumPHYRate = %d\n uSurplusBandwidthAllowance = %d\n uAPSDFlag = %d uMinimumServiceInterval = %d uMaximumServiceInterval = %d\n",
+    os_error_printf(CU_MSG_INFO2, (PS8)"TSpec request sent to driver...\n"
+					"uTid = %d\n uAPSDFlag = %d\n uUserPriority = %d\n uNominalMSDUsize = %d\n bFixedMsduSize = %d\n uMeanDataRate = %d uMinimumPHYRate = %d uSurplusBandwidthAllowance = %d.%d\n",
                parm[0].value,
                parm[1].value,
                parm[2].value,
@@ -3117,7 +3166,7 @@ VOID CuCmd_AddTspec(THandle hCuCmd, ConParm_t parm[], U16 nParms)
                parm[4].value,
                parm[5].value,
                parm[6].value,
-               parm[7].value);
+               parm[7].value >> 13, (parm[7].value & 0x1FFF));
    
 }
 
@@ -3131,16 +3180,16 @@ VOID CuCmd_GetTspec(THandle hCuCmd, ConParm_t parm[], U16 nParms)
     if(OK != CuCommon_GetSetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_GET_TSPEC_PARAMS,
         &TspecParams, sizeof(OS_802_11_QOS_TSPEC_PARAMS))) return;
 
-    os_error_printf(CU_MSG_INFO2, (PS8)"TSpec parameters retrieved:\nuUserPriority = %d\nuNominalMSDUsize = %d\nuMeanDataRate = %d\nuMinimumPHYRate = %d\nuSurplusBandwidthAllowance = %d\nuUAPSD_Flag = %d\nuMinimumServiceInterval = %d\nuMaximumServiceInterval = %d\nuMediumTime = %d\n",
+    os_error_printf(CU_MSG_INFO2, (PS8)"TSpec parameters retrieved:\n"
+					" medium time = %d\n, tid = %d\n uAPSDFlag = %d\n uUserPriority = %d\n uNominalMSDUsize = %d\n uMeanDataRate = %d\n uMinimumPHYRate = %d\n uSurplusBandwidthAllowance = %d.%d\n",
+					TspecParams.uMediumTime,
+					TspecParams.uTid,
+					TspecParams.uAPSDFlag,
                TspecParams.uUserPriority,
                TspecParams.uNominalMSDUsize,
                TspecParams.uMeanDataRate,
                TspecParams.uMinimumPHYRate,
-               TspecParams.uSurplusBandwidthAllowance,
-               TspecParams.uAPSDFlag,
-               TspecParams.uMinimumServiceInterval,
-               TspecParams.uMaximumServiceInterval,
-               TspecParams.uMediumTime);
+					TspecParams.uSurplusBandwidthAllowance >> 13, (TspecParams.uSurplusBandwidthAllowance & 0x1FFF) );
 }
 
 VOID CuCmd_DeleteTspec(THandle hCuCmd, ConParm_t parm[], U16 nParms)
@@ -3445,31 +3494,137 @@ VOID CuCmd_RemoveClsfrEntry(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 
 VOID CuCmd_SetPsRxDelivery(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 {
-    CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
-    TPsRxStreaming tPsRxStreaming;
+	CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
+	TPsRxStreaming tPsRxStreaming;
 
-    tPsRxStreaming.uTid          = parm[0].value;
-    tPsRxStreaming.uStreamPeriod = parm[1].value;
-    tPsRxStreaming.uTxTimeout    = parm[2].value;
-    tPsRxStreaming.bEnabled      = parm[3].value;
+	tPsRxStreaming.uTid          = parm[0].value;
+	tPsRxStreaming.uStreamPeriod = parm[1].value;
+	tPsRxStreaming.uTxTimeout    = parm[2].value;
+	tPsRxStreaming.bEnabled      = parm[3].value;
 
-    if (CuCommon_SetBuffer(pCuCmd->hCuCommon, QOS_MNGR_PS_RX_STREAMING,
-        &tPsRxStreaming, sizeof(TPsRxStreaming)) == OK)
-    {
-        os_error_printf(CU_MSG_INFO2, (PS8)"Sent PS Rx Delivery to driver...");
-    }
-    else
-    {
-        os_error_printf(CU_MSG_INFO2, (PS8)"Error: could not set PS Rx Delivery in driver...\n");
-    }
-    os_error_printf(CU_MSG_INFO2, 
-        (PS8)"TID = %d \n RxPeriod = %d \n TxTimeout = %d\n Enabled = %d\n", 
-        tPsRxStreaming.uTid,      
-        tPsRxStreaming.uStreamPeriod, 
-        tPsRxStreaming.uTxTimeout,
-        tPsRxStreaming.bEnabled);
+	if (CuCommon_SetBuffer(pCuCmd->hCuCommon, QOS_MNGR_PS_RX_STREAMING,
+		&tPsRxStreaming, sizeof(TPsRxStreaming)) == OK)
+	{
+		os_error_printf(CU_MSG_INFO2, (PS8)"Sent PS Rx Delivery to driver...");
+	}
+	else
+	{
+		os_error_printf(CU_MSG_INFO2, (PS8)"Error: could not set PS Rx Delivery in driver...\n");
+	}
+	os_error_printf(CU_MSG_INFO2, 
+		(PS8)"TID = %d \n RxPeriod = %d \n TxTimeout = %d\n Enabled = %d\n", 
+		tPsRxStreaming.uTid,      
+		tPsRxStreaming.uStreamPeriod, 
+		tPsRxStreaming.uTxTimeout,
+		tPsRxStreaming.bEnabled);
 }
 
+VOID CuCmd_SetBaPolicy(THandle hCuCmd, ConParm_t parm[], U16 nParms)
+{
+	CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
+	TBaPolicy tBaPolicy;
+    S32 i = 0;
+
+
+	if (nParms == 0)
+	{
+	    os_error_printf(CU_MSG_INFO2, (PS8)"Block Ack Policy (0-None,1-Only RX,2-Only TX,3-Both:\n");
+    	os_error_printf(CU_MSG_INFO2, (PS8)"+-----+--------------+\n");
+	    os_error_printf(CU_MSG_INFO2, (PS8)"| TID | Policy       |\n");
+    	os_error_printf(CU_MSG_INFO2, (PS8)"+-----+--------------+\n");
+	
+	    for (i=0; i<8; i++)
+	    {
+	        tBaPolicy.uTid = i;
+	        if(OK != CuCommon_GetSetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_MNGR_BA_POLICY,
+	            &tBaPolicy, sizeof(TBaPolicy))) return;      
+
+	        os_error_printf(CU_MSG_INFO2, (PS8)"| %3d | %12d |\n",
+	            tBaPolicy.uTid,         
+	            tBaPolicy.uBaPlociy);
+	    }
+	    os_error_printf(CU_MSG_INFO2, (PS8)"+-----+--------------+\n");
+	}
+
+	else if (nParms != 2)
+		os_error_printf(CU_MSG_INFO2, (PS8)"Error: could not set Ba Policy in driver...\n");
+
+	else
+	{
+				
+		tBaPolicy.uTid          = parm[0].value;
+		tBaPolicy.uBaPlociy 	= parm[1].value;
+
+		if (CuCommon_SetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_MNGR_BA_POLICY,
+			&tBaPolicy, sizeof(TBaPolicy)) == OK)
+		{
+			os_error_printf(CU_MSG_INFO2, (PS8)"Sent Ba Policy to driver...");
+		}
+		else
+		{
+			os_error_printf(CU_MSG_INFO2, (PS8)"Error: could not set Ba Policy in driver...\n");
+		}
+		os_error_printf(CU_MSG_INFO2, 
+			(PS8)"TID = %d \n Policy = %d\n", 
+			tBaPolicy.uTid,      
+			tBaPolicy.uBaPlociy);
+	}
+}
+
+VOID CuCmd_ClearBaPolicy(THandle hCuCmd, ConParm_t parm[], U16 nParms)
+{
+	CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
+	int i;
+	TBaPolicy tBaPolicy;
+
+	tBaPolicy.uBaPlociy = 0;
+	
+	for (i=0;i<MAX_NUM_OF_802_1d_TAGS;i++)
+	{
+		tBaPolicy.uTid = i;
+		
+		if (CuCommon_SetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_MNGR_BA_POLICY,
+			&tBaPolicy, sizeof(TBaPolicy)) != OK)
+		{
+			os_error_printf(CU_MSG_INFO2, (PS8)"Error: could not set Ba Policy in driver...\n");
+		}
+	}
+}
+
+VOID CuCmd_PsTrafficPeriod(THandle hCuCmd, ConParm_t parm[], U16 nParms)
+{
+	CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
+	TPsRxStreaming tPsRxStreaming;
+
+	if (nParms == 0)
+	{
+	    if(OK != CuCommon_GetSetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_MNGR_PS_TRAFFIC_PERIOD,
+	            &tPsRxStreaming, sizeof(TBaPolicy))) return;
+
+		os_error_printf(CU_MSG_INFO2, (PS8)"Ps Traffic Period: %d \n",tPsRxStreaming.uStreamPeriod);
+	}
+	else
+	{
+				
+		tPsRxStreaming.uTid 		 = 0; /* ps traffic in auto rx streaming is on TID 0*/
+		tPsRxStreaming.uStreamPeriod = parm[0].value;
+		tPsRxStreaming.uTxTimeout	 = 0;
+		if (parm[0].value)
+			tPsRxStreaming.bEnabled 	 = TI_TRUE;
+		else
+			tPsRxStreaming.bEnabled 	 = TI_FALSE;
+
+		if (CuCommon_SetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_MNGR_PS_TRAFFIC_PERIOD,
+			&tPsRxStreaming, sizeof(tPsRxStreaming)) == OK)
+		{
+			os_error_printf(CU_MSG_INFO2, (PS8)"Set ps traffic period...\n");
+		}
+		else
+		{
+			os_error_printf(CU_MSG_INFO2, (PS8)"Error: could not set ps traffic period in driver...\n");
+		}
+	}
+}
 
 VOID CuCmd_SetQosParams(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 {
@@ -4784,6 +4939,7 @@ VOID CuCmd_RadioDebug_StopTx(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 	os_error_printf(CU_MSG_INFO2, (PS8)"Plt Tx Stop was OK\n");
 }
 
+
 /* download packet template for transmissions 
 	the template shall be set before calling TX Debug */
 VOID CuCmd_RadioDebug_Template(THandle hCuCmd, ConParm_t parm[], U16 nParms)
@@ -5370,6 +5526,7 @@ VOID nvsUpdateFile(THandle hCuCmd, TNvsStruct nvsStruct, TI_UINT8 version,  S8 u
 	if (NULL == nvsBinFile)
 	{
 		os_error_printf(CU_MSG_ERROR, (PS8)"\n Could not create FILE!!! !!!! \n");
+        return;
 	}
 	
 	/* fill MAC Address */
@@ -6358,6 +6515,40 @@ VOID CuCmd_SetArpIPFilter (THandle hCuCmd, ConParm_t parm[], U16 nParms)
 
 }
 
+VOID CuCmd_SdioValidation(THandle hCuCmd, ConParm_t parm[], U16 nParms)
+{
+    SdioValidationTestParams_t      sdioTestParams;
+    CuCmd_t                         *pCuCmd         = (CuCmd_t*)hCuCmd;
+    TI_UINT32                       uTxnSizeInBytes = 1;
+    TI_UINT32                       uNumOfLoops     = 1;
+
+    
+    /* Set SdioValidationTestParams fileds */
+
+    if(nParms > 0)
+    {
+        uNumOfLoops = parm[0].value;
+    }
+
+    if(nParms > 1)
+    {
+        uTxnSizeInBytes = parm[1].value;
+
+        /* Align to 4 bytes - rounded up */
+        uTxnSizeInBytes += 3;
+        uTxnSizeInBytes &= 0xFFFFFFFC;
+    }
+
+    sdioTestParams.uNumOfLoops  = uNumOfLoops;
+    sdioTestParams.uTxnSize     = uTxnSizeInBytes;
+
+
+    if (OK != CuCommon_SetBuffer(pCuCmd->hCuCommon, FW_DEBUG_SDIO_VALIDATION, &sdioTestParams, sizeof(sdioTestParams)))
+    {
+        os_error_printf(CU_MSG_ERROR, (PS8)"SDIO validation mechanism has failed. \n");
+    }
+}
+
 VOID CuCmd_ShowAbout(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 {
     CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
@@ -6365,38 +6556,42 @@ VOID CuCmd_ShowAbout(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 
     if(OK != CuCommon_GetBuffer(pCuCmd->hCuCommon, SITE_MGR_FIRMWARE_VERSION_PARAM,
         FwVesrion, FW_VERSION_LEN)) return;
-    
-    os_error_printf(CU_MSG_INFO2, (PS8)"MCP version: %s\n", 
+
+    os_error_printf(CU_MSG_INFO2, (PS8)"\nMCP version:   %s\n", 
                                                 MCP_WL7_VERSION_STR);
-    os_error_printf(CU_MSG_INFO2, (PS8)"\nWLAN:\n");
+
 #ifdef XCC_MODULE_INCLUDED
-    os_error_printf(CU_MSG_INFO2, (PS8)"Driver version: \n\t%s_XCC\n", 
+    os_error_printf(CU_MSG_INFO2, (PS8)"WLAN Driver:   %s_XCC\n", 
                                                 SW_VERSION_STR);
 #elif GEM_SUPPORTED
-    os_error_printf(CU_MSG_INFO2, (PS8)"Driver version: \n\t%s_GEM\n", 
+    os_error_printf(CU_MSG_INFO2, (PS8)"WLAN Driver:   %s_GEM\n", 
                                                 SW_VERSION_STR);
 #else
-    os_error_printf(CU_MSG_INFO2, (PS8)"Driver version: \n\t%s_NOCCX\n", 
+    os_error_printf(CU_MSG_INFO2, (PS8)"WLAN Driver:   %s_NOCCX\n", 
                                                 SW_VERSION_STR);
 #endif/* XCC_MODULE_INCLUDED*/
-    os_error_printf(CU_MSG_INFO2, (PS8)"Firmware version: \n\t%s\n", 
+    os_error_printf(CU_MSG_INFO2, (PS8)"WLAN Firmware: %s\n", 
                                                 FwVesrion);
-    
+
 /*
     print GPS version.
 */
-    os_error_printf(CU_MSG_INFO2, (PS8)"\nGPS:\n");
-    os_error_printf(CU_MSG_INFO2, (PS8)"\t%s\n", GPS_SW_VERSION_STR);
+#ifdef TNETW1283
+    os_error_printf(CU_MSG_INFO2, (PS8)"GPS:    %s\n", GPS_SW_VERSION_STR);
+#endif
 /*
     print BTIPS version
 */
-    os_error_printf(CU_MSG_INFO2, (PS8)"\nBTIPS:\n");
-    os_error_printf(CU_MSG_INFO2, (PS8)"\t%s\n", BT_SW_VERSION_STR);
+    os_error_printf(CU_MSG_INFO2, (PS8)"BTIPS:  %s\n", BT_SW_VERSION_STR);
+
+/*
+   print BTIPS version
+*/
+    os_error_printf(CU_MSG_INFO2, (PS8)"FM:     %s\n", FM_SW_VERSION_STR);
 /*
     print BSP
 */
-    os_error_printf(CU_MSG_INFO2, (PS8)"\nBSP:\n");
-    os_error_printf(CU_MSG_INFO2, (PS8)"\t%s\n", BSP_VERSION_STR);
+    os_error_printf(CU_MSG_INFO2, (PS8)"BSP:    %s\n", BSP_VERSION_STR);
 }
 
 VOID CuCmd_Quit(THandle hCuCmd, ConParm_t parm[], U16 nParms)

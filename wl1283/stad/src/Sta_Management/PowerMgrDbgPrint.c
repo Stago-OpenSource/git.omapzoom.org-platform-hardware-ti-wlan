@@ -50,6 +50,7 @@
 
 #define MAX_DESC_LENGTH 32
 
+#ifdef REPORT_LOG
 void powerMgrPrintPriorities( TI_HANDLE hPowerMgr, powerMngModePriority_t* pPriorities );
 
 
@@ -61,7 +62,8 @@ static char powerPolicyDesc[ POWERAUTHO_POLICY_NUM ][ MAX_DESC_LENGTH ] =
 static char priorityDesc[ POWER_MANAGER_MAX_PRIORITY ][ MAX_DESC_LENGTH ] = 
                         { "User priority", "Soft-Gemini priority" };
 static char psStatusDesc[ POWER_SAVE_STATUS_NUMBER ][ MAX_DESC_LENGTH ]=
-                        { "Enter fail", "Enter success", "Exit fail", "Exit succes" };
+                        { "Enter fail", "Enter success" };
+#endif
 
 /****************************************************************************************
 *                        PowerMgr_printObject                                                          *
@@ -74,6 +76,7 @@ RETURN:    void.\n
 ****************************************************************************************/
 void PowerMgr_printObject( TI_HANDLE hPowerMgr )
 {
+#ifdef REPORT_LOG
     PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
 
     WLAN_OS_REPORT(("------------ Power Manager Object ------------\n\n"));
@@ -98,8 +101,10 @@ void PowerMgr_printObject( TI_HANDLE hPowerMgr )
     WLAN_OS_REPORT(("%-15s: 0x%x, %-15s:0x%x\n","hSiteMgr", pPowerMgr->hSiteMgr, "hTWD", pPowerMgr->hTWD));
     WLAN_OS_REPORT(("%-15s: 0x%x, %-15s:0x%x\n","hRetryPsTimer", pPowerMgr->hRetryPsTimer, "hActiveTMEvent", pPowerMgr->passToActiveTMEvent));
     WLAN_OS_REPORT(("%-15s: 0x%x\n", "hDozeTMEvent", pPowerMgr->passToDozeTMEvent));
+#endif
 }
 
+#ifdef REPORT_LOG
 void powerMgrPrintPriorities( TI_HANDLE hPowerMgr, powerMngModePriority_t* pPriorities )
 {
     int i;
@@ -111,6 +116,7 @@ void powerMgrPrintPriorities( TI_HANDLE hPowerMgr, powerMngModePriority_t* pPrio
                          powerModeDesc[ pPriorities[ i ].powerMode ]));
     }
 }
+#endif /* TI_DBG */
 #endif /* TI_DBG */
 
 #endif /* __POWER_MGR_DBG_PRINT__ */

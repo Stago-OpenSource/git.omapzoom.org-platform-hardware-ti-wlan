@@ -121,11 +121,11 @@ typedef struct TxResultDescriptor_t
     uint8			descID;		 /* Packet Identifier - same value used in the Tx descriptor.*/
 	TxDescStatus_e	status;		 /* The status of the transmission, indicating success or one of several
 									 possible reasons for failure. Refer to TxDescStatus_enum above.*/
-    uint16 			mediumUsage; /* Total air access duration including all retrys and overheads.*/
-    uint32 			fwHandlingTime;	/* The time passed from host xfer to Tx-complete.*/
-    uint32 			mediumDelay; /* Total media delay (from 1st EDCA AIFS counter until TX Complete). */
-    uint8  			lsbSecuritySequenceNumber; /* LS-byte of last TKIP seq-num (saved per AC for recovery).*/
-    uint8  			ackFailures; /* Retry count - number of transmissions without successful ACK.*/
+	uint16 			mediumUsage; /* Total air access duration including all retrys and overheads.*/
+    uint32 			totalDelay;	/* The time passed from host xfer to Tx-complete.*/
+	uint32 			mediumDelay; /* Total media delay (from 1st EDCA AIFS counter until TX Complete). */ 
+	uint8  			lsbSecuritySequenceNumber; /* LS-byte of last TKIP seq-num (saved per AC for recovery).*/
+    uint8  			ackFailures; /* Retry count - number of transmissions without successful ACK.*/  
     TxRateIndex_t	rate;		 /* The rate that succeeded getting ACK (Valid only if status=SUCCESS). */
     uint8  			spare;       /* for 4-byte alignment. */  
 } TxResultDescriptor_t;

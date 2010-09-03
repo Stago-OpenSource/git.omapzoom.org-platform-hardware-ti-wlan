@@ -61,6 +61,25 @@
 #define A_5G_BAND_MAX_UPPER_BAND_DFS_CHANNEL    140
 
 
+
+typedef struct
+{
+    TI_UINT8    MinClass;
+    TI_UINT8    MaxClass;
+    TI_UINT8    NumChan;
+    TI_UINT8    TxPower;
+    BandType_e  band;
+    TI_UINT16   Freq;
+    TI_UINT8    Channel[REG_DOMAIN_MAX_CHAN_NUM];
+}RegDomainChanPerClass_t;
+
+typedef struct
+{
+    RegulatoryZone_e         CountryZone;
+    RegDomainChanPerClass_t  DomainReg[REG_DOMAIN_MAX_REG_CLASS_NUM];
+}RegDomainInfo_t;
+
+
 typedef struct
 {
     TI_BOOL    channelValidityPassive; /*TI_TRUE-valid, TI_FALSE-invalid */
@@ -95,6 +114,8 @@ typedef struct
     /* Tx Power Control adjustment flag on=TI_TRUE\off=TI_FALSE */
     TI_BOOL                             bTemporaryTxPowerEnable;
 
+    RegulatoryZone_e                    countryZone;
+    
     /* Internal reg domain variables */
     /*********************************/
 

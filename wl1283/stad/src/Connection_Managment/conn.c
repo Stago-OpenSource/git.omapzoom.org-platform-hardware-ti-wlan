@@ -151,7 +151,7 @@ void conn_init (TStadHandlesList *pStadHandles)
 
 	pConn->hSiteMgr			= pStadHandles->hSiteMgr;
 	pConn->hSmeSm			= pStadHandles->hSme;
-	pConn->hMlmeSm			= pStadHandles->hMlmeSm;
+	pConn->hMlme			= pStadHandles->hMlme;
 	pConn->hRsn				= pStadHandles->hRsn;
 	pConn->hRxData			= pStadHandles->hRxData;
 	pConn->hReport			= pStadHandles->hReport;
@@ -467,7 +467,7 @@ TI_STATUS conn_reportMlmeStatus(TI_HANDLE			hConn,
 							mgmtStatus_e		status,
 							TI_UINT16				uStatusCode)
 {
-	conn_t *pConn = (conn_t *)hConn;
+    conn_t *pConn = (conn_t *)hConn;
 
 
 	/* Save the reason for the use of the SME when triggering DISASSOCIATE event */ 
@@ -484,11 +484,13 @@ TI_STATUS conn_reportMlmeStatus(TI_HANDLE			hConn,
         TRACE0(pConn->hReport, REPORT_SEVERITY_CONSOLE,"               CONN LOST             \n");
         TRACE0(pConn->hReport, REPORT_SEVERITY_CONSOLE,"-------------------------------------\n");
 
-
+#ifdef REPORT_LOG
 		WLAN_OS_REPORT(("-------------------------------------\n"));
 		WLAN_OS_REPORT(("               CONN LOST             \n"));
 		WLAN_OS_REPORT(("-------------------------------------\n"));
-
+#else
+		os_printf("%s: *** CONN LOST ***\n", __func__);
+#endif
 		if( pConn->connType == CONN_TYPE_ROAM )
 			pConn->disConnType = DISCONNECT_IMMEDIATE;
 		else /* connType == CONN_TYPE_ESS */
@@ -501,6 +503,51 @@ TI_STATUS conn_reportMlmeStatus(TI_HANDLE			hConn,
 
 	return TI_OK;
 }
+
+/***********************************************************************
+ *                        conn_ReportApConnStatus									
+ ***********************************************************************
+DESCRIPTION:	Called by the apConn SM when MLME status changed. 
+				Valid only in the case that the current connection type is infrastructure
+				The function calls the connection infra SM with MLME success or MLME failure 
+				according to the status
+                                                                                                   
+INPUT:      hConn	-	Connection handle.
+			status	-	ApConn status
+
+OUTPUT:		
+
+RETURN:     TI_OK on success, TI_NOK otherwise
+
+************************************************************************/
+TI_STATUS conn_ReportApConnStatus(TI_HANDLE	hConn, mgmtStatus_e status, TI_UINT16 uStatusCode)
+{
+    conn_t *pConn = (conn_t *)hConn;
+
+    /* Save the reason for the use of the SME when triggering DISCONNECT event */ 
+	pConn->smContext.disAssocEventReason = status;
+	pConn->smContext.disAssocEventStatusCode = uStatusCode;
+
+    TRACE2(pConn->hReport, REPORT_SEVERITY_INFORMATION, "conn_ReportApConnStatus, disAssocEventReason %d, disAssocEventStatusCode = %d\n", 
+           pConn->smContext.disAssocEventReason, pConn->smContext.disAssocEventStatusCode);
+
+    TRACE0(pConn->hReport, REPORT_SEVERITY_CONSOLE,"-------------------------------------\n");
+    TRACE0(pConn->hReport, REPORT_SEVERITY_CONSOLE,"               CONN LOST             \n");
+    TRACE0(pConn->hReport, REPORT_SEVERITY_CONSOLE,"-------------------------------------\n");
+
+#ifdef REPORT_LOG
+    WLAN_OS_REPORT(("-------------------------------------\n"));
+    WLAN_OS_REPORT(("               CONN LOST             \n"));
+    WLAN_OS_REPORT(("-------------------------------------\n"));
+#else
+    os_printf("%s: *** CONN LOST ***\n", __func__);
+#endif
+
+    conn_infraSMEvent(&(pConn->state), CONN_INFRA_DISCONNECT, pConn);
+    
+	return TI_OK;
+}
+
 
 /***********************************************************************
  *                        conn_reportRsnStatus									
@@ -516,8 +563,7 @@ OUTPUT:
 RETURN:     TI_OK on success, TI_NOK otherwise
 
 ************************************************************************/
-TI_STATUS conn_reportRsnStatus(TI_HANDLE			hConn, 
-							mgmtStatus_e		status)
+TI_STATUS conn_reportRsnStatus(TI_HANDLE hConn, mgmtStatus_e status)
 {
 	conn_t *pConn = (conn_t *)hConn;
 

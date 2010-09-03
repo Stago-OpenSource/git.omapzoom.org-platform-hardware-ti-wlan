@@ -47,6 +47,8 @@
 #include "qosMngr_API.h"
 #include "Device1273.h"
 #include "smeApi.h"
+#include "rrmMgr.h"
+
 
 /** 
  * \fn     staCap_Create 
@@ -122,6 +124,54 @@ TI_STATUS StaCap_Init (TStadHandlesList *pStadHandles)
 	return TI_OK;
 }
 
+
+TI_STATUS StaCap_SetDefaults (TI_HANDLE hStaCap, TStaCapInitParams *pInitParams)
+{
+    TStaCap *pStaCap = (TStaCap *)hStaCap;
+
+    pStaCap->bRRMEnabled = pInitParams->bRRMEnabled;
+
+    pStaCap->uRRMEnabledCapabilities = RRM_LINK_MEASURE_CAPABILITY | RRM_NEIGHBOR_MEASURE_CAPABILITY | 
+                                       RRM_BEACON_PASSIVE_MEASURE_CAPABILITY | RRM_BEACON_ACTIVE_MEASURE_CAPABILITY | 
+                                       RRM_BEACON_TABLE_MEASURE_CAPABILITY | RRM_TS_TC_NORMAL_MEASURE_CAPABILITY | 
+                                       RRM_TS_TC_TRIGGERED_MEASURE_CAPABILITY | RRM_AP_CHANNEL_REPORT_CAPABILITY;
+    
+    return TI_OK;
+}
+
+
+TI_STATUS StaCap_getParam(TI_HANDLE hStaCap, paramInfo_t *pParam)
+{
+    return TI_OK;
+}
+
+
+TI_BOOL StaCap_IsRRMCapabilityEnabled (TI_HANDLE hStaCap)
+{
+    TStaCap *pStaCap = (TStaCap *)hStaCap;
+    return pStaCap->bRRMEnabled;
+}
+
+
+TI_BOOL StaCap_IsCapabilitySupported (TI_HANDLE hStaCap, TI_UINT32 cap)
+{
+    TStaCap *pStaCap = (TStaCap *)hStaCap;
+    return (pStaCap->uRRMEnabledCapabilities & cap);
+}
+
+
+TI_STATUS StaCap_getRRMEnabledCapabilitiesIE(TI_HANDLE hStaCap, TI_UINT8* pRequest,TI_UINT32* pLen)
+{
+    dot11_RM_ENABLED_CAPABILITIES_IE_t* pRMIE = (dot11_RM_ENABLED_CAPABILITIES_IE_t*)pRequest;
+    TStaCap *pStaCap = (TStaCap *)hStaCap;
+    
+    pRMIE->hdr[0] = RRM_ENABLED_CAPABILITIES_ELE_ID;
+    pRMIE->hdr[1] = RRM_ENABLED_CAPABILITIES_ELE_LEN;
+    *((TI_UINT32*)pRMIE->capabilities) = pStaCap->uRRMEnabledCapabilities;
+
+    *pLen = sizeof(pRMIE->hdr) + pRMIE->hdr[1];
+    return TI_OK;
+}
 
 /** 
  * \fn     StaCap_IsHtEnable

@@ -44,12 +44,13 @@
 #include "tidef.h"
 #include "public_radio.h"
 
+
 #define NOISE_HISTOGRAM_LENGTH              8
 #define MAX_NUM_OF_MSR_TYPES_IN_PARALLEL    3
 
 /* The size of the time frame in which we must start the */
-/* measurement request or give up */
-#define MSR_START_MAX_DELAY             50
+/* measurement request or give up (in millisecond) */
+#define MSR_START_MAX_DELAY             50000
 
 /* In non unicast measurement requests a random delay */
 /* between 4 and 40 milliseconds */
@@ -66,12 +67,14 @@
  */
 typedef enum 
 {
-/*	0	*/	MSR_TYPE_BASIC_MEASUREMENT  = 0,			/**< */
-/*	1	*/	MSR_TYPE_CCA_LOAD_MEASUREMENT,				/**< */
-/*	2	*/	MSR_TYPE_NOISE_HISTOGRAM_MEASUREMENT,		/**< */
-/*	3	*/	MSR_TYPE_BEACON_MEASUREMENT,				/**< */
-/*	4	*/	MSR_TYPE_FRAME_MEASUREMENT,					/**< */
-/*	5	*/	MSR_TYPE_MAX_NUM_OF_MEASURE_TYPES			/**< */
+/*	0	*/	MSR_TYPE_BASIC_MEASUREMENT  = 0,			                    /**< */
+/*	1	*/	MSR_TYPE_XCC_CCA_LOAD_MEASUREMENT,				                /**< */
+/*	2	*/	MSR_TYPE_XCC_NOISE_HISTOGRAM_MEASUREMENT,		                /**< */
+/*	3	*/	MSR_TYPE_XCC_BEACON_MEASUREMENT,				                /**< */
+/*	4	*/	MSR_TYPE_FRAME_MEASUREMENT,					                    /**< */
+/*	5	*/	MSR_TYPE_RRM_BEACON_MEASUREMENT = 5,                            /**< */
+/*	6	*/	MSR_TYPE_RRM_TS_TC_MEASUREMENT = 9,                             /**< */
+/*	7	*/	MSR_TYPE_MAX_NUM_OF_MEASURE_TYPES			                    /**< */
 
 } EMeasurementType;
 
@@ -119,7 +122,8 @@ typedef enum
 {
 /*	0	*/	MSR_MODE_NONE = 0,				/**< */
 /*	1	*/	MSR_MODE_XCC,					/**< */
-/*	2	*/	MSR_MODE_SPECTRUM_MANAGEMENT	/**< */
+/*	2	*/	MSR_MODE_SPECTRUM_MANAGEMENT,	/**< */
+/*	3	*/	MSR_MODE_RRM	                /**< */
 
 } EMeasurementMode;
 
@@ -142,8 +146,7 @@ typedef enum
 /*	8	*/	MSR_REJECT_INVALID_CHANNEL,					/**< */
 /*	9	*/	MSR_REJECT_NOISE_HIST_FAIL,					/**< */
 /*	10	*/	MSR_REJECT_CHANNEL_LOAD_FAIL,				/**< */
-/*	11	*/	MSR_REJECT_EMPTY_REPORT						/**< */
-
+/*	11	*/	MSR_REJECT_EMPTY_REPORT				        /**< */
 } EMeasurementRejectReason;
 
  /*
@@ -165,6 +168,16 @@ typedef union
 
 } TMeasurementReplyValue;
 
+
+/* This structure extends the single channel measurement */
+typedef struct
+{
+    TI_UINT8    channelList[SCAN_MAX_NUM_OF_CHANNELS];
+    TI_UINT8    txPowerDbm[SCAN_MAX_NUM_OF_CHANNELS];
+    TI_UINT8    uActualNumOfChannels;
+} channelListWithTxPower_t;
+
+
 /***********************************************************************
  *  Structure definitions.
  ***********************************************************************
@@ -179,6 +192,10 @@ typedef union
  */
 typedef struct
 {
+    ERadioBand                          band;
+    channelListWithTxPower_t            channelListBandBG;
+    channelListWithTxPower_t            channelListBandA;
+    TSsid                               ssid; 
     EMeasurementType                    msrType;	/**< */
     EMeasurementScanMode                scanMode;	/**< */
     TI_UINT32                           duration;	/**< */
@@ -197,14 +214,15 @@ typedef struct
  */
 typedef struct
 {
-    ERadioBand                          band;												/**< */
-    TI_UINT8                            channel;											/**< */
+    //ERadioBand                        band;												/**< */
+    //TI_UINT8                          channel;											/**< */
     TI_UINT64                           startTime;											/**< */
-    TI_UINT8                            txPowerDbm;								  			/**< */  			
+    //TI_UINT8                          txPowerDbm;								  			/**< */  			
     EScanResultTag                      eTag;												/**< */
+	TI_BOOL			                    enterPS;											/**< */
     TI_UINT8                            numberOfTypes;										/**< */
     TMeasurementTypeRequest             msrTypes[ MAX_NUM_OF_MSR_TYPES_IN_PARALLEL ];		/**< */
-
+    TI_BOOL                             bIsNonServingChannelIncluded;
 } TMeasurementRequest;
 
 /** \struct TMeasurementTypeReply
@@ -240,6 +258,27 @@ typedef struct
 
 } TMeasurementReply;
 
+
+
+/* XCC Type */
+typedef struct
+{
+    TI_UINT16  dialogToken;
+    TI_UINT8   activatioDelay;
+    TI_UINT8   measurementOffset;
+} RMFrameReqHdr_t;
+
+/* RRM Type (802.11k) */
+typedef struct
+{
+    TI_UINT8   categry;
+    TI_UINT8   action;
+    TI_UINT8   dialogToken;
+    TI_UINT16  numberOfRepetitions;
+} rrmFrameReqHdr_t;
+
+
+
 /** \struct TMeasurementFrameHdr
  * \brief Measurement Frame Header 
  * 
@@ -248,13 +287,9 @@ typedef struct
  * 
  * \sa
  */
-typedef struct 
-{
-    TI_UINT16                           dialogToken;			/**< Indicates if the received Measurement is the same as the one that is being processed	*/
-    TI_UINT8                            activatioDelay;			/**< */
-    TI_UINT8                            measurementOffset;		/**< */
 
-} TMeasurementFrameHdr;
+
+    
 
 /** \struct TMeasurementFrameRequest
  * \brief Measurement Frame Request 
@@ -265,7 +300,10 @@ typedef struct
  */
 typedef struct 
 {
-    TMeasurementFrameHdr                 *hdr; 			/**< */
+    TI_UINT16                            dialogToken;
+    TI_UINT16                            numberOfRepetitions;
+    TI_UINT8                             activatioDelay;
+    TI_UINT8                             measurementOffset;
     EMeasurementFrameType                frameType;		/**< */
     TI_UINT8                             *requests;		/**< */
     TI_INT32                             requestsLen;	/**< */

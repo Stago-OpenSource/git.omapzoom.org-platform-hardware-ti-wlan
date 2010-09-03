@@ -49,6 +49,7 @@
 #include "siteMgrApi.h"
 #include "regulatoryDomainApi.h"
 #include "scanResultTable.h"
+#include "EvHandler.h"
 
 #define SCAN_OID_DEFAULT_PROBE_REQUEST_RATE_G                       RATE_MASK_UNSPECIFIED  /* Let the FW select */
 #define SCAN_OID_DEFAULT_PROBE_REQUEST_RATE_A                       RATE_MASK_UNSPECIFIED  /* Let the FW select */
@@ -209,14 +210,16 @@ void scanCncnOsSm_ActionStartGScan (TI_HANDLE hScanCncn)
     regulatoryDomain_getParam (pScanCncn->hRegulatoryDomain, &tParam);
 
     /* scan type is passive if 802.11d is enabled and country IE was not yet found, active otherwise */
-    if (((TI_TRUE == bRegulatoryDomainEnabled) && (TI_FALSE == tParam.content.bIsCountryFound)) || SCAN_TYPE_TRIGGERED_PASSIVE == pScanCncn->tOsScanParams.scanType)
+    if (((TI_TRUE == bRegulatoryDomainEnabled) && (TI_FALSE == tParam.content.bIsCountryFound)) 
+        || SCAN_TYPE_TRIGGERED_PASSIVE == pScanCncn->tOsScanParams.scanType 
+        || SCAN_TYPE_NORMAL_PASSIVE == pScanCncn->tOsScanParams.scanType)
     {
-		pScanCncn->tOsScanParams.scanType = SCAN_TYPE_TRIGGERED_PASSIVE;
+		pScanCncn->tOsScanParams.scanType = SCAN_TYPE_NORMAL_PASSIVE;
     }
 	/* All paramters in the func are hard coded, due to that we set to active if not passive */
     else
     {
-        pScanCncn->tOsScanParams.scanType = SCAN_TYPE_TRIGGERED_ACTIVE;
+        pScanCncn->tOsScanParams.scanType = SCAN_TYPE_NORMAL_ACTIVE;
         /* also set number and rate of probe requests */
         pScanCncn->tOsScanParams.probeReqNumber = SCAN_OID_DEFAULT_PROBE_REQUEST_NUMBER_G;
         pScanCncn->tOsScanParams.probeRequestRate = (ERateMask)SCAN_OID_DEFAULT_PROBE_REQUEST_RATE_G;
@@ -378,7 +381,7 @@ void scanCncnOsSm_ActionStartAScan (TI_HANDLE hScanCncn)
 void scanCncnOsSm_ActionCompleteScan (TI_HANDLE hScanCncn)
 {
     TScanCncn       *pScanCncn = (TScanCncn*)hScanCncn;
-
+    TI_UINT32	statusData;
 
 	 /*Update the table only if scan was not rejected*/
 	 if ( !pScanCncn->pScanClients[ pScanCncn->eCurrentRunningAppScanClient ]->bScanRejectedOn2_4)
@@ -401,7 +404,9 @@ void scanCncnOsSm_ActionCompleteScan (TI_HANDLE hScanCncn)
     /* also mark that no app scan client is running */
     pScanCncn->eCurrentRunningAppScanClient = SCAN_SCC_NO_CLIENT;
  
-
+    statusData = SCAN_STATUS_COMPLETE;	/* Completed status */
+	EvHandlerSendEvent (pScanCncn->hEvHandler, IPC_EVENT_SCAN_COMPLETE, (TI_UINT8 *)&statusData, sizeof(TI_UINT32));
+ 
     /* no need to send scan complete event - WZC (or equivalent other OS apps) will query for the results */
 }
 

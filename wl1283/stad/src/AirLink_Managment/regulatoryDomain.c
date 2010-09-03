@@ -75,9 +75,72 @@
 		MAX_TX_POWER : (uTxPower) * DBM_TO_TX_POWER_FACTOR)		
 
 
+
+/*************************** Static Table for Regulatory Class **********************/
+
+RegDomainInfo_t RegClassTbl[REGULATORY_ZONE_MAX] = {
+                                  {REGULATORY_ZONE_USA, /* Country*/
+                                  {{1,1,4,30,BAND_TYPE_5_GHZ,5000,{36,40,44,48,0,0,0,0,0,0,0,0,0,0,0}}, /* min class, max class, num of channel,to power, base freq, channel list*/
+                                  {2,2,4,23,BAND_TYPE_5_GHZ,5000,{52,56,60,64,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {3,3,4,29,BAND_TYPE_5_GHZ,5000,{149,153,157,161,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {4,4,11,23,BAND_TYPE_5_GHZ,5000,{100,104,108,112,116,120,124,128,132,136,140,0,0,0,0}},
+                                  {5,5,5,30,BAND_TYPE_5_GHZ,5000,{149,153,157,161,165,0,0,0,0,0,0,0,0,0,0}},
+                                  {10,10,2,20,BAND_TYPE_4_9GHZ,4850,{20,25,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {11,11,2,33,BAND_TYPE_4_9GHZ,4850,{20,25,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {12,12,11,30,BAND_TYPE_2_4GHZ,2407,{1,2,3,4,5,6,7,8,9,10,11,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}}},
+                                  {REGULATORY_ZONE_JAPAN,
+                                  {{1,1,4,13,BAND_TYPE_5_GHZ,5000,{34,38,42,46,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {2,6,3,13,BAND_TYPE_5_GHZ,5000,{8,12,16,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {7,11,4,13,BAND_TYPE_4_9GHZ,4000,{184,188,192,196,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {30,30,13,13,BAND_TYPE_2_4GHZ,2407,{1,2,3,4,5,6,7,8,9,10,11,12,13,0,0}},
+                                  {31,31,1,13,BAND_TYPE_2_4GHZ,2414,{14,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {32,32,4,13,BAND_TYPE_5_GHZ,5000,{52,56,60,64,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}}},
+                                  {REGULATORY_ZONE_RST, /* Europe + Rest of the world */
+                                  {{1,1,4,23,BAND_TYPE_5_GHZ,5000,{36,40,44,46,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {2,2,4,23,BAND_TYPE_5_GHZ,5000,{52,56,60,64,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {3,3,11,30,BAND_TYPE_5_GHZ,5000,{100,104,108,112,116,120,124,128,132,136,140,0,0,0,0}},
+                                  {4,4,13,20,BAND_TYPE_2_4GHZ,2407,{1,2,3,4,5,6,7,8,9,10,11,12,13,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}}},
+                                  {REGULATORY_ZONE_NONE,
+                                  {{100,100,11,13,BAND_TYPE_2_4GHZ,2407,{1,2,3,4,5,6,7,8,9,10,11,12,13,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+                                  {0,0,0,0,BAND_TYPE_NONE,0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}}}
+                                  };
+
+
+
+
+
+
 /********************************************************************************/
 /*						Internal functions prototypes.							*/
 /********************************************************************************/
+
+static TI_STATUS regulatoryDomain_getChannelsByRegClass(regulatoryDomain_t *pRegulatoryDomain, TI_UINT8 regClass, 
+                                                        RegClassChannelList_t* pChannelList);
+
+static TI_UINT8 regulatoryDomain_getRegClassByChannelAndBand(regulatoryDomain_t *pRegulatoryDomain, BandType_e band, TI_UINT8 channel);
+
+static BandType_e regulatoryDomain_getRadioBandByRegClass(regulatoryDomain_t	*pRegulatoryDomain, TI_UINT8 regClass);
+
 static TI_STATUS regulatoryDomain_updateCurrTxPower(regulatoryDomain_t	*pRegulatoryDomain);
 
 static void regulatoryDomain_setChannelValidity(regulatoryDomain_t *pRegulatoryDomain, 
@@ -236,6 +299,9 @@ TI_STATUS regulatoryDomain_SetDefaults (TI_HANDLE 	hRegulatoryDomain,
     pRegulatoryDomain->minDFS_channelNum = A_5G_BAND_MIN_MIDDLE_BAND_DFS_CHANNEL;
     pRegulatoryDomain->maxDFS_channelNum = A_5G_BAND_MAX_UPPER_BAND_DFS_CHANNEL;
 
+
+    pRegulatoryDomain->countryZone = REGULATORY_ZONE_USA;
+        
 TRACE0(pRegulatoryDomain->hReport, REPORT_SEVERITY_INIT, ".....Regulatory domain configured successfully\n");
 
 	return TI_OK;
@@ -425,6 +491,10 @@ TRACE1(pRegulatoryDomain->hReport, REPORT_SEVERITY_INFORMATION, "regulatoryDomai
 
         break;
 
+    case REGULATORY_DOMAIN_COUNTRY_ZONE_PARAM:
+            pRegulatoryDomain->countryZone = pParam->content.countryZone;
+            break;
+        
 	default:
 TRACE1(pRegulatoryDomain->hReport, REPORT_SEVERITY_ERROR, "Set param, Params is not supported, %d\n\n", pParam->paramType);
 		return PARAM_NOT_SUPPORTED;
@@ -648,6 +718,36 @@ TRACE1(pRegulatoryDomain->hReport, REPORT_SEVERITY_INFORMATION, "regulatoryDomai
         }
         break;
 
+      /* 802.11k setting the zone  */
+     case REGULATORY_DOMAIN_COUNTRY_ZONE_PARAM:
+		pParam->content.countryZone = pRegulatoryDomain->countryZone;
+            break;
+    /* being used for the neighbor report response frame */
+    case REGULATORY_DOMAIN_GET_BAND_BY_REG_CLASS_PARAM:
+        {
+            BandType_e band = regulatoryDomain_getRadioBandByRegClass(pRegulatoryDomain,pParam->content.regulatoryClass);
+            pParam->content.radioBand = band;
+        }
+            break;
+
+
+    case REGULATORY_DOMAIN_GET_CHANNELS_BY_REG_CLASS_PARAM:
+        {
+            TI_UINT8 regClass = pParam->content.regClass;
+            regulatoryDomain_getChannelsByRegClass(pRegulatoryDomain,regClass, &pParam->content.regClassChannelList);
+            break;
+        }
+
+    case REGULATORY_DOMAIN_GET_REG_CLASS_BY_BAND_AND_CHANNEL:
+        {
+            TI_UINT8 regClass = regulatoryDomain_getRegClassByChannelAndBand(pRegulatoryDomain, 
+                                                                             pParam->content.regClassChannelList.band,
+                                                                             pParam->content.regClassChannelList.Channel[0]);                                          
+            pParam->content.regClass = regClass;
+            break;
+        }
+        
+        
 	default:
 TRACE1(pRegulatoryDomain->hReport, REPORT_SEVERITY_ERROR, "Get param, Params is not supported, %d\n\n", pParam->paramType);
 		return PARAM_NOT_SUPPORTED;
@@ -745,6 +845,7 @@ static TI_STATUS setSupportedChannelsAccording2CountryIe(regulatoryDomain_t *pRe
 		return TI_NOK;
 	}
 
+    
     /* Check if the country code should be reset */
     regulatoryDomain_checkCountryCodeExpiry(pRegulatoryDomain);
 
@@ -808,6 +909,25 @@ TRACE0(pRegulatoryDomain->hReport, REPORT_SEVERITY_WARNING, "setSupportedChannel
      * New Country IE was saved. Now - update the last received TS and ScanControlTable
      */
 
+    /* 802.11k changes (to be used during the RRM) */
+    if ((pCountry->countryIE.CountryString[0] = 'U') && (pCountry->countryIE.CountryString[1] = 'S'))
+    {
+        pRegulatoryDomain->countryZone = REGULATORY_ZONE_USA;
+    }
+    else if ((pCountry->countryIE.CountryString[0] = 'J') && (pCountry->countryIE.CountryString[1] = 'P')) 
+    {
+        pRegulatoryDomain->countryZone = REGULATORY_ZONE_JAPAN;
+    }
+    else /* Europe and the rest of the World */
+    {
+        pRegulatoryDomain->countryZone = REGULATORY_ZONE_RST;
+    }
+
+    TRACE1(pRegulatoryDomain->hReport,
+           REPORT_SEVERITY_INFORMATION, 
+           "setSupportedChannelsAccording2CountryIe: Zone updated to %d (0=US, 2=JAPAN, 3=RestOfTheWorld)\n", 
+           pRegulatoryDomain->countryZone);
+    
     /* Mark the time of the received country IE */                
     pRegulatoryDomain->uLastCountryReceivedTS = os_timeStampMs(pRegulatoryDomain->hOs);
 
@@ -1297,6 +1417,7 @@ static TI_STATUS regulatoryDomain_updateCurrTxPower(regulatoryDomain_t	*pRegulat
     pTwdParam = (TTwdParamInfo *)os_memoryAlloc(pRegulatoryDomain->hOs, sizeof(TTwdParamInfo));
     if (!pTwdParam)
     {
+        os_memoryFree(pRegulatoryDomain->hOs, pParam, sizeof(paramInfo_t));
         return TI_NOK;
     }
 
@@ -1557,3 +1678,79 @@ void regDomainPrintValidTables(TI_HANDLE hRegulatoryDomain)
 		pRegulatoryDomain->uUserMaxTxPower));
 
 }
+
+
+static TI_UINT8 regulatoryDomain_getRegClassByChannelAndBand(regulatoryDomain_t *pRegulatoryDomain, BandType_e band, TI_UINT8 channel)
+{
+    TI_UINT8   i=0, j=0;
+    RegDomainInfo_t *pRegDomainInfo = &RegClassTbl[pRegulatoryDomain->countryZone];
+    
+    for (i=0; i< REG_DOMAIN_MAX_REG_CLASS_NUM ; i++) 
+    {
+        for (j=0; j< REG_DOMAIN_MAX_CHAN_NUM ; j++) 
+        {
+            if ((channel == pRegDomainInfo->DomainReg[i].Channel[j]) && (band == pRegDomainInfo->DomainReg[i].band)) 
+            {
+                return pRegDomainInfo->DomainReg[i].MinClass;
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+static BandType_e regulatoryDomain_getRadioBandByRegClass(regulatoryDomain_t *pRegulatoryDomain, TI_UINT8 regClass)
+{
+    BandType_e      bandType = BAND_TYPE_NONE;
+    RegDomainInfo_t *pRegDomainInfo = &RegClassTbl[pRegulatoryDomain->countryZone];
+    TI_UINT8        i = 0;
+
+
+    for (i=0; i< REG_DOMAIN_MAX_REG_CLASS_NUM ; i++) 
+    {
+        if ((regClass >= pRegDomainInfo->DomainReg[i].MinClass) && (regClass <= pRegDomainInfo->DomainReg[i].MaxClass)) 
+        {/* The channel set for this regulatory class and Zone was found */
+            bandType = pRegDomainInfo->DomainReg[i].band;
+            break;
+        }
+    }
+
+    return bandType;
+}
+
+
+static TI_STATUS regulatoryDomain_getChannelsByRegClass(regulatoryDomain_t *pRegulatoryDomain, TI_UINT8 regClass, 
+                                                        RegClassChannelList_t* pChannelList)
+{
+    RegDomainInfo_t *pRegDomainInfo = &RegClassTbl[pRegulatoryDomain->countryZone];
+    TI_UINT8        i = 0, j=0;
+
+       
+    for (i=0; i< REG_DOMAIN_MAX_REG_CLASS_NUM ; i++) 
+    {
+        if ((regClass >= pRegDomainInfo->DomainReg[i].MinClass) && (regClass <= pRegDomainInfo->DomainReg[i].MaxClass)) 
+        {/* The channel set for this regulatory class and Zone was found */
+            pChannelList->band = pRegDomainInfo->DomainReg[i].band;
+            
+            for (j=0; j< REG_DOMAIN_MAX_CHAN_NUM ; j++) 
+            {
+                pChannelList->Channel[j] = pRegDomainInfo->DomainReg[i].Channel[j];
+            }
+            
+            break;
+        }
+    }
+
+    if (i == REG_DOMAIN_MAX_REG_CLASS_NUM)
+    {
+        TRACE2(pRegulatoryDomain->hReport, 
+               REPORT_SEVERITY_ERROR, 
+               "regulatoryDomain_getChannelsByRegClass: Channels set for zone=%d, regClass=%d has not found!!!! \n", 
+               regClass, pRegulatoryDomain->countryZone);
+        
+        return TI_NOK;
+    }
+    return TI_OK;
+}
+

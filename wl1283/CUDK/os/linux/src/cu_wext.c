@@ -37,7 +37,6 @@
 #include <linux/wireless.h>
 #include <string.h>
 
-#include "TWDriver.h"
 #include "STADExternalIf.h"
 #include "ParsEvent.h"
 #include "ipc_sta.h"
@@ -81,7 +80,7 @@ static S32 CuWext_FillBssidList(struct iw_event *iwe, OS_802_11_BSSID_EX* bssidL
             break;
         case SIOCGIWNAME:
             {
-                int i;
+                unsigned i;
                 S8 buffer[IFNAMSIZ];
                 static const char *ieee80211_modes[] = {
                     "?", 
@@ -140,7 +139,8 @@ static S32 CuWext_FillBssidList(struct iw_event *iwe, OS_802_11_BSSID_EX* bssidL
                 {
                     char *p1;
                     p1 = strtok(&buffer[10], " ");
-                    bssidList[index-1].Configuration.BeaconPeriod = atoi(p1);
+                    if (p1 != NULL) 
+                      bssidList[index-1].Configuration.BeaconPeriod = atoi(p1);
                 }
             }           
             break;          

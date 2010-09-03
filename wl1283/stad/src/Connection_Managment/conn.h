@@ -93,7 +93,7 @@ typedef struct
     /* Other modules handles */
 	TI_HANDLE				hSiteMgr;
 	TI_HANDLE				hSmeSm;
-	TI_HANDLE				hMlmeSm;
+	TI_HANDLE				hMlme;
 	TI_HANDLE				hRsn;
 	TI_HANDLE				hReport;
 	TI_HANDLE				hOs;

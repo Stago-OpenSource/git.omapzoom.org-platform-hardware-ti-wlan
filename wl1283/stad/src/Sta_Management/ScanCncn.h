@@ -145,10 +145,12 @@ typedef void (*TScanResultCB) (TI_HANDLE clientObj, EScanCncnResultStatus status
 TI_HANDLE               scanCncn_Create (TI_HANDLE hOS);
 void                    scanCncn_Destroy (TI_HANDLE hScanCncn);
 void                    scanCncn_Init (TStadHandlesList *pStadHandles);
-void                    scanCncn_SetDefaults (TI_HANDLE hScanCncn, TScanCncnInitParams* pScanCncnInitParams);
+void 					scanCncn_Recover (TI_HANDLE hScanCncn);
+TI_STATUS               scanCncn_SetDefaults (TI_HANDLE hScanCncn, TScanCncnInitParams* pScanCncnInitParams);
 void                    scanCncn_SwitchToConnected (TI_HANDLE hScanCncn);
 void                    scanCncn_SwitchToNotConnected (TI_HANDLE hScanCncn);
 void                    scanCncn_SwitchToIBSS (TI_HANDLE hScanCncn);
+void 					scanCncn_TimerExpired (TI_HANDLE hScanCncn, TI_BOOL bTwdInitOccured);
 /**
  * \brief Starts a one-shot scan operation
  * 
@@ -203,10 +205,9 @@ void                    scanCncn_StopPeriodicScan (TI_HANDLE hScanCncn, EScanCnc
  */ 
 void                    scanCncn_RegisterScanResultCB (TI_HANDLE hScanCncn, EScanCncnClient eClient,
                                                        TScanResultCB scanResultCBFunc, TI_HANDLE scanResultCBObj);
-void                    scanCncn_ScanCompleteNotificationCB (TI_HANDLE hScanCncn, EScanResultTag eTag,
-                                                             TI_UINT32 uResultCount, TI_UINT16 SPSStatus,
-                                                             TI_BOOL bTSFError, TI_STATUS scanStatus,
-                                                             TI_STATUS PSMode);
+void                    scanCncn_ScanCompleteNotification (TI_HANDLE hScanCncn, EScanResultTag eTag,
+														   TI_UINT32 uResultCount, TI_UINT16 SPSStatus,
+														   TI_BOOL bTSFError, TI_STATUS scanStatus);
 void                    scanCncn_MlmeResultCB (TI_HANDLE hScanCncn, TMacAddr* bssid, mlmeFrameInfo_t* frameInfo, 
                                                TRxAttr* pRxAttr, TI_UINT8* buffer, TI_UINT16 bufferLength);
 void                    scanCncn_ScrRoamingImmedCB (TI_HANDLE hScanCncn, EScrClientRequestStatus eRequestStatus,
@@ -227,6 +228,7 @@ void                    scanCncn_AppScanResultCB (TI_HANDLE hScanCncn, EScanCncn
                                                   TScanFrameInfo* frameInfo, TI_UINT16 SPSStatus);
 void                    scanCncn_PeriodicScanCompleteCB (TI_HANDLE hScanCncn, char* str, TI_UINT32 strLen);
 void                    scanCncn_PeriodicScanReportCB (TI_HANDLE hScanCncn, char* str, TI_UINT32 strLen);
+void 					scanCncnSm_NoOp (TI_HANDLE hScanCncnClient);
 
 #endif /* __SCANCNCN_H__ */
 

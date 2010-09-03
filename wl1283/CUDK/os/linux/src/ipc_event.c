@@ -57,6 +57,11 @@
 #define IPC_EVENT_MSG_UPDATE_DEBUG_LEVEL    "IPC_EVENT_MSG_UPDATE_DEBUG_LEVEL"
 #define IPC_EVENT_MSG_MAX_LEN   50
 
+/* Macros */
+#define PRINT_FORMAT_S8_VAL(signedVal) \
+(((U8)signedVal > 127) ? (0xFFFFFF00 | signedVal) : signedVal)
+/***********/
+
 /* local types */
 /***************/
 typedef struct IpcEvent_Shared_Memory_t
@@ -249,8 +254,6 @@ static VOID IpcEvent_PrintEvent(IpcEvent_Child_t* pIpcEventChild, U32 EventId, T
                 os_error_printf(CU_MSG_ERROR, "uMinimumPHYRate = %d\n",tspec->uMinimumPHYRate);
                 os_error_printf(CU_MSG_ERROR, "uSurplusBandwidthAllowance = %d\n",tspec->uSurplusBandwidthAllowance);
                 os_error_printf(CU_MSG_ERROR, "uAPSDFlag = %d\n",tspec->uAPSDFlag);
-                os_error_printf(CU_MSG_ERROR, "MinimumServiceInterval = %d\n",tspec->uMinimumServiceInterval);
-                os_error_printf(CU_MSG_ERROR, "MaximumServiceInterval = %d\n",tspec->uMaximumServiceInterval);
                 os_error_printf(CU_MSG_ERROR, "uMediumTime = %d\n\n",tspec->uMediumTime);
            
                 break;
@@ -283,9 +286,13 @@ static VOID IpcEvent_PrintEvent(IpcEvent_Child_t* pIpcEventChild, U32 EventId, T
             case IPC_EVENT_WPS_SESSION_OVERLAP:
                 os_error_printf(CU_MSG_ERROR, (PS8)"IpcEvent_PrintEvent - received IPC_EVENT_WPS_SESSION_OVERLAP\n");
                 break;
-            case IPC_EVENT_RSSI_SNR_TRIGGER:
-                os_error_printf(CU_MSG_ERROR, (PS8)"IpcEvent_PrintEvent - received IPC_EVENT_RSSI_SNR_TRIGGER (index = %d), Data = %d\n", (S8)(*(pData + 2) - 1),(S8)(*pData));
+        case IPC_EVENT_RSSI_SNR_TRIGGER:
+            {
+                os_error_printf(CU_MSG_ERROR, (PS8)"IpcEvent_PrintEvent - received IPC_EVENT_RSSI_SNR_TRIGGER (index = %d), Data = %d\n", 
+                                (S8)(*(pData + 2) - 1),PRINT_FORMAT_S8_VAL(*pData));
                 break;
+            }
+                
             case IPC_EVENT_TIMEOUT:
                 os_error_printf(CU_MSG_ERROR, (PS8)"IpcEvent_PrintEvent - received IPC_EVENT_TIMEOUT\n");
                 break;
@@ -485,6 +492,15 @@ static S32 IpcEvent_Handle_Parent_Event(IpcEvent_Child_t* pIpcEventChild)
     S8 msg[IPC_EVENT_MSG_MAX_LEN];
 
     S32 msgLen = read(pIpcEventChild->pipe_from_parent,msg, IPC_EVENT_MSG_MAX_LEN);
+
+    /* If read() fails it returns -1. Avoid buffer out of boundary */
+    if(msgLen < 0)
+    {
+        os_error_printf(CU_MSG_ERROR, (PS8)"ERROR - IpcEvent_Handle_Parent_Event - read() failed!\n");
+
+        return FALSE;
+    }
+
     msg[msgLen] = 0;
 
     if(!os_strcmp(msg, (PS8)IPC_EVENT_MSG_KILL))

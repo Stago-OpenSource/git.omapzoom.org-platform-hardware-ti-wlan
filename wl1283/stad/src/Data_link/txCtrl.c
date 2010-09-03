@@ -60,14 +60,18 @@
 #ifdef XCC_MODULE_INCLUDED
 #include "XCCMngr.h"
 #endif
+#include "siteMgrApi.h"
 #include "bmtrace_api.h"
 
 
+#define TOKENS_DIVISION_SUB_REMINDER_MASK 31
+#define TOKENS_DIVISION_ADD_REMINDER_MASK 0xFFFFF /* 2^20 - 1 */
 /* 
  * Module internal functions prototypes:
  */
 
 /* Note: put here and not in txCtrl.h to avoid warning in the txCtrl submodules that include txCtrl.h */ 
+
  
 static void   txCtrl_TxCompleteCb (TI_HANDLE hTxCtrl, TxResultDescriptor_t *pTxResultInfo);
 static void   txCtrl_BuildDataPkt (txCtrl_t *pTxCtrl, TTxCtrlBlk *pPktCtrlBlk,
@@ -81,6 +85,22 @@ static void   txCtrl_UpdateTxCounters (txCtrl_t *pTxCtrl,
                                        TTxCtrlBlk *pPktCtrlBlk, 
                                        TI_UINT32 ac, 
                                        TI_BOOL bIsDataPkt);
+
+static void tokensCalculation(txCtrl_t *pTxCtrl, TxResultDescriptor_t *pTxResultInfo, TI_UINT32 ac);
+
+static void txCtrl_UpdatePriorityMap(txCtrl_t *pTxCtrl, TI_UINT32 priorityBitMap);
+
+static void txCtrl_TSMExpiredTimer (TI_HANDLE hTxCtrl, TI_UINT8 tid , TI_BOOL bTwdInitOccured);
+static void txCtrl_TSMExpiredTimer0 (TI_HANDLE hTxCtrl, TI_BOOL bTwdInitOccured);
+static void txCtrl_TSMExpiredTimer1 (TI_HANDLE hTxCtrl, TI_BOOL bTwdInitOccured);
+static void txCtrl_TSMExpiredTimer2 (TI_HANDLE hTxCtrl, TI_BOOL bTwdInitOccured);
+static void txCtrl_NotifyOnTSMFinishedAndCleanObj (txCtrl_t  *pTxCtrl, TSMReportData_t  *pReportData);
+
+static void  txCtrl_UpdateTSMDelayCounters (txCtrl_t  *pTxCtrl, 
+                                            TxResultDescriptor_t *pTxResultInfo,
+                                            TI_UINT8 tid);
+
+
 #ifdef XCC_MODULE_INCLUDED  /* Needed only for XCC-V4 */
 static void   txCtrl_SetTxDelayCounters (txCtrl_t *pTxCtrl, 
                                          TI_UINT32 ac, 
@@ -191,6 +211,7 @@ void txCtrl_Init (TStadHandlesList *pStadHandles)
 {
     txCtrl_t *pTxCtrl = (txCtrl_t *)(pStadHandles->hTxCtrl);
 	TI_UINT32 ac;
+    TI_UINT8 i = 0;
 
     /* Save other modules handles */
 	pTxCtrl->hOs			= pStadHandles->hOs;
@@ -206,7 +227,9 @@ void txCtrl_Init (TStadHandlesList *pStadHandles)
     pTxCtrl->hXCCMngr       = pStadHandles->hXCCMngr;
     pTxCtrl->hQosMngr       = pStadHandles->hQosMngr;
 	pTxCtrl->hRxData        = pStadHandles->hRxData;
-
+    pTxCtrl->hMeasurementMgr= pStadHandles->hMeasurementMgr;
+    pTxCtrl->hSiteMgr       = pStadHandles->hSiteMgr;
+    
     /* Set Tx parameters to defaults */
     pTxCtrl->headerConverMode = HDR_CONVERT_NONE;
     pTxCtrl->currentPrivacyInvokedMode = DEF_CURRENT_PRIVACY_MODE;
@@ -218,6 +241,24 @@ void txCtrl_Init (TStadHandlesList *pStadHandles)
 	pTxCtrl->bCreditCalcTimerRunning = TI_FALSE;
 	pTxCtrl->genericEthertype = ETHERTYPE_EAPOL;
 
+
+    for (i = 0; i < TSM_REPORT_NUM_OF_MEASUREMENT_IN_PARALLEL_MAX; i++)
+    {
+        pTxCtrl->tTSMTimers[i].hRequestTimer = tmr_CreateTimer (pTxCtrl->hTimer);
+        if (pTxCtrl->tTSMTimers[i].hRequestTimer == NULL)
+        {
+            TRACE0(pTxCtrl->hReport, REPORT_SEVERITY_ERROR, "txCtrl_Init(): Failed to create hRequestTimer!\n");
+            return;
+        }
+        
+        pTxCtrl->tTSMTimers[i].bRequestTimerRunning = TI_FALSE;
+    }
+
+    pTxCtrl->tTSMTimers[0].fExpiryCbFunc = txCtrl_TSMExpiredTimer0;
+    pTxCtrl->tTSMTimers[1].fExpiryCbFunc = txCtrl_TSMExpiredTimer1;
+    pTxCtrl->tTSMTimers[2].fExpiryCbFunc = txCtrl_TSMExpiredTimer2;
+    
+    
 	for (ac = 0; ac < MAX_NUM_OF_AC; ac++)
 	{
 		pTxCtrl->aMsduLifeTimeTu[ac] = MGMT_PKT_LIFETIME_TU;
@@ -248,8 +289,15 @@ void txCtrl_Init (TStadHandlesList *pStadHandles)
                     TWD_EVENT_TX_HW_QUEUE_UPDATE_BUSY_MAP, 
 					(void *)txCtrl_UpdateBackpressure, 
                     pStadHandles->hTxCtrl);
+    /* Register Full Map callback */
+    TWD_RegisterCb (pTxCtrl->hTWD, 
+                    TWD_EVENT_TX_HW_QUEUE_UPDATE_FULL_QUEUE_MAP, 
+                    (void *)txCtrl_UpdatePriorityMap, 
+                    pStadHandles->hTxCtrl);
+
 
     TRACE0(pTxCtrl->hReport, REPORT_SEVERITY_INIT, ".....Tx Data configured successfully\n");
+
 }
 
 
@@ -269,6 +317,7 @@ TI_STATUS txCtrl_SetDefaults (TI_HANDLE hTxCtrl, txDataInitParams_t *txDataInitP
 {
     txCtrl_t *pTxCtrl = (txCtrl_t *)hTxCtrl;
 
+
     pTxCtrl->creditCalculationTimeout = txDataInitParams->creditCalculationTimeout;
 	pTxCtrl->bCreditCalcTimerEnabled  = txDataInitParams->bCreditCalcTimerEnabled;
 
@@ -283,6 +332,7 @@ TI_STATUS txCtrl_SetDefaults (TI_HANDLE hTxCtrl, txDataInitParams_t *txDataInitP
 		return TI_NOK;
 	}
 
+    pTxCtrl->TSMInProgressBitmap = 0;
     return TI_OK;
 }
 
@@ -327,7 +377,7 @@ TI_STATUS txCtrl_Unload (TI_HANDLE hTxCtrl)
 *				STATUS_XMIT_BUSY    - Packet dropped due to lack of HW resources, retransmit later.
 *				STATUS_XMIT_ERROR   - Packet dropped due to an unexpected problem (bug).
 ********************************************************************************/
-TI_STATUS txCtrl_XmitData (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk)
+EStatusXmit txCtrl_XmitData (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk)
 {
     txCtrl_t   *pTxCtrl = (txCtrl_t *)hTxCtrl;
 	ETxnStatus eStatus;       /* The Xfer return value (different than this function's return values). */
@@ -631,6 +681,13 @@ TRACE3(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_TxCompleteCb(): Pk
 	bIsDataPkt = ( (pPktCtrlBlk->tTxPktParams.uPktType == TX_PKT_TYPE_ETHER) || 
 		           (pPktCtrlBlk->tTxPktParams.uPktType == TX_PKT_TYPE_WLAN_DATA) );
 
+	if (bIsDataPkt &&
+		pTxCtrl->admissionRequired[ac] && 
+		AC_ADMITTED ==pTxCtrl->admissionState[ac] &&
+		TI_FALSE == pTxCtrl->acDowngraded[ac])
+	{
+		tokensCalculation(pTxCtrl, pTxResultInfo, ac);
+	}
 #ifdef XCC_MODULE_INCLUDED    
 	/* If it's a XCC link-test packet, call its handler. */
 	if (pPktCtrlBlk->tTxPktParams.uFlags & TX_CTRL_FLAG_LINK_TEST)
@@ -651,6 +708,27 @@ TRACE3(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_TxCompleteCb(): Pk
         CL_TRACE_END_L4("tiwlan_drv.ko", "INHERIT", "TX_Cmplt", ".Cntrs");
     }
 
+    if (TI_TRUE == bIsDataPkt) 
+    {
+#ifdef XCC_MODULE_INCLUDED
+
+        if (TX_SUCCESS == pTxResultInfo->status) 
+        {
+        /* update delay histogram */
+		txCtrl_SetTxDelayCounters (pTxCtrl, 
+        						   ac, 
+        						   ENDIAN_HANDLE_LONG(pTxResultInfo->totalDelay), 
+        						   pPktCtrlBlk->tTxPktParams.uDriverDelay, 
+                                   ENDIAN_HANDLE_LONG(pTxResultInfo->mediumDelay));  
+        }
+		
+#endif
+        if (pTxCtrl->TSMInProgressBitmap && (0x01 << pPktCtrlBlk->tTxDescriptor.tid))
+        {  
+            txCtrl_UpdateTSMDelayCounters(pTxCtrl, pTxResultInfo, pPktCtrlBlk->tTxDescriptor.tid);
+        }
+    }
+    
 	/* Free the packet resources (packet and CtrlBlk)  */
     txCtrl_FreePacket (pTxCtrl, pPktCtrlBlk, TI_OK);
 
@@ -672,7 +750,8 @@ TRACE3(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_TxCompleteCb(): Pk
 
 TI_UINT32 txCtrl_BuildDataPktHdr (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk, AckPolicy_e eAckPolicy)
 {
-    txCtrl_t *pTxCtrl = (txCtrl_t *)hTxCtrl;    
+    txCtrl_t   *pTxCtrl  = (txCtrl_t *)  hTxCtrl;    
+
     TEthernetHeader     *pEthHeader;
     dot11_header_t      *pDot11Header;
     Wlan_LlcHeader_T    *pWlanSnapHeader;
@@ -690,19 +769,32 @@ TI_UINT32 txCtrl_BuildDataPktHdr (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk, Ac
 	 *   - Add padding for FW security overhead: 4 bytes for TKIP, 8 for AES.  
 	 */
 
-       	if (( (pPktCtrlBlk->tTxPktParams.uPktType == TX_PKT_TYPE_EAPOL)
-			  &&
-			  pTxCtrl->eapolEncryptionStatus) 
-		 ||
-			((pPktCtrlBlk->tTxPktParams.uPktType != TX_PKT_TYPE_EAPOL)
-			  &&
-			  pTxCtrl->currentPrivacyInvokedMode ))
-        {
-        
-			fc |= DOT11_FC_WEP;
-			uHdrLen += pTxCtrl->encryptionFieldSize;
-			uHdrAlignPad = pTxCtrl->encryptionFieldSize % 4;
+   	if ( ( (pPktCtrlBlk->tTxPktParams.uPktType != TX_PKT_TYPE_EAPOL)
+           &&
+		   pTxCtrl->currentPrivacyInvokedMode 
+         )
+
+         ||
+
+         ( (pPktCtrlBlk->tTxPktParams.uPktType == TX_PKT_TYPE_EAPOL)
+		   &&
+		   pTxCtrl->eapolEncryptionStatus
+           &&
+           (txMgmtQ_GetConnState(pTxCtrl->hTxMgmtQ) == TX_CONN_STATE_OPEN)
+         )                                                                   /* - Encrypt Eapols only when eapolEncryptionStatus is true 
+                                                                                  and station is connected (during re-key). 
+                                                                                - In connection and roaming do not encrypt Eapols.
+                                                                                - This condition will cost us an extra clock tick in
+                                                                                  the Data Path ONLY in case of an Eapol. 
+                                                                                  This is not the common case in the Data Path.
+                                                                              */
+       )
+    {
+        fc |= DOT11_FC_WEP;
+		uHdrLen += pTxCtrl->encryptionFieldSize;
+		uHdrAlignPad = pTxCtrl->encryptionFieldSize % 4;
 	}
+
 
 	/* 
 	 * Handle QoS if needed:
@@ -1097,7 +1189,39 @@ static void txCtrl_UpdateBackpressure (txCtrl_t *pTxCtrl, TI_UINT32 freedAcBitma
 	txDataQ_UpdateBusyMap (pTxCtrl->hTxDataQ, busyTidBitmap);
 	txMgmtQ_UpdateBusyMap (pTxCtrl->hTxMgmtQ, busyTidBitmap);
 }
+/***************************************************************************
+*                           txCtrl_UpdatePriorityMap 
+****************************************************************************
+* DESCRIPTION:  This function is called whenever the priority-TIDs bitmap may change, 
+*				  (except on packet-xmit - handled separately for performance). 
+*				This includes:
+*					1) Init
+*					2) ACs admission required change (upon association)
+*					3) ACs admission state change (upon association and add/delete Tspec).
+*					4) Tx-Complete - provides also freed ACs.
+*
+*				It updates the local bitmap, and the data-queue.
+*
+*/
+static void txCtrl_UpdatePriorityMap(txCtrl_t *pTxCtrl, TI_UINT32 priorityBitMap)
+{
+    TI_UINT32 priorityTidBitmap = 0;
+    TI_UINT32 ac = 0;
 
+    while (priorityBitMap)
+    {
+        /* If the AC is busy, add its related TIDs to the total busy TIDs bitmap. */
+        if (priorityBitMap & 1)
+            priorityTidBitmap |= pTxCtrl->admittedAcToTidMap[ac];
+
+        /* Move to next AC. */
+        priorityBitMap = priorityBitMap >> 1;
+        ac++;
+    }
+
+    txDataQ_UpdatePriorityMap (pTxCtrl->hTxDataQ, priorityTidBitmap);
+
+}
 
 /****************************************************************************
  *                      txCtrl_SetTxDelayCounters()
@@ -1159,6 +1283,186 @@ static void txCtrl_SetTxDelayCounters (txCtrl_t *pTxCtrl,
 
 
 
+
+/*
+
+typedef enum
+{
+    TX_SUCCESS              = 0,     
+	TX_HW_ERROR             = 1,
+	TX_DISABLED             = 2,
+	TX_RETRY_EXCEEDED       = 3,
+	TX_TIMEOUT              = 4,
+	TX_KEY_NOT_FOUND        = 5,
+	TX_PEER_NOT_FOUND       = 6,
+    TX_SESSION_MISMATCH     = 7 
+} TxDescStatus_enum;
+
+*/
+
+
+static void txCtrl_TSMExpiredTimer (TI_HANDLE hTxCtrl, TI_UINT8 tid , TI_BOOL bTwdInitOccured)
+{
+    txCtrl_t  *pTxCtrl = (txCtrl_t*)hTxCtrl;
+
+    pTxCtrl->TSMReportStat[tid].reportingReason = 0; /* regular TSM report (non triggered one )*/
+
+    txCtrl_NotifyOnTSMFinishedAndCleanObj(pTxCtrl, &pTxCtrl->TSMReportStat[tid]);
+}
+
+static void txCtrl_TSMExpiredTimer0 (TI_HANDLE hTxCtrl, TI_BOOL bTwdInitOccured)
+{
+    txCtrl_t  *pTxCtrl = (txCtrl_t*)hTxCtrl;
+    txCtrl_TSMExpiredTimer(hTxCtrl, pTxCtrl->tTSMTimers[0].tid, bTwdInitOccured);
+}
+
+static void txCtrl_TSMExpiredTimer1 (TI_HANDLE hTxCtrl, TI_BOOL bTwdInitOccured)
+{
+    txCtrl_t  *pTxCtrl = (txCtrl_t*)hTxCtrl;
+    txCtrl_TSMExpiredTimer(hTxCtrl, pTxCtrl->tTSMTimers[1].tid, bTwdInitOccured);
+}
+
+static void txCtrl_TSMExpiredTimer2 (TI_HANDLE hTxCtrl, TI_BOOL bTwdInitOccured)
+{
+    txCtrl_t  *pTxCtrl = (txCtrl_t*)hTxCtrl;
+    txCtrl_TSMExpiredTimer(hTxCtrl, pTxCtrl->tTSMTimers[2].tid, bTwdInitOccured);
+}
+
+
+static void txCtrl_NotifyOnTSMFinishedAndCleanObj (txCtrl_t  *pTxCtrl, TSMReportData_t  *pReportData)
+{
+
+    TRACE2(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_NotifyOnTSMFinishedAndCleanObj: TID=%d,  Reporting reason = %d\n",
+           pReportData->uTID, pReportData->reportingReason);
+    
+    pTxCtrl->TSMInProgressBitmap &= ~(0x01 << pReportData->uTID);
+    pTxCtrl->fTriggerReportCB(pTxCtrl->hMeasurementMgr, pReportData);
+
+    os_memoryZero(pTxCtrl->hOs, pReportData , sizeof(TSMReportData_t));
+}
+
+static void  txCtrl_UpdateTSMDelayCounters (txCtrl_t  *pTxCtrl, 
+                                            TxResultDescriptor_t *pTxResultInfo,
+                                            TI_UINT8 tid)
+{ 
+    TI_UINT8         binIndex = 0;
+    TSMReportData_t  *pReportData = &pTxCtrl->TSMReportStat[tid];
+    TI_UINT32        pktTotalDelay = ENDIAN_HANDLE_LONG(pTxResultInfo->totalDelay);
+
+
+    TRACE3(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_UpdateTSMDelayCounters: status=%d, tid=%d, pktTotalDelay=%d\n",
+           pTxResultInfo->status, tid, pktTotalDelay);
+    
+    pReportData->uMsduTotalCounter++;
+    
+    
+    switch (pTxResultInfo->status) 
+    {
+    case TX_SUCCESS:
+        {
+            pReportData->uMsduTransmittedOKCounter++;
+            pReportData->uConsecutiveDiscardedMsduCounter = 0;
+            
+            if (pktTotalDelay >= pReportData->uDelayThreshold) 
+            {
+                pReportData->uMaxConsecutiveDelayedPktsCounter++;
+            } 
+            else 
+            {
+                pReportData->uMaxConsecutiveDelayedPktsCounter = 0;
+            }
+    
+            /* Increment the bin range index  counter that the current packet Tx delay falls in. */
+            for (binIndex = 0; binIndex < TSM_REPORT_NUM_OF_BINS_MAX; binIndex++) 
+            {
+                TRACE3(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_UpdateTSMDelayCounters: pktTotalDelay=%d, binIndex[%d] range = %d\n",
+                      pktTotalDelay, binIndex, pReportData->binDelayThreshold[binIndex]);
+
+                if ( pktTotalDelay <= pReportData->binDelayThreshold[binIndex])
+                {
+                    pReportData->binsDelayCounter[binIndex]++;
+                    break;
+                }
+            }
+
+            /* more than one retransmission */
+            if (pTxResultInfo->ackFailures >= 2)
+            {
+                pReportData->uMsduMultipleRetryCounter++; 
+            }
+    
+            break;   
+        }
+    case TX_RETRY_EXCEEDED:
+        {
+            pReportData->uMsduRetryExceededCounter++;
+            pReportData->uConsecutiveDiscardedMsduCounter++; /* serves the consecutive condition trigger */
+            pReportData->uAverageDiscardedMsduCredit--;    /* serves the average condition trigger */
+            break;
+        }
+    case TX_TIMEOUT:
+        {
+            pReportData->uMsduLifeTimeExpiredCounter++; 
+            pReportData->uConsecutiveDiscardedMsduCounter++; /* serves the consecutive condition trigger */
+            pReportData->uAverageDiscardedMsduCredit--;     /* serves the average condition trigger */
+            break;
+        }
+    default:
+        {
+            
+        }
+
+    }
+
+    /* check if any of the reporting trigger has been met, if true send the report row data to the RRM object */
+    if (TI_TRUE == pReportData->bIsTriggeredReport) 
+    {
+        /* the dealy threshold condition */
+        if (pReportData->uDelayThreshold > 0) 
+        {
+            if (pReportData->uMaxConsecutiveDelayedPktsCounter == pReportData->uMaxConsecutiveDelayedPktsThr) 
+            {
+                /* call rrm to build and send the TSM report */
+                pReportData->reportingReason = (TI_UINT8)TSM_REQUEST_TRIGGER_CONDITION_DELAY;
+                txCtrl_NotifyOnTSMFinishedAndCleanObj(pTxCtrl, pReportData);
+                return;
+            }
+        }
+
+        /* the Consecutive threshold condition */
+        if (pReportData->uConsecutiveErrorThreshold > 0) 
+        {
+            if (pReportData->uConsecutiveDiscardedMsduCounter == pReportData->uConsecutiveErrorThreshold) 
+            {
+                /* call rrm to build and send the TSM report */
+                pReportData->reportingReason = (TI_UINT8)TSM_REQUEST_TRIGGER_CONDITION_CONSECUTIVE;
+                txCtrl_NotifyOnTSMFinishedAndCleanObj(pTxCtrl, pReportData);
+                return;
+            }
+        }
+
+        /* the Average threshold condition */
+        if (pReportData->uAverageErrorThreshold > 0) 
+        { 
+            if (pReportData->uAverageDiscardedMsduCredit <= 0) 
+            {
+                /* call rrm to build and send the TSM report */
+                pReportData->reportingReason = (TI_UINT8)TSM_REQUEST_TRIGGER_CONDITION_AVERAGE;
+                txCtrl_NotifyOnTSMFinishedAndCleanObj(pTxCtrl, pReportData);
+                return;
+            }
+
+            /* Every measurementCount num of packets load the creadit with the average threshold */
+            if (0 == (pReportData->uMsduTotalCounter % pReportData->measurementCount))
+            {   
+                pReportData->uAverageDiscardedMsduCredit += pReportData->uAverageErrorThreshold;
+            }
+        }
+        
+    }  
+}
+
+
 /***************************************************************************
 *                       txCtrl_UpdateTxCounters                            
 ****************************************************************************
@@ -1209,6 +1513,7 @@ TRACE1(pTxCtrl->hReport, REPORT_SEVERITY_WARNING, "txCtrl_UpdateTxCounters(): Tx
 	if ( !bIsDataPkt )
 		return;
 
+    
 	if (pTxResultInfo->status == TX_SUCCESS) 
 	{
 		/* update the retry histogram */
@@ -1216,14 +1521,6 @@ TRACE1(pTxCtrl->hReport, REPORT_SEVERITY_WARNING, "txCtrl_UpdateTxCounters(): Tx
 							   (TX_RETRY_HISTOGRAM_SIZE - 1) : pTxResultInfo->ackFailures;
 		pTxCtrl->txDataCounters[ac].RetryHistogram[retryHistogramIndex]++;
 
-#ifdef XCC_MODULE_INCLUDED
-		/* update delay histogram */
-		txCtrl_SetTxDelayCounters (pTxCtrl, 
-        						   ac, 
-        						   ENDIAN_HANDLE_LONG(pTxResultInfo->fwHandlingTime), 
-        						   pPktCtrlBlk->tTxPktParams.uDriverDelay, 
-        						   ENDIAN_HANDLE_LONG(pTxResultInfo->mediumDelay));  
-#endif
 
 		if (pTxCtrl->headerConverMode == HDR_CONVERT_QOS)
         {
@@ -1376,4 +1673,197 @@ TI_STATUS txCtrl_CheckForTxStuck (TI_HANDLE hTxCtrl)
 } /* txCtrl_FailureTest */
 
 
+
+static void tokensCalculation(txCtrl_t *pTxCtrl, TxResultDescriptor_t *pTxResultInfo, TI_UINT32 ac)
+{
+	TI_UINT32 currentTimeStamp = os_timeStampUs(pTxCtrl->hOs);
+	TokenCalculationParams_t *pTokenCalcParams = &(pTxCtrl->tokenCalcParams[ac]);
+	TI_UINT32 timeDiff = currentTimeStamp - pTokenCalcParams->lastCalcTimeStamp;
+
+    /* Decrease tokens from the bucket by the medium Time used for the current 
+    transmitted packet (and the previous reminder).
+    Note: Divide by 32 to match the Allocated Medium Time units. */
+    pTokenCalcParams->tokens -= ((pTxResultInfo->mediumUsage + pTokenCalcParams->usedTokensReminder) >> 5);
+
+    /* Save the division by 32 reminder to be added in the next iteration */
+    pTokenCalcParams->usedTokensReminder = (pTxResultInfo->mediumUsage + pTokenCalcParams->usedTokensReminder) 
+                                                & TOKENS_DIVISION_SUB_REMINDER_MASK;
+
+    /* check if it is time to add tokens to the bucket */
+	if (timeDiff > pTokenCalcParams->timeDiffMinThreshold)
+	{
+		TI_UINT32 tempTimeDiff, temp;
+		TI_UINT32 tokensToAdd;
+		TI_UINT16 allocatedMediumTime = pTokenCalcParams->allocatedMediumTime;
+
+        /* Since we divided by 2^20 instead of 1,000,000 we have an inaccuracy,
+         in order to compensate on the inaccuracy we add (timediff/32 + timediff/64) to the timediff */
+        temp = timeDiff * allocatedMediumTime;
+        tempTimeDiff = temp + (temp >> 5) + (temp >> 6);
+
+        /* Add the previous division reminder */
+		tempTimeDiff += pTokenCalcParams->unusedTokensReminder;
+
+        /* Divide by a million and add tokens to the bucket */
+		tokensToAdd = (tempTimeDiff >> 20);
+        pTokenCalcParams->tokens += tokensToAdd;
+
+        /* Save the division by 1000000 reminder */
+		pTokenCalcParams->unusedTokensReminder = tempTimeDiff & TOKENS_DIVISION_ADD_REMINDER_MASK;
+
+        pTokenCalcParams->lastCalcTimeStamp = currentTimeStamp;
+ 	    TRACE4(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "tokensCalculation: tokens = %d tokensToAdd = %d, tempTimeDiff = %d mediumUsage = %d\n", 
+	 					pTokenCalcParams->tokens, tokensToAdd, tempTimeDiff, pTxResultInfo->mediumUsage);
+	}
+
+    /* Check if the bucket thresholds were crossed */
+	if (pTokenCalcParams->tokens > pTokenCalcParams->allocatedMediumTime)
+	{
+		pTokenCalcParams->tokens = pTokenCalcParams->allocatedMediumTime;
+	}
+	else if (pTokenCalcParams->tokens < 0)
+	{
+        qosMngr_MediumTimeDowngrade(pTxCtrl->hQosMngr, ac, pTxCtrl->highestAdmittedAc[ac], DOWNGRADE_DURATION);
+		pTokenCalcParams->tokens = 	pTokenCalcParams->allocatedMediumTime;
+	}
+}
+
+TI_STATUS txCtrl_UpdateTSMParameters(TI_HANDLE          hTxCtrl,
+                                     TSMParams_t        *pTSMParams,
+                                     tTriggerTSMReport  fCB)
+{     
+    TI_UINT8            i=0;
+    TI_BOOL             bRequestIsValid = TI_FALSE;
+    TSMReportData_t     *pReportData = NULL;
+    txCtrl_t            *pTxCtrl = (txCtrl_t *)hTxCtrl;
+    paramInfo_t         param;
+    
+
+    TRACE3(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_UpdateTSMParameters: tid=%d, bIsTriggeredReport=%d, uDuration=%d\n",
+           pTSMParams->uTID, pTSMParams->bIsTriggeredReport, pTSMParams->uDuration);
+   
+
+    if ((pTSMParams->uTID < 0) || (pTSMParams->uTID >= TSM_REPORT_NUM_OF_TID_MAX)) 
+    {
+        TRACE0(pTxCtrl->hReport, REPORT_SEVERITY_ERROR, "txCtrl_UpdateTSMParameters: TID should be in range of 0-7!!!n");
+        return TI_NOK;
+    }
+    
+    /* The STA does not support the TSM off more than 3 TIDs in parallel */
+    if (pTxCtrl->TSMInProgressBitmap & ((0x01 << pTSMParams->uTID))) 
+    {
+        TRACE0(pTxCtrl->hReport, REPORT_SEVERITY_ERROR, "txCtrl_UpdateTSMParameters: TSM Measurement is in progress already. reject this measurement request!!n");
+        return TI_NOK;
+    }
+    
+    TRACE1(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_UpdateTSMParameters: Updating TSM Report params for TID = %d \n",pTSMParams->uTID );
+
+    pReportData = &pTxCtrl->TSMReportStat[pTSMParams->uTID];
+    pReportData->uTID = pTSMParams->uTID;
+    pReportData->bIsTriggeredReport = pTSMParams->bIsTriggeredReport;
+    pReportData->measurementToken = pTSMParams->measurementToken;
+    pReportData->frameToken = pTSMParams->frameToken;
+    pReportData->frameNumOfRepetitions = pTSMParams->frameNumOfRepetitions;
+    pReportData->measurementDuration = pTSMParams->uDuration;
+    pReportData->bin0Range = pTSMParams->uBin0Range;
+    MAC_COPY(pReportData->peerSTA, pTSMParams->peerSTA);
+
+    TRACE1(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, "txCtrl_UpdateTSMParameters: Bin0 range = %d \n",pReportData->bin0Range);
+
+    pReportData->binDelayThreshold[0] = pTSMParams->uBin0Range; 
+    pReportData->binDelayThreshold[1] = pTSMParams->uBin0Range << 1; 
+    pReportData->binDelayThreshold[2] = pTSMParams->uBin0Range << 2; 
+    pReportData->binDelayThreshold[3] = pTSMParams->uBin0Range << 3; 
+    pReportData->binDelayThreshold[4] = pTSMParams->uBin0Range << 4; 
+    pReportData->binDelayThreshold[5] = 0xFFFFFFFF; /* Actually, it is defined as every delay which is bigger than bin4 threshold */
+   
+
+    /* register for the trigger report CB to be called upon trigger condition met/duration ended */
+    pTxCtrl->fTriggerReportCB = fCB; 
+
+    
+    /* For non-triggered TSM , allocate timer if available and start the measurment */
+    if (TI_FALSE == pReportData->bIsTriggeredReport)
+    {
+        for (i = 0; i < TSM_REPORT_NUM_OF_MEASUREMENT_IN_PARALLEL_MAX; i++)
+        {
+            if (pTxCtrl->tTSMTimers[i].bRequestTimerRunning == TI_FALSE)
+            {
+                if ((pTxCtrl->tTSMTimers[i].hRequestTimer != NULL) && (pTxCtrl->tTSMTimers[i].fExpiryCbFunc != NULL)) 
+                {
+
+                     TRACE3(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, 
+                            "txCtrl_UpdateTSMParameters: Measurment Started for timer Index=%d, TID=%d, Duration=%d [TUs] \n",
+                            i, pTSMParams->uTID, pTSMParams->uDuration);
+                     
+                     tmr_StartTimer(pTxCtrl->tTSMTimers[i].hRequestTimer,
+                               pTxCtrl->tTSMTimers[i].fExpiryCbFunc,
+                               hTxCtrl,
+                               (pTSMParams->uDuration*1024/1000),
+                               TI_FALSE);
+
+                     pTxCtrl->tTSMTimers[i].bRequestTimerRunning = TI_TRUE;
+                     pTxCtrl->tTSMTimers[i].tid = pTSMParams->uTID;
+                     bRequestIsValid = TI_TRUE;
+                     break;
+                }
+               
+            }
+        }
+
+        if (TI_FALSE == bRequestIsValid) 
+        {
+            TRACE0(pTxCtrl->hReport, REPORT_SEVERITY_ERROR, "txCtrl_UpdateTSMParameters: Timer can not be allocated for this non-triggered report !!n");
+            return TI_NOK;
+        }
+        
+    }
+    else
+    {
+        pReportData->measurementCount = pTSMParams->tTriggerReporting.measuCount;
+        pReportData->triggerCondition = pTSMParams->tTriggerReporting.triggerCondition;
+        pReportData->uMaxConsecutiveDelayedPktsThr = pTSMParams->uDelayedMsduCount;
+
+        if (pReportData->triggerCondition &  TSM_REQUEST_TRIGGER_CONDITION_DELAY) 
+        {
+            pReportData->uDelayThreshold = pReportData->binDelayThreshold[pTSMParams->uDelayedMsduRange + 1];
+        }
+        else
+        {
+            pReportData->uDelayThreshold = 0;
+        }
+            
+     
+        pReportData->uConsecutiveErrorThreshold = (pReportData->triggerCondition & 
+                                                   TSM_REQUEST_TRIGGER_CONDITION_CONSECUTIVE) ?
+                                                   pTSMParams->tTriggerReporting.consecutiveErrorThreshold: 0;
+
+        if (pReportData->triggerCondition & TSM_REQUEST_TRIGGER_CONDITION_AVERAGE) 
+        {
+            pReportData->uAverageErrorThreshold = pTSMParams->tTriggerReporting.averageErrorThreshold;
+            /* Load the average delay trigger condition credit with the threshold received */
+            pReportData->uAverageDiscardedMsduCredit = pReportData->uAverageErrorThreshold; 
+        }
+        else
+        {
+            pReportData->uAverageErrorThreshold = 0;
+        }
+         
+        
+    }
+
+    /* save the measurement start time TSF */
+    param.paramType = SITE_MGR_CURRENT_TSF_TIME_STAMP;
+    siteMgr_getParam(pTxCtrl->hSiteMgr, &param);
+    os_memoryCopy(pTxCtrl->hOs, (void*)pReportData->actualMeasurementTSF, 
+                  (void*)param.content.siteMgrCurrentTsfTimeStamp, TIME_STAMP_LEN);
+
+   
+    /* Mark that this measurement has just started */   
+    pReportData->bTSMInProgress = TI_TRUE;
+    pTxCtrl->TSMInProgressBitmap |= (0x01 << pTSMParams->uTID);
+
+    
+    return TI_OK;
+}
 

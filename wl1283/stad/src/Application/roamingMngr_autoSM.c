@@ -164,7 +164,7 @@ TGenSM_actionCell roamingMngrAuto_matrix[ROAMING_MNGR_NUM_STATES][ROAMING_MNGR_N
         /* next state and actions for CONNECTING state */                      
         {   {ROAMING_STATE_CONNECTING, roamingMngr_smUnexpected},           /* START            */ 
             {ROAMING_STATE_IDLE, roamingMngr_smStop},                       /* STOP             */ 
-            {ROAMING_STATE_IDLE, roamingMngr_smDisconnectWhileConnecting},      /* ROAM_TRIGGER     */ 
+            {ROAMING_STATE_IDLE, roamingMngr_smDisconnectWhileConnecting},  /* ROAM_TRIGGER     */ 
             {ROAMING_STATE_CONNECTING, roamingMngr_smUnexpected},           /* SCAN,            */ 
             {ROAMING_STATE_CONNECTING, roamingMngr_smUnexpected},           /* SELECT           */ 
             {ROAMING_STATE_CONNECTING, roamingMngr_smHandover},             /* REQ_HANDOVER     */ 
@@ -502,6 +502,8 @@ static void roamingMngr_smHandover(TI_HANDLE hRoamingMngr)
     if (pRoamingMngr->candidateApIndex == CURRENT_AP_INDEX)
     {   /* get the current AP */
         pApToConnect = apConn_getBSSParams(pRoamingMngr->hAPConnection);
+        if (pApToConnect == NULL)
+         return;
     }
     else
     {   /* get the candidate AP */
@@ -598,6 +600,8 @@ static void roamingMngr_smSuccHandover(TI_HANDLE hRoamingMngr)
         {   
 			/* get the current AP */
             pNewConnectedAp = apConn_getBSSParams(pRoamingMngr->hAPConnection);
+            if (pNewConnectedAp == NULL)
+             return;
         }
         else
         {   
@@ -776,6 +780,7 @@ static void roamingMngr_smStartIdle(void *pData)
     pRoamingMngr->roamingTrigger = ROAMING_TRIGGER_NONE;
 
     pCurBssEntry = apConn_getBSSParams(pRoamingMngr->hAPConnection);
+    if (pCurBssEntry != NULL)  
     scanMngr_startContScan(pRoamingMngr->hScanMngr, &pCurBssEntry->BSSID, pCurBssEntry->band);
 
     /* Start pre-authentication in order to set PMKID

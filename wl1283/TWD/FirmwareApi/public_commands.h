@@ -68,7 +68,7 @@ typedef enum
 
     CMD_NOISE_HIST      = 28,
     
-    CMD_LNA_CONTROL     = 32,
+    CMD_LNA_CONTROL     = 32,	/* Obsolete */
     CMD_SET_BCN_MODE    = 33,
 
     CMD_MEASUREMENT      = 34,
@@ -351,9 +351,9 @@ typedef struct
 /* ScanOptions bit mask field.*/
 #define SCAN_ACTIVE         0
 #define SCAN_PASSIVE        1   /* 1 = passive scan, 0 = active scan*/
-/* #define SCAN_5GHZ_BAND      2  */  /* 1 = scan channel list in 5 Ghz band, 0 = scan channel list in 2.4 Ghz band*/ 
 #define TRIGGERED_SCAN      2   /* 1 = Triggered scan, 0 = Normal scan*/
 #define SCAN_PRIORITY_HIGH  4   /* 1 = High priority scan, 0 = Low priority scan*/
+#define SCAN_FORCE          8    /* 1 = force scan even enter to PS fail, 0 = do not do scan if enter to PS fail*/
  
 typedef uint8 TidTrigger_t;
 
@@ -373,18 +373,16 @@ typedef struct
                                       /* Scan Type (bit 0) - When this bit is set, the */
                                       /*  WiLink performs a passive scan. When this bit*/
                                       /*  is cleared, the WiLink performs an active scan. */
-                                      /* Band Select (bit 1) - When this bit is set, the*/
-                                      /*  WiLink scans the specified channels in the */
-                                      /*  5GHz band. When this bit is cleared, the */
-                                      /*  WiLink scans the specified channels in the */
-                                      /*  2.4GHz band. */
-                                      /* Voice mode (bit 2) - When this bit is set, */
+                                      /* Voice mode (bit 1) - When this bit is set, */
                                       /*  the request is for a voice scan. When this bit*/
                                       /*  is cleared, the request is for a normal scan. */
-                                      /* Scan priority (bit 3) - When this bit is set, */
+                                      /* Scan priority (bit 2) - When this bit is set, */
                                       /*  the request is for a high priority scan. When*/
                                       /*  this bit is cleared, the request is for a low*/
                                       /*  priority scan.*/
+	                                  /*  force mode (bit 3) - When this bit is set force scan even
+	                                      enter to PS fails, When this bit is cleared  do not do scan if 
+	                                      enter to PS fail*/
         
     uint8              numChannels;   /* Number of scan channels in the list (minimum is*/
                                       /* 1, maximum is 30).*/
@@ -393,7 +391,7 @@ typedef struct
                                       /* requests to send per channel, in active scan. */
     
     EHwRateBitFiled    txdRateSet;    /* This EHwRateBitFiled format field specifies the rate and */
-                                      /* modulation to transmit the probe request during*/
+	                                  /* modulation to transmit the probe request during*/
 	                                  /* an active scan. It is not used for passive scans.*/
    
     TidTrigger_t       tidTrigger;    /* used for TidTriggered scan only.*/
@@ -466,6 +464,7 @@ typedef uint8 ETCondCount_t;
 
 #define PROCESS_SCAN_IS_HIGH(pScanParameters) ((pScanParameters)->basicScanParameters.scanOptions & SCAN_PRIORITY_HIGH)
 #define PROCESS_SCAN_IS_LOW(pScanParameters) ((PROCESS_SCAN_IS_HIGH(pScanParameters)) == 0)
+#define PROCESS_SCAN_IS_FROCE(pScanParameters) ((pScanParameters)->basicScanParameters.scanOptions & SCAN_FORCE)
 
 
 /* Per-Channel scan parameters.*/
@@ -630,6 +629,9 @@ typedef struct
                                      /* field to determine the rate at which to */
                                      /* transmit control frame responses (such as ACK */
 	                                 /* or CTS frames). */
+
+	EHwRateBitFiled   supportedRateSet;  /* This field specifies the rates supported */
+									    /* for the BSS or IBSS. */
     
     uint8             dtimInterval;  /* This field specifies the number of beacon */
                                      /* intervals between DTIM beacon frames. The host*/
@@ -917,6 +919,7 @@ typedef enum
 	TEMPLATE_BAR, /*for firmware internal use only*/
     TEMPLATE_CTS, /* For CTS-to-self (FastCTS) mechanism for BT/WLAN coexistence (SoftGemini). */
     TEMPLATE_ARP_RSP, /* Template for Automatic ARP reply by FW */
+    TEMPLATE_LINK_MEASUREMENT_REPORT, /* Template for RRM (802.11k) link measurement report */
 
     MAX_NUM_OF_TEMPLATES = 0xff
 } TemplateType_enum;
@@ -1024,33 +1027,6 @@ typedef struct
 } NoiseHistRequest_t;
 
 
-/******************************************************************************
-
-    ID:       CMD_LNA_CONTROL
-    Desc:     This command controls the LNA state. 
-    Params:   LNAControl_t - see below.
-
-******************************************************************************/
-
-typedef enum
-{
-    LNA_MODE_MANUAL,    /* 0: The LNA is set to manual mode and is turned off.*/
-    LNA_MODE_AUTO,      /* 1: The LNA is set to automatic mode.*/
-    LNA_MODE_INVALID = 0xFF
-} LnaMode_enum;
-
-#ifdef HOST_COMPILE
-typedef uint8 LnaMode_e;
-#else
-typedef LnaMode_enum LnaMode_e;
-#endif
-
-typedef struct
-{
-    LnaMode_e LNAControlField; /* refer to LnaMode_enum*/
-    uint8     padding[3];      /* for alignment to 32 bits boundry*/
-} LNAControl_t;
-
 
 /******************************************************************************
 
@@ -1089,7 +1065,7 @@ typedef struct
 
     uint8 scanTag;              /* results tag */
 
-    uint8 padding[1];           /* for alignment to 32 bits boundry*/
+    uint8 EnterPS;              /* 1 Enter to PS before measurment*/
 } MeasurementParameters_t;
 
 /******************************************************************************
@@ -1175,25 +1151,6 @@ typedef struct
                                          /* When set, Power save protocol is enabled. */
                                          /* When cleared, Power save protocol is */
                                          /* disabled (refer to StationPSMode_enum).*/
-    
-    uint8                  needToSendNullData;
-    uint8 numberOfRetries;               /* This field specifies the maximum allowed */
-                                         /* number of retries of the Null data packet */
-                                         /* that FW will send after switching the */
-                                         /* Power Save Protocol mode.*/
-
-    uint8 hangOverPeriod;                /* This field specifies the hangover period, */
-                                         /* which is the time in TUs during which the */
-                                         /* WiLink remains awake after sending an MPDU */
-                                         /* with the Power Save bit set, indicating that*/
-                                         /* the station is to go into Power Save mode. */
-                                         /* Setting bit 0 does not affect the hangover */
-                                         /* period.*/
-    
-    EHwRateBitFiled rateToTransmitNullData; /* This EHwBitRate format field specifies the rate and */
-                                         /* modulation to transmit the Null data packet*/
-	                                     /* to the AP. */
-    
 } PSModeParameters_t;
 
 /******************************************************************************
@@ -1229,7 +1186,7 @@ typedef struct
 
     ID:       CMD_AP_DISCOVERY
     Desc:     This command instructs the WiLink device to perform an AP discovery 
-              measurement on a single channel. This command can only be issued after 
+              measurement on a multiple channels channel. This command can only be issued after 
               a measurement process has been started by the WiLink device as a result
               of a previous Measurement command. The Measurement command specifies the 
               channel on which the AP discovery is performed. Once the "AP discovery" 
@@ -1239,40 +1196,33 @@ typedef struct
     Params:   ApDiscoveryParameters_t - see below.
 
 ******************************************************************************/
+typedef struct
+
+{
+    uint8         txPowerAttenuation; /* TX power level to be used per channel scanned. */
+                                      /* If 0, leave normal TX power level for this */
+                                      /* channel. Range: 0 - 20.5 [dB].*/ 
+    Channel_e     channel;            /* Channel number to scan, valid range 0-255 */
+  
+    uint16        padding;     
+
+} ApDiscoveryChannelParmeters_t;
+
 
 
 typedef struct
 {
-    ACXRxConfigStruct rxFilter; /* This field is the Rx filter configuration for the */
-                                /* device while the AP Discovery process is running. */
-                                /* When the process ends the previous Rx filter */
-                                /* configuration is reset. The filter configuration is*/
-                                /* composed of two 32 bit registers. When they are set */
-                                /* to 0xFFFFFFFF the Rx filter configuration is not */
-                                /* changed.*/
-    
-    uint32 scanDuration;        /* This field specifies the amount of time, in time*/
-                                /* units (TUs), to perform the AP discovery. The value*/
-                                /* can range from 0 to 65535 TUs (67.1 seconds). */
-    
-    uint16 scanOptions;         /* This field specifies whether the AP discovery is */
-                                /* performed by an active scan or a passive scan. */
-                                /* 0 - ACTIVE, 1 - PASSIVE.*/
-    
-    uint8  numOfProbRqst;       /* This field indicates the number of probe requests to*/
-                                /* send per channel, when active scan is specified. */
-                                /* Note: for XCC measurement this value should be set */
-                                /*       to 1.*/
-    
-    uint8 txPowerAttenuation;   /* TX power level to be used for sending probe requests*/
-                                /* when active scan is specified. */
-                                /* If 0, leave normal TX power level for this channel. */
-
-    EHwRateBitFiled txdRateSet; /* This EHwBitRate format field specifies the rate and modulation*/
-                                /* to transmit the probe request when an active scan is*/
-	                            /* specified. */
-
+    BasicScanParameters_t         basicScanParams; 
+    BasicScanChannelParameters_t  channelParamsBandGeneral;
+    ApDiscoveryChannelParmeters_t channelParamsBandBG[SCAN_MAX_NUM_OF_CHANNELS];
+	ApDiscoveryChannelParmeters_t channelParamsBandA[SCAN_MAX_NUM_OF_CHANNELS];
+	EHwRateBitFiled               txdRateSetBG;
+    EHwRateBitFiled               txdRateSetA;
+    uint8                         numOfChannelsBandBG;
+    uint8                         numOfChannelsBandA;
+    uint16                        padding;         
 } ApDiscoveryParameters_t;
+
 
 /******************************************************************************
 
@@ -1470,7 +1420,7 @@ typedef struct
     uint8                   terminateOnReport;      /* Terminate after report */
     uint8                   resultsTag;             /* Tag for filtered scan results */
     ScanBssType_e           bssType;                /* BSS type to filter (0 - Infra, 1 - IBSS, 2 - Any) */
-    ScanSsidFilterType_e    ssidFilterType;         /* SSID filter Type (0 - Any, 1 - specified in command, 2 - use SSID list, 3 - use SSID list no filter) */
+    ScanSsidFilterType_e    ssidFilterType;         /* SSID filter Type (0 - Any, 1 - specified in command, 2 - use SSID list) */
     uint8                   ssidLength;             /* SSID Length (if ssidType is specified in command) */
     uint8                   ssid[32];               /* SSID (if ssidType is specified in command) */
     uint8                   numProbe;               /* Number of probe requests to transmit per (hidden) SSID per channel */

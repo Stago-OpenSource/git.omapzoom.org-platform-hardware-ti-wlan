@@ -405,7 +405,9 @@ static void fwEvent_StateMachine (TfwEvent *pFwEvent)
                 if (pFwEvent->bIntrPending) 
                 {
                     CL_TRACE_START_L5();
-                    pFwEvent->bIntrPending = TI_FALSE;
+                    /* We are starting handling of pending interrupt request*/
+                    /* Clear Pendig and Set InProgress flags*/
+                    pFwEvent->bIntrPending = TI_FALSE;  
                     eStatus = fwEvent_SmReadIntrInfo (pFwEvent);
                     pFwEvent->eSmState = FWEVENT_STATE_WAIT_INTR_INFO;
                     CL_TRACE_END_L5("tiwlan_drv.ko", "CONTEXT", "FwEvent", ".HndlCmplt");
@@ -686,7 +688,7 @@ void fwEvent_SetInitMask (TI_HANDLE hFwEvent)
     TfwEvent *pFwEvent = (TfwEvent *)hFwEvent;
 
     /* Unmask only the interrupts needed for the FW configuration process. */
-    pFwEvent->uEventMask = ACX_INTR_CMD_COMPLETE | ACX_INTR_EVENT_A | ACX_INTR_EVENT_B;
+    pFwEvent->uEventMask = ACX_INTR_CMD_COMPLETE | ACX_INTR_EVENT_A | ACX_INTR_EVENT_B | ACX_INTR_HW_AVAILABLE;
     pFwEvent->tMaskTxn.uData = ~pFwEvent->uEventMask;
     TXN_FW_EVENT_SET_MASK_ADDR(pFwEvent)
     twIf_Transact(pFwEvent->hTwIf, &(pFwEvent->tMaskTxn.tTxnStruct));
@@ -715,6 +717,36 @@ TI_STATUS fwEvent_Stop (TI_HANDLE hFwEvent)
     
     return TI_OK;
 }
+
+
+
+/*
+ * \brief	Mask all interrupts
+ * 
+ * \param  hFwEvent  - FwEvent Driver handle
+ * \return void
+ * 
+ * \par Description
+ *
+ * Masks all interrupts from FW.
+ * 
+ * \sa
+ */
+void fwEvent_MaskAllFwInterrupts(TI_HANDLE hFwEvent)
+{
+    TfwEvent *pFwEvent = (TfwEvent *)hFwEvent;
+
+
+    /* Mask all FW interrupts */
+    
+    pFwEvent->uEventMask     = 0;
+    pFwEvent->tMaskTxn.uData = ~pFwEvent->uEventMask;
+    
+    TXN_FW_EVENT_SET_MASK_ADDR(pFwEvent)
+        
+    twIf_Transact(pFwEvent->hTwIf, &(pFwEvent->tMaskTxn.tTxnStruct));
+}
+
 
 
 /*
@@ -778,10 +810,12 @@ void fwEvent_EnableInterrupts(TI_HANDLE hFwEvent)
 }
 
 
+
 #ifdef TI_DBG
 
 void fwEvent_PrintStat (TI_HANDLE hFwEvent)
 {
+#ifdef REPORT_LOG
     TfwEvent *pFwEvent = (TfwEvent *)hFwEvent;
     FwStatus_t *fwStat = &pFwEvent->tFwStatusTxn.tFwStatus; 
 	int i;
@@ -806,6 +840,7 @@ void fwEvent_PrintStat (TI_HANDLE hFwEvent)
 		WLAN_OS_REPORT(("txReleasedBlks[%1d] = 0x%08x\n", i, fwStat->txReleasedBlks[i]));
     }
     WLAN_OS_REPORT(("fwLocalTime = 0x%08x\n", fwStat->fwLocalTime));
+#endif
 }
 
 #endif  /* TI_DBG */

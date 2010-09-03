@@ -51,6 +51,7 @@
 #include "paramOut.h"
 #include "requestHandler.h"
 #include "measurementMgrSM.h"
+#include "rrmMgr.h"
 #ifdef XCC_MODULE_INCLUDED
  #include "XCCRMMngrParam.h"
 #endif
@@ -60,6 +61,7 @@
 typedef TI_STATUS (*parserFrameReq_t)   (TI_HANDLE hMeasurementMgr, 
                                          TI_UINT8 *pData, TI_INT32 dataLen,
                                          TMeasurementFrameRequest *frameReq);
+
 
 typedef TI_BOOL (*isTypeValid_t)        (TI_HANDLE hMeasurementMgr, 
                                          EMeasurementType type, 
@@ -77,6 +79,14 @@ typedef TI_STATUS (*buildReport_t)      (TI_HANDLE hMeasurementMgr,
 typedef TI_STATUS (*sendReportAndCleanObj_t)(TI_HANDLE hMeasurementMgr);
 
 
+#define RRM_REPORT_MAX_SIZE (2000)
+
+
+typedef struct
+{
+    TI_UINT8           dialogToken;
+    neighborAPList_t   neighborApsList;
+} rrmNeighborReport_t;
 
 typedef struct 
 {
@@ -87,6 +97,8 @@ typedef struct
 
     /* Methods */
     parserFrameReq_t            parserFrameReq;
+   
+    
     isTypeValid_t               isTypeValid;
     buildRejectReport_t         buildRejectReport;
     buildReport_t               buildReport;
@@ -120,6 +132,8 @@ typedef struct
     RM_report_frame_t           XCCFrameReport;
 #endif
     MeasurementReportFrame_t    dot11hFrameReport;
+    TI_UINT8                    rrmFrameReportBuff[RRM_REPORT_MAX_SIZE]; /* 802.11k */
+    
     TI_UINT16                   nextEmptySpaceInReport;
     TI_UINT16                   frameLength;
 
@@ -135,7 +149,10 @@ typedef struct
     /* XCC Traffic Stream Metrics measurement parameters */
     TI_HANDLE                   hTsMetricsReportTimer[MAX_NUM_OF_AC];
     TI_BOOL                     isTsMetricsEnabled[MAX_NUM_OF_AC];
-
+    /* RRM Fields */
+    rrmNeighborReport_t         tNeighborReport;
+    
+    
     /* Handles to other modules */
     TI_HANDLE                   hRequestH;
     TI_HANDLE                   hRegulatoryDomain;
@@ -151,6 +168,7 @@ typedef struct
     TI_HANDLE                   hTxCtrl;
     TI_HANDLE                   hTimer;
     TI_HANDLE                   hSme;
+    
 } measurementMgr_t;
 
 

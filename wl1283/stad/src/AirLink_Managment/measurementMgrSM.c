@@ -56,7 +56,7 @@
 #include "TWDriver.h"
 #include "timer.h"
 #include "sme.h"
-
+#include "rrmMgr.h"
 
 char * measurementMgr_stateDesc[MEASUREMENTMGR_NUM_STATES] =
 {  
@@ -324,6 +324,8 @@ static TI_STATUS measurementMgrSM_acConnected(void * pData)
 	iappParsingRegistrationTable_t iappParsingRegistration;
 #endif
 
+    TRACE1(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, "measurementMgrSM_acConnected: measurement mode=%d\n", pMeasurementMgr->Mode);    
+    
 	/* do nothing if we're already in connected mode */
 	if (pMeasurementMgr->Connected)
 	{
@@ -338,6 +340,7 @@ TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Connected flag 
 
     /* upon connection to a new AP set the measurment scan flag to FALSE */
     pMeasurementMgr->bMeasurementScanExecuted = TI_FALSE;
+
 
 	/* get the current serving channel */
 	param.paramType = SITE_MGR_CURRENT_CHANNEL_PARAM;
@@ -367,29 +370,43 @@ TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_WARNING, ": Could not register 
         }
         
         pMeasurementMgr->parserFrameReq = measurementMgr_XCCParseFrameReq;
+
+        
         pMeasurementMgr->isTypeValid = measurementMgr_XCCIsTypeValid;
 		pMeasurementMgr->buildReport = measurementMgr_XCCBuildReport;
 		pMeasurementMgr->buildRejectReport = measurementMgr_XCCBuildRejectReport;
 		pMeasurementMgr->sendReportAndCleanObj = measurementMgr_XCCSendReportAndCleanObject;
-        requestHandler_setRequestParserFunction(pMeasurementMgr->hRequestH, 
-                                                measurementMgr_XCCParseRequestIEHdr);
+
+
+        requestHandler_setRequestParserFunction(pMeasurementMgr->hRequestH, measurementMgr_XCCParseReq);
 	}
 	else
 #endif
 	{
-		if(pMeasurementMgr->Mode == MSR_MODE_SPECTRUM_MANAGEMENT)
+		if(pMeasurementMgr->Mode == MSR_MODE_RRM)
 		{
-TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": MeasurementMgr set to Spectrum Management mode\n");
+            TSetTemplate                    templateStruct;
+            LinkMeasurementReportTemplate_t templateLinkReport;
+
+            
+TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": MeasurementMgr set to RRM mode\n");
 
             /* NOTE: These 5 functions need to be corrected to fit the 802.11h standered */
-            pMeasurementMgr->parserFrameReq = measurementMgr_dot11hParseFrameReq;
-            pMeasurementMgr->isTypeValid = measurementMgr_dot11hIsTypeValid;
-			pMeasurementMgr->buildReport = measurementMgr_dot11hBuildReport;
-			pMeasurementMgr->buildRejectReport = measurementMgr_dot11hBuildRejectReport;
-			pMeasurementMgr->sendReportAndCleanObj = measurementMgr_dot11hSendReportAndCleanObject;
-            requestHandler_setRequestParserFunction(pMeasurementMgr->hRequestH, 
-                                                    measurementMgr_dot11hParseRequestIEHdr);
+            pMeasurementMgr->parserFrameReq = rrmMgr_ParseFrameReq;
+            pMeasurementMgr->isTypeValid = rrmMgr_IsTypeValid;
+			pMeasurementMgr->buildReport = rrmMgr_BuildReport;
+			pMeasurementMgr->buildRejectReport = rrmMgr_BuildRejectReport;
+			pMeasurementMgr->sendReportAndCleanObj = rrmMgr_SendReportAndCleanObject;
+            requestHandler_setRequestParserFunction(pMeasurementMgr->hRequestH, rrmMgr_ParseRequestElement);
+    
+            templateStruct.ptr = (TI_UINT8 *) &templateLinkReport;
+            templateStruct.type = LINK_MEAUSREMENT_REPORT_TEMPLATE;
+            templateStruct.uRateMask = RATE_MASK_UNSPECIFIED;
 
+            /* Build the template and send it to the FW */
+            buildLinkMeasurementReportTemplate(pMeasurementMgr->hSiteMgr, &templateStruct);
+            TWD_CmdTemplate (pMeasurementMgr->hTWD, &templateStruct, NULL, NULL);
+            
 		}
 	}
 
@@ -461,7 +478,7 @@ TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Measurement Man
 static TI_STATUS measurementMgrSM_acFrameReceived_fromIdle(void * pData)
 {
     measurementMgr_t * pMeasurementMgr = (measurementMgr_t *) pData;
-    TI_UINT16 activationDelay;
+    TI_UINT16 activationDelay = 0;
     TI_STATUS status;
     paramInfo_t param;
     TI_UINT16 tbtt;
@@ -492,14 +509,38 @@ TRACE1(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Frame Type = %d
                                MEASUREMENTMGR_EVENT_ABORT, pMeasurementMgr);
     }
 
-	/* converting beacon interval to msec */
-    tbtt = (param.content.beaconInterval * 1024) / 1000;	/* from TU to msec */   
 
-	/* Initializing Activation Delay Time */
-	activationDelay	= pMeasurementMgr->newFrameRequest.hdr->activatioDelay;
-	activationDelay	*= tbtt;    
-    /* Adding the Measurement Offset to the activation delay */
-	activationDelay	+= pMeasurementMgr->newFrameRequest.hdr->measurementOffset;
+    TRACE1(pMeasurementMgr->hReport,
+           REPORT_SEVERITY_INFORMATION,
+           "measurementMgrSM_acFrameReceived_fromIdle: measMode = %d\n",
+           pMeasurementMgr->Mode);
+    
+
+    /* Only XCC measurements considers the activation delay. Every other measurement start immediately. */ 
+    if (MSR_MODE_XCC == pMeasurementMgr->Mode) 
+    {
+        /* converting beacon interval to msec */
+        tbtt = (param.content.beaconInterval * 1024) / 1000;	/* from TU to msec */   
+
+    	/* Initializing Activation Delay Time */
+    	activationDelay	= pMeasurementMgr->newFrameRequest.activatioDelay;
+    	activationDelay	*= tbtt;    
+        /* Adding the Measurement Offset to the activation delay */
+    	activationDelay	+= pMeasurementMgr->newFrameRequest.measurementOffset;
+    }
+    else
+    {
+        TRACE0(pMeasurementMgr->hReport,
+               REPORT_SEVERITY_INFORMATION,
+               "measurementMgrSM_acFrameReceived_fromIdle: Not XCC mode - Setting Activation delay to default of 0\n");
+        
+        activationDelay = 0;
+    }
+
+    TRACE1(pMeasurementMgr->hReport,
+           REPORT_SEVERITY_INFORMATION,
+           "measurementMgrSM_acFrameReceived_fromIdle: activationDelay = %d\n",
+           activationDelay);
 
     /* Inserting all received measurement requests into the queue */
 	status = requestHandler_insertRequests(pMeasurementMgr->hRequestH, 
@@ -822,60 +863,75 @@ static TI_STATUS measurementMgrSM_acAbort_fromWaitForSCR(void * pData)
 static TI_STATUS measurementMgrSM_acStartMeasurement(void * pData)
 {
     measurementMgr_t * pMeasurementMgr = (measurementMgr_t *) pData;
-
+    
 	/* Cryptic: the first struct is the requestHandler request while */
 	/* the second one is the measurementSRV request */
-    MeasurementRequest_t * pRequestArr[MAX_NUM_REQ];
-	TMeasurementRequest request;
+    MeasurementRequest_t*   pRequestArr[MAX_NUM_REQ]; /* Request Handler type */
+	TMeasurementRequest     request;                  /* Measurement Mgr type */
+    TI_UINT8                i =0;
+    paramInfo_t	    *pParam;
+    TI_UINT8        numOfRequestsInParallel;
+    TI_UINT8        requestIndex;
+	TI_UINT32       timePassed;
+	TI_BOOL         requestedBeaconMeasurement= TI_FALSE;
+	TI_STATUS       status;
 
-    paramInfo_t	*pParam;
-    TI_UINT8 numOfRequestsInParallel;
-    TI_UINT8 requestIndex;
-	TI_UINT32 timePassed;
-	TI_BOOL requestedBeaconMeasurement= TI_FALSE;
-	TI_STATUS status;
-
+ 
     TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Starting Measurement operation\n");
 
+     
+    /* Getting the next request/requests from the request handler */
+    status = requestHandler_getNextReq(pMeasurementMgr->hRequestH, TI_TRUE, pRequestArr,
+        &numOfRequestsInParallel);
+
+    
     pParam = (paramInfo_t *)os_memoryAlloc(pMeasurementMgr->hOs, sizeof(paramInfo_t));
     if (!pParam)
     {
         return TI_NOK;
     }
+    
 
-	request.channel = pMeasurementMgr->measuredChannelID;
-	request.startTime = 0;	/* ignored by MeasurementSRV for now - for .11k */
-	request.numberOfTypes = 0;
-
-TRACE1(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Measured Channel = %d\n", pMeasurementMgr->measuredChannelID);
-
-	pParam->paramType = REGULATORY_DOMAIN_GET_SCAN_CAPABILITIES;
-	pParam->content.channelCapabilityReq.channelNum = pMeasurementMgr->measuredChannelID;
-	pParam->content.channelCapabilityReq.scanOption = ACTIVE_SCANNING;
-
-	if (pMeasurementMgr->measuredChannelID <= MAX_CHANNEL_IN_BAND_2_4)
+	/* get the current serving channel */
+ /*   pParam->paramType = SITE_MGR_CURRENT_CHANNEL_PARAM;
+	siteMgr_getParam(pMeasurementMgr->hSiteMgr, pParam);
+	if (pMeasurementMgr->measuredChannelID != pParam->content.siteMgrCurrentChannel)
 	{
-		request.band = RADIO_BAND_2_4_GHZ;
-		pParam->content.channelCapabilityReq.band = RADIO_BAND_2_4_GHZ;
+		request.enterPS = TI_TRUE;
 	}
 	else
 	{
-		request.band = RADIO_BAND_5_0_GHZ;
-		pParam->content.channelCapabilityReq.band = RADIO_BAND_5_0_GHZ;
-	}
+		request.enterPS = TI_FALSE;
+	}*/
 
-	regulatoryDomain_getParam(pMeasurementMgr->hRegulatoryDomain, pParam);
-	
-    request.txPowerDbm = pParam->content.channelCapabilityRet.maxTxPowerDbm;
+    pParam->paramType = SITE_MGR_CURRENT_TSF_TIME_STAMP;
+    siteMgr_getParam(pMeasurementMgr->hSiteMgr, pParam);
+    os_memoryCopy(pMeasurementMgr->hOs, (void*)&request.startTime, 
+                  (void*)pParam->content.siteMgrCurrentTsfTimeStamp, TIME_STAMP_LEN);
+
+    
+    request.numberOfTypes = 0;
+
+#if 0       
+TRACE1(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Measured Channel = %d\n", pMeasurementMgr->measuredChannelID);
+
+ 
+
+
+    if (pMeasurementMgr->measuredChannelID <= MAX_CHANNEL_IN_BAND_2_4) {
+        request.band = RADIO_BAND_2_4_GHZ;
+        pParam->content.channelCapabilityReq.band = RADIO_BAND_2_4_GHZ;
+    } else {
+        request.band = RADIO_BAND_5_0_GHZ;
+        pParam->content.channelCapabilityReq.band = RADIO_BAND_5_0_GHZ;
+    }
+#endif
 
     request.eTag = SCAN_RESULT_TAG_MEASUREMENT;
     os_memoryFree(pMeasurementMgr->hOs, pParam, sizeof(paramInfo_t));
 
     TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Querying Request Handler for the next request in the queue\n");
 
-    /* Getting the next request/requests from the request handler */
-    status = requestHandler_getNextReq(pMeasurementMgr->hRequestH, TI_TRUE, pRequestArr,
-        &numOfRequestsInParallel);
 
 	if (status != TI_OK)
 	{	
@@ -890,11 +946,16 @@ TRACE1(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Measured Channe
 	/* from the requestHandler */
 	pMeasurementMgr->currentNumOfRequestsInParallel = numOfRequestsInParallel;
 
+
+    request.numberOfTypes = 0;
+    
 	for (requestIndex = 0; requestIndex < numOfRequestsInParallel; requestIndex++)
-	{
-        if (pRequestArr[requestIndex]->Type == MSR_TYPE_BEACON_MEASUREMENT)
+	{   
+        if ((pRequestArr[requestIndex]->Type == MSR_TYPE_XCC_BEACON_MEASUREMENT) || 
+            (pRequestArr[requestIndex]->Type == MSR_TYPE_RRM_BEACON_MEASUREMENT))
         {
 			requestedBeaconMeasurement = TI_TRUE;
+
 
 			if (pRequestArr[requestIndex]->ScanMode == MSR_SCAN_MODE_BEACON_TABLE)
 			{
@@ -906,49 +967,172 @@ TRACE1(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Measured Channe
 				continue;
 			}
         }
+        
+        pRequestArr[requestIndex]->startTimeInTSF = request.startTime;
+        
+        /******** build the request/s for the measurementSrv - Start */
+       
+        request.msrTypes[request.numberOfTypes].channelListBandBG.uActualNumOfChannels = pRequestArr[requestIndex]->uActualNumOfChannelsBandBG; 
+        request.msrTypes[request.numberOfTypes].channelListBandA.uActualNumOfChannels = pRequestArr[requestIndex]->uActualNumOfChannelsBandA; 
+
+  
+        TRACE4(pMeasurementMgr->hReport, 
+               REPORT_SEVERITY_INFORMATION, 
+               "measurementMgrSM_acStartMeasurement: request.numberOfTypes = %d"
+               "requestIndex = %d "
+               "NumOfchannelListBandBG = %d"
+               "NumOfchannelListBandA = %d\n",
+               request.numberOfTypes,
+               requestIndex,
+               request.msrTypes[request.numberOfTypes].channelListBandBG.uActualNumOfChannels,
+               request.msrTypes[request.numberOfTypes].channelListBandA.uActualNumOfChannels);
+         
+        
+        for (i=0 ; i< pRequestArr[requestIndex]->uActualNumOfChannelsBandBG ; i++) 
+        {
+
+            pParam->paramType = REGULATORY_DOMAIN_GET_SCAN_CAPABILITIES;
+            pParam->content.channelCapabilityReq.scanOption = ACTIVE_SCANNING;
+            pParam->content.channelCapabilityReq.channelNum = pRequestArr[requestIndex]->channelListBandBG[i];
+            pParam->content.channelCapabilityReq.band = RADIO_BAND_2_4_GHZ;
+            regulatoryDomain_getParam(pMeasurementMgr->hRegulatoryDomain, pParam);
+            
+            request.msrTypes[request.numberOfTypes].channelListBandBG.channelList[i] = pRequestArr[requestIndex]->channelListBandBG[i];
+            request.msrTypes[request.numberOfTypes].channelListBandBG.txPowerDbm[i] = pParam->content.channelCapabilityRet.maxTxPowerDbm;
+
+
+            TRACE4(pMeasurementMgr->hReport, 
+                   REPORT_SEVERITY_INFORMATION, 
+                   "measurementMgrSM_acStartMeasurement: Band B/G channels: "
+                   "channel[%d] = %d "
+                   "txPower[%d] = %d ",
+                   i, request.msrTypes[request.numberOfTypes].channelListBandBG.channelList[i],
+                   i, request.msrTypes[request.numberOfTypes].channelListBandBG.txPowerDbm[i]);
+            
+            if (pMeasurementMgr->servingChannelID != pRequestArr[requestIndex]->channelListBandBG[i])
+                request.bIsNonServingChannelIncluded = TI_TRUE;
+           
+        }
+
+        
+        for (i=0 ; i< pRequestArr[requestIndex]->uActualNumOfChannelsBandA ; i++) 
+        {
+            pParam->paramType = REGULATORY_DOMAIN_GET_SCAN_CAPABILITIES;
+            pParam->content.channelCapabilityReq.scanOption = ACTIVE_SCANNING;
+            pParam->content.channelCapabilityReq.channelNum = pRequestArr[requestIndex]->channelListBandA[i];
+            pParam->content.channelCapabilityReq.band = RADIO_BAND_5_0_GHZ;
+            regulatoryDomain_getParam(pMeasurementMgr->hRegulatoryDomain, pParam);
+
+            
+            request.msrTypes[request.numberOfTypes].channelListBandA.channelList[i] = pRequestArr[requestIndex]->channelListBandA[i];
+            request.msrTypes[request.numberOfTypes].channelListBandA.txPowerDbm[i] = pParam->content.channelCapabilityRet.maxTxPowerDbm;
+
+
+            TRACE4(pMeasurementMgr->hReport, 
+                   REPORT_SEVERITY_INFORMATION, 
+                   "measurementMgrSM_acStartMeasurement: Band A channels: "
+                   "channel[%d] = %d "
+                   "txPower[%d] = %d ",
+                   i, request.msrTypes[request.numberOfTypes].channelListBandA.channelList[i],
+                   i, request.msrTypes[request.numberOfTypes].channelListBandA.txPowerDbm[i]);
+            
+            if (pMeasurementMgr->servingChannelID != pRequestArr[requestIndex]->channelListBandA[i])
+                request.bIsNonServingChannelIncluded = TI_TRUE;
+        }
+
 
         /* save the request so we can reference it when results arrive */
         pMeasurementMgr->currentRequest[request.numberOfTypes] = pRequestArr[requestIndex];
 
         /* add the measurement type to the request's list */
-		request.msrTypes[request.numberOfTypes].duration = pRequestArr[requestIndex]->DurationTime;
+		request.msrTypes[request.numberOfTypes].duration = pRequestArr[requestIndex]->DurationTime; /* In TUs */
 		request.msrTypes[request.numberOfTypes].scanMode = pRequestArr[requestIndex]->ScanMode;
-		request.msrTypes[request.numberOfTypes].msrType = pRequestArr[requestIndex]->Type;
+		request.msrTypes[request.numberOfTypes].msrType =  pRequestArr[requestIndex]->Type;
 
-        TRACE3(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ":\n\nMeasurement Request #%d Details: Type = %d, Duration = %d\n\n",						request.numberOfTypes+1,						request.msrTypes[request.numberOfTypes].msrType,						request.msrTypes[request.numberOfTypes].duration);
+        request.msrTypes[request.numberOfTypes].ssid.len = pRequestArr[requestIndex]->tSSID.len;
+            
+        os_memoryCopy(pMeasurementMgr->hOs, request.msrTypes[request.numberOfTypes].ssid.str, 
+                      pRequestArr[requestIndex]->tSSID.str, pRequestArr[requestIndex]->tSSID.len);
+        
+
+        TRACE5(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, 
+               "measurementMgrSM_acStartMeasurement: Duration=%d. ScanMode=%d. \n Type = %d. \n ssidLen=%d. \n band=%d \n",
+               pRequestArr[requestIndex]->DurationTime,
+               pRequestArr[requestIndex]->ScanMode,
+               pRequestArr[requestIndex]->Type,
+               pRequestArr[requestIndex]->tSSID.len,
+               pRequestArr[requestIndex]->band);
+        
+
+        if (requestedBeaconMeasurement == TI_TRUE)
+        {
+            /* build a probe request template and send it to the HAL */
+            TSetTemplate templateStruct;
+            probeReqTemplate_t probeReqTemplate;
+            TSsid ssid;
+
+            templateStruct.ptr = (TI_UINT8 *) &probeReqTemplate;
+            templateStruct.type = PROBE_REQUEST_TEMPLATE;
+            templateStruct.uRateMask = RATE_MASK_UNSPECIFIED;
+            
+            if (pRequestArr[requestIndex]->Type == MSR_TYPE_RRM_BEACON_MEASUREMENT) 
+            {
+                for (i=0; i< pRequestArr[requestIndex]->tSSID.len ; i++) 
+                {
+                    ssid.str[i] = pRequestArr[requestIndex]->tSSID.str[i];
+                }
+
+                ssid.len = pRequestArr[requestIndex]->tSSID.len;
+            } 
+            else /* MSR_TYPE_XCC_BEACON_MEASUREMENT */
+            {
+                ssid.len = 0; /* broadcast ssid */
+            }
+
+            TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Sending probe request template...\n");
+
+
+            if ((pRequestArr[requestIndex]->band == RADIO_BAND_2_4_GHZ) || (pRequestArr[requestIndex]->band == RADIO_BAND_DUAL)) 
+            {
+                templateStruct.eBand =  RADIO_BAND_2_4_GHZ;
+                buildProbeReqTemplate( pMeasurementMgr->hSiteMgr, &templateStruct, &ssid, RADIO_BAND_2_4_GHZ);
+               
+                
+#ifdef XCC_MODULE_INCLUDED
+            {	/* Insert Radio Mngt Capability IE according XCC4*/
+                TI_UINT32				len = 0;
+                measurementMgr_radioMngtCapabilityBuild (pMeasurementMgr, 
+                                                         templateStruct.ptr + templateStruct.len, 
+                                                         (TI_UINT8*)&len);
+                templateStruct.len += len;
+            }
+#endif                
+                TWD_CmdTemplate (pMeasurementMgr->hTWD, &templateStruct, NULL, NULL);
+            }
+
+            if ((pRequestArr[requestIndex]->band == RADIO_BAND_5_0_GHZ) || (pRequestArr[requestIndex]->band == RADIO_BAND_DUAL))  
+            {
+                templateStruct.eBand =  RADIO_BAND_5_0_GHZ;
+                buildProbeReqTemplate( pMeasurementMgr->hSiteMgr, &templateStruct, &ssid, RADIO_BAND_5_0_GHZ);
+#ifdef XCC_MODULE_INCLUDED
+            {	/* Insert Radio Mngt Capability IE according XCC4*/
+                TI_UINT32				len = 0;
+                measurementMgr_radioMngtCapabilityBuild (pMeasurementMgr, 
+                                                         templateStruct.ptr + templateStruct.len, 
+                                                         (TI_UINT8*)&len);
+                templateStruct.len += len;
+            }
+#endif                    
+                TWD_CmdTemplate (pMeasurementMgr->hTWD, &templateStruct, NULL, NULL);
+            }
+
+        }
 
 		request.numberOfTypes++;
-	}
+	} /* End of for loop of the parallel request(s) */
 
-	if (requestedBeaconMeasurement == TI_TRUE)
-	{
-        /* build a probe request template and send it to the HAL */
-        TSetTemplate templateStruct;
-		probeReqTemplate_t probeReqTemplate;
-		TSsid broadcastSSID;
 
- 		templateStruct.ptr = (TI_UINT8 *) &probeReqTemplate;
-		templateStruct.type = PROBE_REQUEST_TEMPLATE;
-        templateStruct.eBand = request.band;
-        templateStruct.uRateMask = RATE_MASK_UNSPECIFIED;
-		broadcastSSID.len = 0;
-
-        TRACE0(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Sending probe request template...\n");
-
-        buildProbeReqTemplate( pMeasurementMgr->hSiteMgr, &templateStruct, &broadcastSSID, request.band );
-#ifdef XCC_MODULE_INCLUDED
-  		{	/* Insert Radio Mngt Capability IE according XCC4*/
-  			TI_UINT32				len = 0;
-  			measurementMgr_radioMngtCapabilityBuild (pMeasurementMgr, 
-                                                     templateStruct.ptr + templateStruct.len, 
-                                                     (TI_UINT8*)&len);
-  			templateStruct.len += len;
-  		}
-#endif
-
-		TWD_CmdTemplate (pMeasurementMgr->hTWD, &templateStruct, NULL, NULL);
-	}
-
+   
 	/* Check if the maximum time to wait for the measurement request to */
 	/* finish has already passed */
 	timePassed = os_timeStampMs(pMeasurementMgr->hOs) - pMeasurementMgr->currentRequestStartTime;
@@ -962,6 +1146,7 @@ TRACE1(pMeasurementMgr->hReport, REPORT_SEVERITY_INFORMATION, ": Measured Channe
 				MEASUREMENTMGR_EVENT_COMPLETE, pMeasurementMgr);  
 	}
 
+    
     /* set the measurement scan executed flag to TRUE */
     pMeasurementMgr->bMeasurementScanExecuted = TI_TRUE;
 

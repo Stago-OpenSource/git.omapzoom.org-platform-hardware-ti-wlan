@@ -70,6 +70,10 @@ typedef struct
 	TI_UINT32 uDroppedPacket;
 } TTxDataQueueDebugCnt;
 
+#define HIGH_PRIORITY_QUEUE_LIST    0
+#define LOW_PRIORITY_QUEUE_LIST     1
+#define MAX_QUEUE_LIST      2
+
 /* The module's object */
 typedef struct 
 {
@@ -91,8 +95,9 @@ typedef struct
 	TI_UINT32            aQueueMaxSize[MAX_NUM_OF_AC]; /* indicates the max size of each Data queue */
 	TI_UINT32            aTxSendPaceThresh[MAX_NUM_OF_AC]; /* Number of packets to queue before scheduling Tx handling */
 	TI_HANDLE            aQueues[MAX_NUM_OF_AC];  /* The Tx aQueues handles */
-    TI_BOOL	             aQueueBusy[MAX_NUM_OF_AC]; /* per queue busy indication */
-	TI_UINT32            uLastQueId; /* the last queue processed by the scheduler */				
+    TI_UINT32	         uQueueBusyBitMap; /* per queue busy indication bit map*/
+    TI_UINT32            uQueuePriorityBitMap; /* per queue low priority indication */
+	TI_UINT32            uLastQueId[MAX_QUEUE_LIST]; /* the last queue processed by the scheduler */				
 	TI_BOOL				 aNetStackQueueStopped[MAX_NUM_OF_AC];/*indicate if the current queue was full and caused Tx network stack stop*/
 	TI_BOOL				 bStopNetStackTx;/*Flag to enable/disable Tx stop*/
 

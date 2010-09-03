@@ -240,16 +240,12 @@ NDIS_STRING STRScanControlTable24           = NDIS_STRING_CONST( "AllowedChannel
 NDIS_STRING STRScanControlTable5            = NDIS_STRING_CONST( "AllowedChannelsTable5" );
 
 NDIS_STRING STRBurstModeEnable              = NDIS_STRING_CONST( "BurstModeEnable" );
+
 /* Smart Reflex */
 NDIS_STRING STRSRState                      = NDIS_STRING_CONST( "SRState" );
 NDIS_STRING STRSRConfigParam1               = NDIS_STRING_CONST( "SRF1" );
 NDIS_STRING STRSRConfigParam2               = NDIS_STRING_CONST( "SRF2" );
 NDIS_STRING STRSRConfigParam3               = NDIS_STRING_CONST( "SRF3" );
-NDIS_STRING STRSRSenNP                      = NDIS_STRING_CONST( "SR_SEN_N_P" );
-NDIS_STRING STRSRSenNPGain                  = NDIS_STRING_CONST( "SR_SEN_N_P_Gain" );
-NDIS_STRING STRSRSenPrn                     = NDIS_STRING_CONST( "SR_SEN_PRN" );
-NDIS_STRING STRSRSenNrn                     = NDIS_STRING_CONST( "SR_SEN_NRN" );
-NDIS_STRING STRSRDebugTable                 = NDIS_STRING_CONST( "SR_Debug_Table" );
 
 
 /*
@@ -258,7 +254,6 @@ Power Manager
 NDIS_STRING STRPowerMode                    = NDIS_STRING_CONST( "dot11PowerMode" );
 NDIS_STRING STRBeaconReceiveTime            = NDIS_STRING_CONST( "BeaconReceiveTime" );
 NDIS_STRING STRBaseBandWakeUpTime           = NDIS_STRING_CONST( "BaseBandWakeUpTime" );
-NDIS_STRING STRHangoverPeriod               = NDIS_STRING_CONST( "HangoverPeriod" );
 NDIS_STRING STRBeaconListenInterval         = NDIS_STRING_CONST( "BeaconListenInterval" );
 NDIS_STRING STRDtimListenInterval         = NDIS_STRING_CONST( "DtimListenInterval" );
 NDIS_STRING STRNConsecutiveBeaconsMissed    = NDIS_STRING_CONST( "NConsecutiveBeaconsMissed" );
@@ -276,12 +271,25 @@ NDIS_STRING STRDcoItrimModerationTimeout    = NDIS_STRING_CONST( "DcoItrimModera
 
 NDIS_STRING STRPsPollDeliveryFailureRecoveryPeriod     = NDIS_STRING_CONST( "PsPollDeliveryFailureRecoveryPeriod" );
 
-NDIS_STRING STRPowerMgmtHangOverPeriod      = NDIS_STRING_CONST( "PowerMgmtHangOverPeriod" );
-NDIS_STRING STRPowerMgmtMode                = NDIS_STRING_CONST( "PowerMgmtMode" );
-NDIS_STRING STRPowerMgmtNeedToSendNullData  = NDIS_STRING_CONST( "PowerMgmtNeedToSendNullData" );
-NDIS_STRING STRPowerMgmtNullPktRateModulation = NDIS_STRING_CONST( "PowerMgmtNullPktRateModulation" );
-NDIS_STRING STRPowerMgmtNumNullPktRetries   = NDIS_STRING_CONST( "PowerMgmtNumNullPktRetries" );
-NDIS_STRING STRPowerMgmtPllLockTime         = NDIS_STRING_CONST( "PllLockTime" );
+NDIS_STRING STRPowerMgmtMode                	= NDIS_STRING_CONST( "PowerMgmtMode" );
+NDIS_STRING STRPowerMgmtNullPktRateModulation 	= NDIS_STRING_CONST( "PowerMgmtNullPktRateModulation" );
+NDIS_STRING STRPowerMgmtNumNullPktEnterRetries  = NDIS_STRING_CONST( "PowerMgmtNumNullPktEnterRetries" );
+NDIS_STRING STRPowerMgmtNumNullPktExitRetries   = NDIS_STRING_CONST( "PowerMgmtNumNullPktExitRetries" );
+NDIS_STRING STRPowerMgmtPllLockTime         	= NDIS_STRING_CONST( "PllLockTime" );
+
+
+NDIS_STRING STRHangOverPeriod      				= NDIS_STRING_CONST( "PsHangOverPeriod" );
+NDIS_STRING STRDynamicHangoverMode 				= NDIS_STRING_CONST( "PsDynamicHangoverMode" );
+NDIS_STRING STREarlyTerminationMode 			= NDIS_STRING_CONST( "PsEarlyTerminationMode" );
+NDIS_STRING STRRecoverTime 						= NDIS_STRING_CONST( "PsRecoverTime" );
+NDIS_STRING STRMaxHangOverPeriod 				= NDIS_STRING_CONST( "PsMaxHangOverPeriod" );
+NDIS_STRING STRMinHangOverPeriod 				= NDIS_STRING_CONST( "PsMinHangOverPeriod" );
+NDIS_STRING STRIncreaseDeltaTimeFromHangOver	= NDIS_STRING_CONST( "PsIncreaseDeltaTimeFromHangOver" );
+NDIS_STRING STRDecreaseDeltaTimeFromHangOver	= NDIS_STRING_CONST( "PsDecreaseDeltaTimeFromHangOver" );
+NDIS_STRING STRQuietTimeForEarlyTermination		= NDIS_STRING_CONST( "PsQuietTimeForEarlyTermination" );
+NDIS_STRING STRIncreaseHangoverTime				= NDIS_STRING_CONST( "PsIncreaseHangoverTime" );
+NDIS_STRING STRSlidingWindowSize				= NDIS_STRING_CONST( "PsSlidingWindowSize" );
+
 
 NDIS_STRING STRBeaconRxTimeout     = NDIS_STRING_CONST( "BeaconRxTimeout" );
 NDIS_STRING STRBroadcastRxTimeout  = NDIS_STRING_CONST( "BroadcastRxTimeout" );
@@ -290,10 +298,6 @@ NDIS_STRING STRRxBroadcastInPs     = NDIS_STRING_CONST( "RxBroadcastInPs" );
 NDIS_STRING STRConsecutivePsPollDeliveryFailureThreshold = NDIS_STRING_CONST( "ConsecutivePsPollDeliveryFailureThreshold" );
 
 NDIS_STRING STRTxPower                      = NDIS_STRING_CONST( "TxPower" );
-
-/* Scan SRV */
-NDIS_STRING STRNumberOfNoScanCompleteToRecovery         = NDIS_STRING_CONST( "NumberOfNoScanCompleteToRecovery" );
-NDIS_STRING STRTriggeredScanTimeOut                     = NDIS_STRING_CONST( "TriggeredScanTimeOut" );
 
 /*-----------------------------------*/
 /*   Coexistence params               */
@@ -457,6 +461,7 @@ NDIS_STRING STRBaInactivityTimeoutTid_5         = NDIS_STRING_CONST("BaInactivit
 NDIS_STRING STRBaInactivityTimeoutTid_6         = NDIS_STRING_CONST("BaInactivityTimeoutTid_6");
 NDIS_STRING STRBaInactivityTimeoutTid_7         = NDIS_STRING_CONST("BaInactivityTimeoutTid_7");
 
+NDIS_STRING STRPsTrafficPeriod                  = NDIS_STRING_CONST("PsTrafficPeriod");
 
 /* HW Tx queues mem-blocks allocation thresholds */
 NDIS_STRING STRQOStxBlksThresholdBE             = NDIS_STRING_CONST("QOS_txBlksThresholdBE");
@@ -466,6 +471,10 @@ NDIS_STRING STRQOStxBlksThresholdVO             = NDIS_STRING_CONST("QOS_txBlksT
 
 /* HW Rx mem-blocks Number */
 NDIS_STRING STRRxMemBlksNum                     = NDIS_STRING_CONST("RxMemBlksNum");
+NDIS_STRING STRDynMemEnable                     = NDIS_STRING_CONST("DynMemEnable");
+NDIS_STRING STRTxFreeReq                        = NDIS_STRING_CONST("TxFreeReq");
+NDIS_STRING STRRxFreeReq                        = NDIS_STRING_CONST("RxFreeReq");
+NDIS_STRING STRTxMin                            = NDIS_STRING_CONST("TxMin");
 
 /* Traffic Intensity parameters*/
 NDIS_STRING STRTrafficIntensityThresHigh        = NDIS_STRING_CONST("TrafficIntensityThresHigh");
@@ -685,6 +694,9 @@ NDIS_STRING STRScanPushMode                      = NDIS_STRING_CONST( "ScanPushM
 NDIS_STRING STRScanResultAging                   = NDIS_STRING_CONST( "ScanResultAging" );
 NDIS_STRING STRScanCncnRssiThreshold             = NDIS_STRING_CONST( "ScanCncnRssiThreshold" );
 
+NDIS_STRING STRNumOfNoScanCompleteToRecovery     = NDIS_STRING_CONST( "NumberOfNoScanCompleteToRecovery" );
+NDIS_STRING STRSplitScanTimeOut                  = NDIS_STRING_CONST( "SplitScanTimeOut" );
+
 NDIS_STRING STRParseWSCInBeacons      = NDIS_STRING_CONST( "ParseWSCInBeacons" );
 
 /*-----------------------------------*/
@@ -700,12 +712,15 @@ NDIS_STRING STRContextSwitchRequired  = NDIS_STRING_CONST("ContextSwitchRequired
 /*-----------------------------------*/
 /*      Radio parameters             */
 /*-----------------------------------*/
+#ifdef TNETW1283
+NDIS_STRING STRFemVendorAndOptions =       			NDIS_STRING_CONST("FemVendorAndOptions");
+#endif
 NDIS_STRING STRTXBiPReferencePDvoltage_2_4G =       NDIS_STRING_CONST("TXBiPReferencePDvoltage_2_4G");
 NDIS_STRING STRTxBiPReferencePower_2_4G =           NDIS_STRING_CONST("TxBiPReferencePower_2_4G");  
 NDIS_STRING STRTxBiPOffsetdB_2_4G =                 NDIS_STRING_CONST("TxBiPOffsetdB_2_4G");  
 NDIS_STRING STRTxPerRatePowerLimits_2_4G_Normal =  	NDIS_STRING_CONST("TxPerRatePowerLimits_2_4G_Normal");
 NDIS_STRING STRTxPerRatePowerLimits_2_4G_Degraded = NDIS_STRING_CONST("TxPerRatePowerLimits_2_4G_Degraded");
-NDIS_STRING STRTxPerRatePowerLimits_2_4G_Extreme =  NDIS_STRING_CONST("STRTxPerRatePowerLimits_2_4G_Extreme");
+NDIS_STRING STRTxPerRatePowerLimits_2_4G_Extreme =  NDIS_STRING_CONST("TxPerRatePowerLimits_2_4G_Extreme");
 NDIS_STRING STRTxPerChannelPowerLimits_2_4G_11b =   NDIS_STRING_CONST("TxPerChannelPowerLimits_2_4G_11b");
 NDIS_STRING STRTxPerChannelPowerLimits_2_4G_OFDM =  NDIS_STRING_CONST("TxPerChannelPowerLimits_2_4G_OFDM");
 NDIS_STRING STRTxPDVsRateOffsets_2_4G =             NDIS_STRING_CONST("TxPDVsRateOffsets_2_4G");
@@ -738,7 +753,6 @@ NDIS_STRING STRTXTraceLoss_5G =                     NDIS_STRING_CONST("TXTraceLo
 NDIS_STRING STRRxRssiAndProcessCompensation_5G =    NDIS_STRING_CONST("RxRssiAndProcessCompensation_5G");
 NDIS_STRING STRFRefClock =    						NDIS_STRING_CONST("STRFRefClock");
 NDIS_STRING STRFRefClockSettingTime =    			NDIS_STRING_CONST("STRFRefClockSettingTime");
-NDIS_STRING STRClockValidOnWakeup =    	    		NDIS_STRING_CONST("ClockValidOnWakeup");
 #ifdef TNETW1283
 NDIS_STRING STRFRefClockValidOnWakeup =    			NDIS_STRING_CONST("FRefClockValidOnWakeup");
 NDIS_STRING STRTcxoClock =    						NDIS_STRING_CONST("TCXO_Clk");
@@ -747,17 +761,24 @@ NDIS_STRING STRTcxoClockValidOnWakeup =    			NDIS_STRING_CONST("TCXO_ClockValid
 NDIS_STRING STRTcxoClockLdoVoltage =    			NDIS_STRING_CONST("TCXO_LDO_Voltage");
 NDIS_STRING STRNewPllAlgo =    			            NDIS_STRING_CONST("NewPllAlgo");
 NDIS_STRING STRPlatformConfiguration =    			NDIS_STRING_CONST("Platform_configuration");
+
+NDIS_STRING STRTxPDVsChannelOffsets_2_4G =    		NDIS_STRING_CONST("TxPDVsChannelOffsets_2_4G");
+NDIS_STRING STRTxPDVsTemperature_2_4G =    			NDIS_STRING_CONST("TxPDVsTemperature_2_4G");
+NDIS_STRING STRTxPDVsChannelOffsets_5G =    		NDIS_STRING_CONST("TxPDVsChannelOffsets_5G");
+NDIS_STRING STRTxPDVsTemperature_5G =    			NDIS_STRING_CONST("TxPDVsTemperature_5G");
 #endif
 NDIS_STRING STRFRefClockStatus =    				NDIS_STRING_CONST("FRefClockStatus");
 NDIS_STRING STRTXBiPFEMAutoDetect =    				NDIS_STRING_CONST("TXBiPFEMAutoDetect");
 NDIS_STRING STRTXBiPFEMManufacturer =    			NDIS_STRING_CONST("TXBiPFEMManufacturer");
+NDIS_STRING STRClockValidOnWakeup =    	    		NDIS_STRING_CONST("ClockValidOnWakeup");
 NDIS_STRING STRDC2DCMode =    	    	            NDIS_STRING_CONST("DC2DCMode");
 NDIS_STRING STRSingle_Dual_Band_Solution =          NDIS_STRING_CONST("Single_Dual_Band_Solution");
 NDIS_STRING STRSettings = 							NDIS_STRING_CONST("Settings");
+NDIS_STRING STRXTALItrimVal = 						NDIS_STRING_CONST("XTALItrimVal");
 NDIS_STRING STRGenFwCmd =                           NDIS_STRING_CONST("GenFwCmd");
 NDIS_STRING STRHostIfCfgBitmap =                    NDIS_STRING_CONST("HostIfCfgBitmap");
 
-#ifdef TNETW1283
+#ifndef TNETW1283
 NDIS_STRING STRTxPerChannelPowerCompensation_2_4G =    NDIS_STRING_CONST("TxPerChannelPowerCompensation_2_4G");
 NDIS_STRING STRTxPerChannelPowerCompensation_5G_OFDM =    NDIS_STRING_CONST("TxPerChannelPowerCompensation_5G_OFDM");
 #endif
@@ -812,7 +833,7 @@ NDIS_STRING STRRateMngRateCheckUp        			= NDIS_STRING_CONST("RateMngRateChec
 NDIS_STRING STRRateMngRateCheckDown        			= NDIS_STRING_CONST("RateMngRateCheckDown");
 NDIS_STRING STRRateMngRateRetryPolicy        	    = NDIS_STRING_CONST("RateMngRateRetryPolicy");
 NDIS_STRING STRincludeWSCinProbeReq                 = NDIS_STRING_CONST("IncludeWSCinProbeReq");
-
+NDIS_STRING STRRRMEnabled                           = NDIS_STRING_CONST("RRMEnabled");
 
 
 static void parseTwoDigitsSequenceHex (TI_UINT8 *sInString, TI_UINT8 *uOutArray, TI_UINT8 uSize);
@@ -984,7 +1005,7 @@ regFillInitTable(
     static TI_UINT8 defStaMacAddress7[]= "17 71 72 73 74 75";
 
 
-    static TI_UINT8 regArpIpStrLen = REG_ARP_IP_ADDR_STR_LEN ;
+    static TI_UINT8 regArpIpStrLen = REG_ARP_IP_ADDR_STR_LEN;
     static TI_UINT8 staArpIpAddress[REG_ARP_IP_ADDR_STR_LEN];
     static TI_UINT8 defArpIpAddress[] =  "0a 02 0a b7" ;       /*value by default*/
 
@@ -992,7 +1013,6 @@ regFillInitTable(
     /*TI_UINT8 defBeaconIETableSize = 0 ;*/
     static TI_UINT8 defBeaconIETable[] = "00 01 01 01 32 01 2a 01 03 01 06 01 07 01 20 01 25 01 23 01 30 01 28 01 2e 01 3d 01 85 01 dd 01 00 52 f2 02 00 01";
     /*TI_UINT8 tmpIeTable[BEACON_FILTER_TABLE_MAX_SIZE] ;*/
-    /*TI_UINT8 staBeaconFilterIETable[BEACON_FILTER_STRING_MAX_LEN] ;*/
     static TI_UINT8 tmpIeTableSize = 37;
     static TI_UINT8 strSize = 113;
 
@@ -1005,8 +1025,6 @@ regFillInitTable(
     /* defaults values for CoexActivity table*/
     /* example: WLAN(0), BT_VOICE(0), defPrio(20), raisePrio(25), minServ(0), maxServ(1ms) */
     static TI_UINT8 defCoexActivityTable[] = ""; /* Sample "01 00 14 19 0000 0001 " */
-    /*TI_UINT8 strCoexActivityTable[COEX_ACTIVITY_TABLE_MAX_NUM*COEX_ACTIVITY_TABLE_SIZE] ;*/
-    /*TI_UINT8 strCoexActivitySize = 0;*/
 
     static TI_UINT32 filterOffset = 0;
     static char filterMask[16];
@@ -1022,27 +1040,27 @@ regFillInitTable(
     static TI_UINT8   ScanControlTable24Def[2* NUM_OF_CHANNELS_24] = "FFFFFFFFFFFFFFFFFFFFFFFFFFFF";
     static TI_UINT8   ScanControlTable5Def[2 * NUM_OF_CHANNELS_5] = "FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000000000000000000000000000000000000000000000000000000000000000000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF000000FF0000000000000000FF000000FF000000FF000000FF000000FF000000000000000000000000000000";
     static TI_UINT8   reportSeverityTableDefaults[REPORT_SEVERITY_MAX] = "0001101";
-    /*I_UINT8   reportModuleTableDefaults[REPORT_FILES_NUM];*/
     static TI_UINT16  reportSeverityTableLen;
-    /*TI_UINT16  reportModuleTableLen;*/
 
-    /*TI_UINT8   uSmeTempList[ 255 ];*/
-    /*TI_UINT32  uSmeScanIntervalsTempList[ 255 ];*/
-    /*TI_UINT32  uTempEntriesCount, uSmeGChannelsCount, uIndex;*/
     TI_UINT32  uTempEntriesCount, uIndex;
     static TI_UINT32  uWiFiMode = 0;
     static TI_UINT32  uPerformanceBoostMode = PERFORMANCE_BOOST_MODE_DEF;
     static TI_INT8    SRConfigParams[MAX_SMART_REFLEX_PARAM];
     static TI_UINT32  len,TempSRCnt;
-	static TI_UINT8   uTempRatePolicyList[RATE_MNG_MAX_RETRY_POLICY_PARAMS_LEN];
-	static TI_UINT32  uTempRatePolicyCnt=0;
+    static TI_UINT8   uTempRatePolicyList[RATE_MNG_MAX_RETRY_POLICY_PARAMS_LEN];
+    static TI_UINT32  uTempRatePolicyCnt=0;
+/*    TI_UINT32  uTempEntriesCount, uSmeGChannelsCount, uIndex;
+    TI_UINT32  uWiFiMode = 0;
+    TI_UINT32  uPerformanceBoostMode = PERFORMANCE_BOOST_MODE_DEF;
+    TI_INT8    SRConfigParams[MAX_SMART_REFLEX_PARAM];
+    TI_UINT32  len,TempSRCnt;
+	TI_UINT8   uTempRatePolicyList[RATE_MNG_MAX_RETRY_POLICY_PARAMS_LEN];
+	TI_UINT32  uTempRatePolicyCnt=0;*/
 	
     int macIndex ; /*used for group address filtering*/
 
     PRINT(DBG_REGISTRY_LOUD, "TIWL: Reading InitTable parameters\n");
-    
-    /*set all report modules.as default*/
-    /*memset(reportModuleTableDefaults, '1', REPORT_FILES_NUM );*/
+
     
     /* Reset structure */
     NdisZeroMemory(p, sizeof(TInitTable));
@@ -1052,13 +1070,14 @@ regFillInitTable(
                             sizeof p->siteMgrInitParams.includeWSCinProbeReq, 
                             (TI_UINT8*)&p->siteMgrInitParams.includeWSCinProbeReq);
      
+
     /* Beacon filter*/
     /*is the desired state ENABLED ?*/
     regReadIntegerParameter(pAdapter, &STRBeaconFilterDesiredState,
                             DEF_BEACON_FILTER_ENABLE_VALUE, MIN_BEACON_FILTER_ENABLE_VALUE, MAX_BEACON_FILTER_ENABLE_VALUE,
                             sizeof p->siteMgrInitParams.beaconFilterParams.desiredState, 
                             (TI_UINT8*)&p->siteMgrInitParams.beaconFilterParams.desiredState );
-    
+
     regReadIntegerParameter(pAdapter, &STRBeaconFilterStored,
                             DEF_NUM_STORED_FILTERS, MIN_NUM_STORED_FILTERS, MAX_NUM_STORED_FILTERS,
                             sizeof p->siteMgrInitParams.beaconFilterParams.numOfStored, 
@@ -1073,7 +1092,7 @@ regFillInitTable(
                             (TI_UINT8*)(&p->siteMgrInitParams.beaconFilterParams.IETableSize) );
     
     tmpIeTableSize = p->siteMgrInitParams.beaconFilterParams.IETableSize;
-    
+
     /*Read the number of elements in the table ( this is because 221 has 5 values following it )*/
     regReadIntegerParameter(pAdapter, &STRBeaconIETableNumOfElem,
                             DEF_BEACON_FILTER_IE_TABLE_NUM, BEACON_FILTER_IE_TABLE_MIN_NUM,
@@ -1085,17 +1104,16 @@ regFillInitTable(
     strSize = 3 * tmpIeTableSize - 1 ; /*includes spaces between bytes*/
     if ( ( tmpIeTableSize  > 0 ) && ( tmpIeTableSize <= BEACON_FILTER_IE_TABLE_MAX_SIZE) )
     {
-	TI_UINT8 *staBeaconFilterIETable;
-
-	staBeaconFilterIETable = os_memoryAlloc(pAdapter, BEACON_FILTER_STRING_MAX_LEN);
-	if (staBeaconFilterIETable) {
-		regReadStringParameter(pAdapter, &STRBeaconIETable ,
+        TI_UINT8 *staBeaconFilterIETable;
+        staBeaconFilterIETable = os_memoryAlloc(pAdapter, BEACON_FILTER_STRING_MAX_LEN);
+        if (staBeaconFilterIETable) {
+        regReadStringParameter(pAdapter, &STRBeaconIETable ,
                             (TI_INT8*)(defBeaconIETable), strSize,
                             (TI_UINT8*)staBeaconFilterIETable, &strSize);
 
-		parseTwoDigitsSequenceHex (staBeaconFilterIETable, (TI_UINT8*)&p->siteMgrInitParams.beaconFilterParams.IETable[0], tmpIeTableSize);
-		os_memoryFree(pAdapter, staBeaconFilterIETable, BEACON_FILTER_STRING_MAX_LEN);
-	}
+        parseTwoDigitsSequenceHex (staBeaconFilterIETable, (TI_UINT8*)&p->siteMgrInitParams.beaconFilterParams.IETable[0], tmpIeTableSize);
+            os_memoryFree(pAdapter, staBeaconFilterIETable, BEACON_FILTER_STRING_MAX_LEN);
+        }
     }
 
     /* MAC ADDRESSES FILTER*/
@@ -1212,7 +1230,6 @@ regFillInitTable(
         }
     }
 
- 
     /************************/
     /* Read severity table */
     /**********************/
@@ -1227,26 +1244,22 @@ regFillInitTable(
     /***********************/
     /* Read modules table */
     /*********************/
+    {
+        TI_UINT8 *reportModuleTableDefaults;
+        TI_UINT16  reportModuleTableLen;
 
-	{
-		TI_UINT8 *reportModuleTableDefaults;
-		TI_UINT16  reportModuleTableLen;
-
-		reportModuleTableDefaults = os_memoryAlloc(pAdapter, REPORT_FILES_NUM);
-		if (!reportModuleTableDefaults)
-			return;
-
-		/*set all report modules.as default*/
-		memset(reportModuleTableDefaults, '1', REPORT_FILES_NUM );
-
-		regReadStringParameter(pAdapter, &STR_ReportModuleTable,
+        reportModuleTableDefaults = os_memoryAlloc(pAdapter, REPORT_FILES_NUM);
+        if (!reportModuleTableDefaults)
+            return;
+        /*set all report modules.as default*/
+        memset(reportModuleTableDefaults, '1', REPORT_FILES_NUM );
+    regReadStringParameter(pAdapter, &STR_ReportModuleTable,
                     (TI_INT8*)reportModuleTableDefaults,
                     (TI_UINT8)REPORT_FILES_NUM,
                     (TI_UINT8*)p->tReport.aFileEnable,
                     (TI_UINT8*)&reportModuleTableLen);
-		os_memoryFree(pAdapter, reportModuleTableDefaults, REPORT_FILES_NUM);
-	}
-
+        os_memoryFree(pAdapter, reportModuleTableDefaults, REPORT_FILES_NUM);
+    }
     /*
         Default SSID should be non-Valid SSID, hence the STA will not try to connect
     */
@@ -1338,7 +1351,7 @@ regFillInitTable(
             16, 16, 16, 
             sizeof p->twdInitParams.tGeneral.TraceBufferSize,
             (TI_UINT8*)&p->twdInitParams.tGeneral.TraceBufferSize);
-   
+
     regReadIntegerParameter(pAdapter, &STRPrintTrace, 
             TI_FALSE, TI_FALSE, TI_TRUE, 
             sizeof p->twdInitParams.tGeneral.bDoPrint, 
@@ -1379,6 +1392,7 @@ regFillInitTable(
                             (TI_UINT8*)&p->PowerMgrInitParams.MaximumConsecutiveET);
 
     /*--------------- Maximal time between full beacon reception ------------------*/
+
     regReadIntegerParameter(pAdapter, &STRMaxFullBeaconInterval,
                             POWER_MGMNT_MAX_FULL_BEACON_DEF, POWER_MGMNT_MAX_FULL_BEACON_MIN,
                             POWER_MGMNT_MAX_FULL_BEACON_MAX,
@@ -1403,7 +1417,7 @@ regFillInitTable(
                             sizeof p->twdInitParams.tGeneral.TxFlashEnable, 
                             (TI_UINT8*)&p->twdInitParams.tGeneral.TxFlashEnable);
 
-
+    
     p->twdInitParams.tGeneral.beaconTemplateSize = sizeof(probeRspTemplate_t);
     p->twdInitParams.tGeneral.probeRequestTemplateSize = sizeof(probeReqTemplate_t);
     p->twdInitParams.tGeneral.probeResponseTemplateSize = sizeof(probeRspTemplate_t);
@@ -1412,7 +1426,16 @@ regFillInitTable(
     p->twdInitParams.tGeneral.PsPollTemplateSize = sizeof(psPollTemplate_t);
     p->twdInitParams.tGeneral.qosNullDataTemplateSize = sizeof(QosNullDataTemplate_t);
     p->twdInitParams.tGeneral.ArpRspTemplateSize = sizeof(ArpRspTemplate_t);
+    p->twdInitParams.tGeneral.LinkMeasReportTemplateSize = sizeof(LinkMeasurementReportTemplate_t);
 
+    /* The link measurement request will be supported if STA supports the RRM capabilitiy */
+    regReadIntegerParameter(pAdapter, &STRRRMEnabled,STA_CAPABILITY_RRM_ENABLED_DEF, 
+                            STA_CAPABILITY_RRM_ENABLED_MIN, 
+                            STA_CAPABILITY_RRM_ENABLED_MAX,
+                            sizeof (p->twdInitParams.tGeneral.bIsLinkMeasRequestEnabled),
+                            (TI_UINT8*)&(p->twdInitParams.tGeneral.bIsLinkMeasRequestEnabled));
+
+    
     regReadIntegerParameter(pAdapter,
                             &STRBeaconRxTimeout,
                             BCN_RX_TIMEOUT_DEF_VALUE,
@@ -1690,23 +1713,23 @@ regFillInitTable(
 
     regReadIntegerParameter(pAdapter, &STRdot11AuthRespTimeout,
                             AUTH_RESPONSE_TIMEOUT_DEF, AUTH_RESPONSE_TIMEOUT_MIN, AUTH_RESPONSE_TIMEOUT_MAX,
-                            sizeof p->authInitParams.authResponseTimeout,
-                            (TI_UINT8*)&p->authInitParams.authResponseTimeout);
+                            sizeof p->tMlmeInitParams.authResponseTimeout,
+                            (TI_UINT8*)&p->tMlmeInitParams.authResponseTimeout);
 
     regReadIntegerParameter(pAdapter, &STRdot11MaxAuthRetry,
                             AUTH_MAX_RETRY_COUNT_DEF, AUTH_MAX_RETRY_COUNT_MIN, AUTH_MAX_RETRY_COUNT_MAX,
-                            sizeof p->authInitParams.authMaxRetryCount,
-                            (TI_UINT8*)&p->authInitParams.authMaxRetryCount);
+                            sizeof p->tMlmeInitParams.authMaxRetryCount,
+                            (TI_UINT8*)&p->tMlmeInitParams.authMaxRetryCount);
 
     regReadIntegerParameter(pAdapter, &STRdot11AssocRespTimeout,
                             ASSOC_RESPONSE_TIMEOUT_DEF, ASSOC_RESPONSE_TIMEOUT_MIN, ASSOC_RESPONSE_TIMEOUT_MAX,
-                            sizeof p->assocInitParams.assocResponseTimeout,
-                            (TI_UINT8*)&p->assocInitParams.assocResponseTimeout);
+                            sizeof p->tMlmeInitParams.assocResponseTimeout,
+                            (TI_UINT8*)&p->tMlmeInitParams.assocResponseTimeout);
 
     regReadIntegerParameter(pAdapter, &STRdot11MaxAssocRetry,
                             ASSOC_MAX_RETRY_COUNT_DEF, ASSOC_MAX_RETRY_COUNT_MIN, ASSOC_MAX_RETRY_COUNT_MAX,
-                            sizeof p->assocInitParams.assocMaxRetryCount,
-                            (TI_UINT8*)&p->assocInitParams.assocMaxRetryCount);
+                            sizeof p->tMlmeInitParams.assocMaxRetryCount,
+                            (TI_UINT8*)&p->tMlmeInitParams.assocMaxRetryCount);
 
     regReadIntegerParameter(pAdapter, &STRRxDataFiltersEnabled,
                             RX_DATA_FILTERS_ENABLED_DEF, RX_DATA_FILTERS_ENABLED_MIN, RX_DATA_FILTERS_ENABLED_MAX,
@@ -1839,6 +1862,13 @@ regFillInitTable(
                     sizeof p->qosMngrInitParams.uDesireCwMax,
                     (TI_UINT8*)&p->qosMngrInitParams.uDesireCwMax);
 
+    regReadIntegerParameter(pAdapter, &STRPsTrafficPeriod,
+                    QOS_PS_TRAFFIC_RATE_DEF, QOS_PS_TRAFFIC_RATE_MIN,
+                    QOS_PS_TRAFFIC_RATE_MAX,
+                    sizeof p->qosMngrInitParams.uPsTrafficPeriod,
+                    (TI_UINT8*)&p->qosMngrInitParams.uPsTrafficPeriod);
+
+
 /*                              SME Initialization Parameters                           */
 /*                          ====================================                        */
 
@@ -1898,87 +1928,111 @@ regFillInitTable(
                             SME_SCAN_PROBE_REQ_DEF, SME_SCAN_PROBE_REQ_MIN, SME_SCAN_PROBE_REQ_MAX,
                             sizeof p->tSmeInitParams.uProbeReqNum,
                             (TI_UINT8*)&p->tSmeInitParams.uProbeReqNum);
-    {
-	TI_UINT32 *uSmeScanIntervalsTempList;
 
-	uSmeScanIntervalsTempList = os_memoryAlloc(pAdapter, SME_SCAN_INTERVALS_LIST_STRING_MAX_SIZE * sizeof(TI_UINT32));
-	if (!uSmeScanIntervalsTempList) {
-		return;
-	}
-	regReadIntegerTable(pAdapter, &STRSmeScanIntervals, SME_SCAN_INTERVALS_LIST_VAL_DEF,
-                        SME_SCAN_INTERVALS_LIST_STRING_MAX_SIZE,
-                        (TI_UINT8 *)uSmeScanIntervalsTempList, NULL, &uTempEntriesCount,
-                        sizeof (TI_UINT32),TI_FALSE);
-	/* sanity check */
-	if (uTempEntriesCount > PERIODIC_SCAN_MAX_INTERVAL_NUM)
-	{
-		uTempEntriesCount = PERIODIC_SCAN_MAX_INTERVAL_NUM;
-	}
-	/* convert from TI_UINT8 to TI_UINT32 */
-	for (uIndex = 0; uIndex < uTempEntriesCount; uIndex++)
-	{
-            p->tSmeInitParams.uScanIntervals[ uIndex ] = uSmeScanIntervalsTempList[ uIndex ];
-	}
-	os_memoryFree(pAdapter, uSmeScanIntervalsTempList, SME_SCAN_INTERVALS_LIST_STRING_MAX_SIZE * sizeof(TI_UINT32));
+    {
+        TI_UINT32 *uSmeScanIntervalsTempList;
+        uSmeScanIntervalsTempList = os_memoryAlloc(pAdapter, SME_SCAN_INTERVALS_LIST_STRING_MAX_SIZE * sizeof(TI_UINT32));
+        if (!uSmeScanIntervalsTempList) {
+            return;
+        }
+        regReadIntegerTable(pAdapter, &STRSmeScanIntervals, SME_SCAN_INTERVALS_LIST_VAL_DEF,
+							SME_SCAN_INTERVALS_LIST_STRING_MAX_SIZE,
+							(TI_UINT8 *)uSmeScanIntervalsTempList, NULL, &uTempEntriesCount,
+							sizeof (TI_UINT32),TI_FALSE);
+        /* sanity check */
+        if (uTempEntriesCount > PERIODIC_SCAN_MAX_INTERVAL_NUM)
+        {
+        	uTempEntriesCount = PERIODIC_SCAN_MAX_INTERVAL_NUM;
+        }
+        /* convert from TI_UINT8 to TI_UINT32 */
+        for (uIndex = 0; uIndex < uTempEntriesCount; uIndex++)
+        {
+        	p->tSmeInitParams.uScanIntervals[ uIndex ] = uSmeScanIntervalsTempList[ uIndex ];
+        }
+        os_memoryFree(pAdapter, uSmeScanIntervalsTempList, SME_SCAN_INTERVALS_LIST_STRING_MAX_SIZE * sizeof(TI_UINT32));
     }
+
     {
-	TI_UINT8  *uSmeTempList;
-	TI_UINT32  uSmeGChannelsCount;
-
-	uSmeTempList = os_memoryAlloc(pAdapter, SME_SCAN_CHANNELS_LIST_G_STRING_MAX_SIZE);
-	if (!uSmeTempList) {
-		return;
-	}
-
-	regReadIntegerTable(pAdapter, &STRSmeScanGChannels, SME_SCAN_CHANNELS_LIST_G_VAL_DEF,
-                        SME_SCAN_CHANNELS_LIST_G_STRING_MAX_SIZE,
-                        (TI_UINT8*)uSmeTempList, NULL, &uTempEntriesCount,
-                        sizeof (TI_UINT8),TI_FALSE);
-
-
-    /* convert to channel list */
-    for (uIndex = 0; uIndex < uTempEntriesCount; uIndex++)
-    {
-        p->tSmeInitParams.tChannelList[ uIndex ].eBand = RADIO_BAND_2_4_GHZ;
-        p->tSmeInitParams.tChannelList[ uIndex ].uChannel = uSmeTempList[ uIndex ];
-    }
-    uSmeGChannelsCount = uTempEntriesCount;
+        TI_UINT8  *uSmeTempList;
+        TI_UINT32  uSmeGChannelsCount = 0;
+        uSmeTempList = os_memoryAlloc(pAdapter, SME_SCAN_CHANNELS_LIST_G_STRING_MAX_SIZE);
+        if (!uSmeTempList)
+        {
+            return;
+        }
 
 	/* 
-	 * Add A_MODE channels to scan list only if it enabled 
-	 * NOTE: Don't use empty channel list string 
+		 * Add BG_MODE channels to scan list in case of BG or DUAL mode
 	 */
-    if ((p->siteMgrInitParams.siteMgrDesiredDot11Mode  == DOT11_A_MODE) ||
-        (p->siteMgrInitParams.siteMgrDesiredDot11Mode  == DOT11_DUAL_MODE))
-    {
-		regReadIntegerTable(pAdapter, &STRSmeScanAChannels, SME_SCAN_CHANNELS_LIST_A_VAL_DEF,
-							SME_SCAN_CHANNELS_LIST_A_STRING_MAX_SIZE,
-							(TI_UINT8*)uSmeTempList, NULL, &uTempEntriesCount,
-							sizeof (TI_UINT8),TI_FALSE);
+        if ((p->siteMgrInitParams.siteMgrDesiredDot11Mode  == DOT11_B_MODE) ||
+        		(p->siteMgrInitParams.siteMgrDesiredDot11Mode  == DOT11_G_MODE) ||
+        		(p->siteMgrInitParams.siteMgrDesiredDot11Mode  == DOT11_DUAL_MODE))
+        {
+        	regReadIntegerTable(pAdapter, &STRSmeScanGChannels, SME_SCAN_CHANNELS_LIST_G_VAL_DEF,
+								SME_SCAN_CHANNELS_LIST_G_STRING_MAX_SIZE,
+								(TI_UINT8*)uSmeTempList, NULL, &uTempEntriesCount,
+								sizeof (TI_UINT8),TI_FALSE);
 
-		/* convert to channel list */
-		for (uIndex = 0; uIndex < uTempEntriesCount; uIndex++)
-		{
-			p->tSmeInitParams.tChannelList[ uSmeGChannelsCount + uIndex ].eBand = RADIO_BAND_5_0_GHZ;
-			p->tSmeInitParams.tChannelList[ uSmeGChannelsCount + uIndex ].uChannel = uSmeTempList[ uIndex ];
-		}
+        	/* convert to channel list */
+        	for (uIndex = 0; uIndex < uTempEntriesCount; uIndex++)
+        	{
+        		p->tSmeInitParams.tChannelList[ uIndex ].eBand = RADIO_BAND_2_4_GHZ;
+        		p->tSmeInitParams.tChannelList[ uIndex ].uChannel = uSmeTempList[ uIndex ];
+        	}
+        	uSmeGChannelsCount = uTempEntriesCount;
+        }
 
-		p->tSmeInitParams.uChannelNum = uSmeGChannelsCount + uIndex;
-	}
-	else
-	{
-		p->tSmeInitParams.uChannelNum = uSmeGChannelsCount;
-	}
-	os_memoryFree(pAdapter, uSmeTempList, SME_SCAN_CHANNELS_LIST_G_STRING_MAX_SIZE);
+        /*
+         * Add A_MODE channels to scan list in case of A mode only
+         */
+        if (p->siteMgrInitParams.siteMgrDesiredDot11Mode  == DOT11_A_MODE)
+        {
+        	regReadIntegerTable(pAdapter, &STRSmeScanAChannels, SME_SCAN_CHANNELS_LIST_A_VAL_DEF,
+        			SME_SCAN_CHANNELS_LIST_A_STRING_MAX_SIZE,
+        			(TI_UINT8*)&uSmeTempList, NULL, &uTempEntriesCount,
+        			sizeof (TI_UINT8),TI_FALSE);
+
+        	/* convert to channel list */
+        	for (uIndex = 0; uIndex < uTempEntriesCount; uIndex++)
+        	{
+        		p->tSmeInitParams.tChannelList[ uIndex ].eBand = RADIO_BAND_5_0_GHZ;
+        		p->tSmeInitParams.tChannelList[ uIndex ].uChannel = uSmeTempList[ uIndex ];
+        	}
+
+        	uSmeGChannelsCount = uTempEntriesCount;
+        }
+
+
+        /*
+         * Add A_MODE channels to scan list only if DUAL mode is enabled
+         * NOTE: Don't use empty channel list string
+         */
+        if (p->siteMgrInitParams.siteMgrDesiredDot11Mode  == DOT11_DUAL_MODE)
+        {
+        	regReadIntegerTable(pAdapter, &STRSmeScanAChannels, SME_SCAN_CHANNELS_LIST_A_VAL_DEF,
+								SME_SCAN_CHANNELS_LIST_A_STRING_MAX_SIZE,
+								(TI_UINT8*)uSmeTempList, NULL, &uTempEntriesCount,
+								sizeof (TI_UINT8),TI_FALSE);
+
+        	/* convert to channel list */
+        	for (uIndex = 0; uIndex < uTempEntriesCount; uIndex++)
+        	{
+        		p->tSmeInitParams.tChannelList[ uSmeGChannelsCount + uIndex ].eBand = RADIO_BAND_5_0_GHZ;
+        		p->tSmeInitParams.tChannelList[ uSmeGChannelsCount + uIndex ].uChannel = uSmeTempList[ uIndex ];
+        	}
+
+        	uSmeGChannelsCount = uSmeGChannelsCount + uIndex;
+        }
+
+        p->tSmeInitParams.uChannelNum = uSmeGChannelsCount;
     }
-
     regReadIntegerParameter(pAdapter, &STRdot11AuthenticationMode,
-                            RSN_AUTH_SUITE_DEF, RSN_AUTH_SUITE_MIN, RSN_AUTH_SUITE_MAX,
+							   RSN_AUTH_SUITE_DEF, RSN_AUTH_SUITE_MIN, RSN_AUTH_SUITE_MAX,
                             sizeof p->rsnInitParams.authSuite,
                             (TI_UINT8*)&p->rsnInitParams.authSuite);
 
     /* Soft Gemini Section */
-    
+
     regReadIntegerParameter(pAdapter, &STRBThWlanCoexistEnable,
                             SOFT_GEMINI_ENABLED_DEF, SOFT_GEMINI_ENABLED_MIN, SOFT_GEMINI_ENABLED_MAX,
                             sizeof p->SoftGeminiInitParams.SoftGeminiEnable, 
@@ -2254,19 +2308,18 @@ regFillInitTable(
 
     /* Read the CoexActivity table string */
     {
-	TI_UINT8 *strCoexActivityTable;
-	TI_UINT8 strCoexActivitySize = 0;
-
-	strCoexActivityTable = os_memoryAlloc(pAdapter, COEX_ACTIVITY_TABLE_MAX_NUM*COEX_ACTIVITY_TABLE_SIZE);
-	if (strCoexActivityTable) {
-		regReadStringParameter(pAdapter, &STRCoexActivityTable ,
+        TI_UINT8 *strCoexActivityTable;
+        TI_UINT8 strCoexActivitySize = 0;
+        strCoexActivityTable = os_memoryAlloc(pAdapter, COEX_ACTIVITY_TABLE_MAX_NUM*COEX_ACTIVITY_TABLE_SIZE);
+        if (strCoexActivityTable) {
+    regReadStringParameter(pAdapter, &STRCoexActivityTable ,
                             (TI_INT8*)(defCoexActivityTable), strCoexActivitySize,
                             (TI_UINT8*)strCoexActivityTable, &strCoexActivitySize);
 
-		/* Convert the CoexActivity table string */
-		regConvertStringtoCoexActivityTable(strCoexActivityTable , p->twdInitParams.tGeneral.halCoexActivityTable.numOfElements, &p->twdInitParams.tGeneral.halCoexActivityTable.entry[0] , strCoexActivitySize);
-		os_memoryFree(pAdapter, strCoexActivityTable, COEX_ACTIVITY_TABLE_MAX_NUM*COEX_ACTIVITY_TABLE_SIZE);
-	}
+    /* Convert the CoexActivity table string */
+    regConvertStringtoCoexActivityTable(strCoexActivityTable , p->twdInitParams.tGeneral.halCoexActivityTable.numOfElements, &p->twdInitParams.tGeneral.halCoexActivityTable.entry[0] , strCoexActivitySize);
+            os_memoryFree(pAdapter, strCoexActivityTable, COEX_ACTIVITY_TABLE_MAX_NUM*COEX_ACTIVITY_TABLE_SIZE);
+        }
     }
 
 	/*
@@ -2295,14 +2348,6 @@ regFillInitTable(
                             BASE_BAND_WAKE_UP_TIME_MAX_VALUE,
                             sizeof p->PowerMgrInitParams.BaseBandWakeUpTime,
                             (TI_UINT8*)&p->PowerMgrInitParams.BaseBandWakeUpTime);
-
-    regReadIntegerParameter(pAdapter,
-                            &STRHangoverPeriod,
-                            HANGOVER_PERIOD_DEF_VALUE,
-                            HANGOVER_PERIOD_MIN_VALUE,
-                            HANGOVER_PERIOD_MAX_VALUE,
-                            sizeof p->PowerMgrInitParams.hangoverPeriod,
-                            (TI_UINT8*)&p->PowerMgrInitParams.hangoverPeriod);
 
     regReadIntegerParameter(pAdapter,
                             &STRBeaconListenInterval,
@@ -2484,151 +2529,78 @@ regReadIntegerTable (pAdapter, &STRTxPerChannelPowerCompensation_5G_OFDM, RADIO_
 
 #ifdef TNETW1283
 regReadIntegerTable (pAdapter, &STRSettings, RADIO_GENERAL_SETTING_DEF_TABLE,
-                     MAX_GENERAL_SETTINGS_PARAM, NULL, (TI_INT8*)&p->twdInitParams.tPlatformGenParams.GeneralSettings, 
+                     MAX_SETTINGS_PARAM, NULL, (TI_INT8*)&p->twdInitParams.tPlatformGenParams.GeneralSettings,
                      (TI_UINT32*)&uTempEntriesCount, sizeof (TI_UINT8),TI_TRUE);
+
+regReadIntegerParameter(pAdapter,
+						&STRPlatformConfiguration,
+						RADIO_PLATFORM_CONFIGURATION_DEF,
+						RADIO_PLATFORM_CONFIGURATION_MIN,
+						RADIO_PLATFORM_CONFIGURATION_MAX,
+                        sizeof p->twdInitParams.tPlatformGenParams.Platform_configuration,
+                        (TI_UINT8*)&p->twdInitParams.tPlatformGenParams.Platform_configuration);
+
+regReadIntegerParameter(pAdapter, &STRXTALItrimVal,
+						XTAL_ITRIM_VAL_MIN,
+						XTAL_ITRIM_VAL_DEF, /*todo check default value*/
+						XTAL_ITRIM_VAL_MAX,
+                        sizeof p->twdInitParams.tPlatformGenParams.XTALItrimVal,
+                        (TI_UINT8*)&p->twdInitParams.tPlatformGenParams.XTALItrimVal);
 #else
 regReadIntegerParameter(pAdapter, &STRSettings,
 						65,0,255,
                         sizeof p->twdInitParams.tPlatformGenParams.GeneralSettings,
-                        (TI_UINT32*)&p->twdInitParams.tPlatformGenParams.GeneralSettings);
+                        (TI_UINT8*)&p->twdInitParams.tPlatformGenParams.GeneralSettings);
 #endif
 
+
 /*---------------------- Smart Reflex Configration -----------------------*/
-      regReadIntegerParameter(pAdapter,
-                            &STRSRState,
-                            SMART_REFLEX_STATE_DEF,
-                            SMART_REFLEX_STATE_MIN,
-                            SMART_REFLEX_STATE_MAX,
-                            sizeof p->twdInitParams.tPlatformGenParams.SRState,
-                            (TI_UINT8*)&p->twdInitParams.tPlatformGenParams.SRState);
-
-      
-      NdisZeroMemory(&SRConfigParams[0],MAX_SMART_REFLEX_PARAM );
-
-      regReadIntegerTable (pAdapter, &STRSRConfigParam1, SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE_SRF1,
-                           MAX_SR_PARAM_LEN, NULL, (TI_INT8*)&SRConfigParams,
-                          (TI_UINT32*)&TempSRCnt, sizeof (TI_INT8),TI_TRUE);
-
-	  len = SRConfigParams[0];
-      
-	  NdisZeroMemory(&(p->twdInitParams.tPlatformGenParams.SRF1[0]),MAX_SMART_REFLEX_PARAM);
-
-      if ((len < MAX_SMART_REFLEX_PARAM) &&
-          ((TempSRCnt <= len + 1) || (TempSRCnt == MAX_SMART_REFLEX_PARAM)))
-	  {
-		  memcpy(&(p->twdInitParams.tPlatformGenParams.SRF1[0]), &SRConfigParams[0],TempSRCnt);
-	  }
-
-      NdisZeroMemory(&SRConfigParams[0],MAX_SMART_REFLEX_PARAM );
-     
-      regReadIntegerTable (pAdapter, &STRSRConfigParam2, SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE_SRF2,
-                           MAX_SR_PARAM_LEN, NULL, (TI_INT8*)&SRConfigParams, 
-                          (TI_UINT32*)&TempSRCnt, sizeof (TI_INT8),TI_TRUE);
-
-	  len = SRConfigParams[0];
-	 
-      if ((len > MAX_SR_PARAM_LEN)|| (TempSRCnt > len + 1))
-      {
-		  NdisZeroMemory(&(p->twdInitParams.tPlatformGenParams.SRF2[0]),MAX_SMART_REFLEX_PARAM);
-      }
-      else
-	  {
-		 memcpy(&(p->twdInitParams.tPlatformGenParams.SRF2[0]), &SRConfigParams[0],TempSRCnt);
-	  }
-
-	  NdisZeroMemory(&SRConfigParams[0],MAX_SMART_REFLEX_PARAM );
-
-      regReadIntegerTable (pAdapter, &STRSRConfigParam3, SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE_SRF3,
-                           MAX_SR_PARAM_LEN, NULL, (TI_INT8*)&SRConfigParams, 
-                          (TI_UINT32*)&TempSRCnt, sizeof (TI_INT8),TI_TRUE);
-
-      len = SRConfigParams[0];
-
-      if ((len > MAX_SR_PARAM_LEN)|| (TempSRCnt > len + 1))
-      {
-		  NdisZeroMemory(&(p->twdInitParams.tPlatformGenParams.SRF3[0]),MAX_SMART_REFLEX_PARAM );
-      }
-      else
-	  {
-		  memcpy(&(p->twdInitParams.tPlatformGenParams.SRF3[0]), &SRConfigParams[0],TempSRCnt);
-	  }
+    regReadIntegerParameter(pAdapter, &STRSRState,
+                          SMART_REFLEX_STATE_DEF, SMART_REFLEX_STATE_MIN, SMART_REFLEX_STATE_MAX,
+                          sizeof p->twdInitParams.tPlatformGenParams.SRState,
+                          (TI_UINT8*)&p->twdInitParams.tPlatformGenParams.SRState);
+    
+    NdisZeroMemory(&SRConfigParams[0],MAX_SMART_REFLEX_PARAM );
+    regReadIntegerTable (pAdapter, &STRSRConfigParam1, SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE_SRF1,
+                         MAX_SMART_REFLEX_PARAM, NULL, (TI_INT8*)&SRConfigParams, 
+                        (TI_UINT32*)&TempSRCnt, sizeof (TI_INT8),TI_TRUE);
+    len = SRConfigParams[0];
+    NdisZeroMemory(&(p->twdInitParams.tPlatformGenParams.SRF1[0]),MAX_SMART_REFLEX_PARAM);
+    if ((len < MAX_SMART_REFLEX_PARAM) && ((TempSRCnt <= len + 1) || (TempSRCnt == MAX_SMART_REFLEX_PARAM)))
+    {
+        memcpy(&(p->twdInitParams.tPlatformGenParams.SRF1[0]), &SRConfigParams[0],TempSRCnt);
+    }
+    
+    NdisZeroMemory(&SRConfigParams[0],MAX_SMART_REFLEX_PARAM );
+    regReadIntegerTable (pAdapter, &STRSRConfigParam2, SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE_SRF2,
+                         MAX_SR_PARAM_LEN, NULL, (TI_INT8*)&SRConfigParams, 
+                         (TI_UINT32*)&TempSRCnt, sizeof (TI_INT8),TI_TRUE);
+    len = SRConfigParams[0];
+    if ((len > MAX_SR_PARAM_LEN) || (TempSRCnt > len + 1))
+    {
+        NdisZeroMemory(&(p->twdInitParams.tPlatformGenParams.SRF2[0]),MAX_SMART_REFLEX_PARAM);
+    }
+    else
+    {
+       memcpy(&(p->twdInitParams.tPlatformGenParams.SRF2[0]), &SRConfigParams[0],TempSRCnt);
+    }
+    
+    NdisZeroMemory(&SRConfigParams[0],MAX_SMART_REFLEX_PARAM);
+    regReadIntegerTable (pAdapter, &STRSRConfigParam3, SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE_SRF3,
+                         MAX_SR_PARAM_LEN, NULL, (TI_INT8*)&SRConfigParams, 
+                         (TI_UINT32*)&TempSRCnt, sizeof (TI_INT8), TI_TRUE);
+    len = SRConfigParams[0];
+    if ((len > MAX_SR_PARAM_LEN)|| (TempSRCnt > len + 1))
+    {
+        NdisZeroMemory(&(p->twdInitParams.tPlatformGenParams.SRF3[0]),MAX_SMART_REFLEX_PARAM );
+    }
+    else
+    {
+        memcpy(&(p->twdInitParams.tPlatformGenParams.SRF3[0]), &SRConfigParams[0],TempSRCnt);
+    }
 
      
-      regReadIntegerParameter(pAdapter,
-                            &STRSRSenNP,
-                            SMART_REFLEX_DEBUG_DEF,
-                            SMART_REFLEX_DEBUG_MIN,
-                            SMART_REFLEX_DEBUG_MAX,
-                            sizeof p->twdInitParams.tSmartReflexDebugParams.senN_P,
-                            (TI_UINT8*)&p->twdInitParams.tSmartReflexDebugParams.senN_P);
-
-      regReadIntegerParameter(pAdapter,
-                            &STRSRSenNPGain,
-                            SMART_REFLEX_DEBUG_DEF,
-                            SMART_REFLEX_DEBUG_MIN,
-                            SMART_REFLEX_DEBUG_MAX,
-                            sizeof p->twdInitParams.tSmartReflexDebugParams.senN_P_Gain,
-                            (TI_UINT8*)&p->twdInitParams.tSmartReflexDebugParams.senN_P_Gain);
-
-      regReadIntegerParameter(pAdapter,
-                            &STRSRSenPrn,
-                            SMART_REFLEX_DEBUG_DEF,
-                            SMART_REFLEX_DEBUG_MIN,
-                            SMART_REFLEX_DEBUG_MAX,
-                            sizeof p->twdInitParams.tSmartReflexDebugParams.senPRN,
-                            (TI_UINT8*)&p->twdInitParams.tSmartReflexDebugParams.senPRN);
-
-      regReadIntegerParameter(pAdapter,
-                            &STRSRSenNrn,
-                            SMART_REFLEX_DEBUG_DEF,
-                            SMART_REFLEX_DEBUG_MIN,
-                            SMART_REFLEX_DEBUG_MAX,
-                            sizeof (p->twdInitParams.tSmartReflexDebugParams.senNRN),
-                            (TI_UINT8*)&p->twdInitParams.tSmartReflexDebugParams.senNRN);
-
-     
-      regReadIntegerTable (pAdapter, &STRSRDebugTable, SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE,
-                           MAX_SR_PARAM_LEN, NULL, (TI_INT8*)&p->twdInitParams.tSmartReflexDebugParams.errorTable, 
-                           &TempSRCnt, sizeof (TI_UINT8),TI_FALSE);
-
-
-
-
-
-
 /*---------------------- Power Management Configuration -----------------------*/
-    regReadIntegerParameter(pAdapter,
-                            &STRPowerMgmtHangOverPeriod,
-                            HANGOVER_PERIOD_DEF_VALUE,
-                            HANGOVER_PERIOD_MIN_VALUE,
-                            HANGOVER_PERIOD_MAX_VALUE,
-                            sizeof p->PowerMgrInitParams.hangOverPeriod,
-                            (TI_UINT8*)&p->PowerMgrInitParams.hangOverPeriod);
-
-    regReadIntegerParameter(pAdapter,
-                            &STRPowerMgmtNeedToSendNullData,
-                            POWER_MGMNT_NEED_TO_SEND_NULL_PACKET_DEF_VALUE,
-                            POWER_MGMNT_NEED_TO_SEND_NULL_PACKET_MIN_VALUE,
-                            POWER_MGMNT_NEED_TO_SEND_NULL_PACKET_MAX_VALUE,
-                            sizeof p->PowerMgrInitParams.needToSendNullData,
-                            (TI_UINT8*)&p->PowerMgrInitParams.needToSendNullData);
-    
-    regReadIntegerParameter(pAdapter,
-                            &STRPowerMgmtNullPktRateModulation,
-                            POWER_MGMNT_NULL_PACKET_RATE_MOD_DEF_VALUE,
-                            POWER_MGMNT_NULL_PACKET_RATE_MOD_MIN_VALUE,
-                            POWER_MGMNT_NULL_PACKET_RATE_MOD_MAX_VALUE,
-                            sizeof p->PowerMgrInitParams.NullPktRateModulation,
-                            (TI_UINT8*)&p->PowerMgrInitParams.NullPktRateModulation);
-    
-    regReadIntegerParameter(pAdapter,
-                            &STRPowerMgmtNumNullPktRetries,
-                            POWER_MGMNT_NUM_NULL_PACKET_RETRY_DEF_VALUE,
-                            POWER_MGMNT_NUM_NULL_PACKET_RETRY_MIN_VALUE,
-                            POWER_MGMNT_NUM_NULL_PACKET_RETRY_MAX_VALUE,
-                            sizeof p->PowerMgrInitParams.numNullPktRetries,
-                            (TI_UINT8*)&p->PowerMgrInitParams.numNullPktRetries);
-
     regReadIntegerParameter(pAdapter,
                             &STRPowerMgmtPllLockTime,
                             PLL_LOCK_TIME_DEF_VALUE,
@@ -2671,40 +2643,147 @@ regReadIntegerParameter(pAdapter, &STRSettings,
 
     /*-----------------------------------------------------------------------*/
 
-    /*--------------- Power Server Init Parameters ------------------*/
+    /*--------------- Power Save Configuration ------------------*/
     regReadIntegerParameter(pAdapter,
-                            &STRPowerMgmtNumNullPktRetries,
-                            POWER_MGMNT_NUM_NULL_PACKET_RETRY_DEF_VALUE,
-                            POWER_MGMNT_NUM_NULL_PACKET_RETRY_MIN_VALUE,
-                            POWER_MGMNT_NUM_NULL_PACKET_RETRY_MAX_VALUE,
-                            sizeof p->twdInitParams.tPowerSrv.numNullPktRetries,
-                            (TI_UINT8*)&p->twdInitParams.tPowerSrv.numNullPktRetries);
+                            &STRPowerMgmtNumNullPktEnterRetries,
+                            POWER_MGMNT_NUM_NULL_PACKET_ENTER_RETRY_DEF_VALUE,
+                            POWER_MGMNT_NUM_NULL_PACKET_ENTER_RETRY_MIN_VALUE,
+                            POWER_MGMNT_NUM_NULL_PACKET_ENTER_RETRY_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.numOfEnterPsRetries,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.numOfEnterPsRetries);
 
-        regReadIntegerParameter(pAdapter,
-                            &STRPowerMgmtHangOverPeriod,
+	regReadIntegerParameter(pAdapter,
+                            &STRPowerMgmtNumNullPktExitRetries,
+                            POWER_MGMNT_NUM_NULL_PACKET_EXIT_RETRY_DEF_VALUE,
+                            POWER_MGMNT_NUM_NULL_PACKET_EXIT_RETRY_MIN_VALUE,
+                            POWER_MGMNT_NUM_NULL_PACKET_EXIT_RETRY_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.numOfExitPsRetries,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.numOfExitPsRetries);
+
+    regReadIntegerParameter(pAdapter,
+                            &STRPowerMgmtNullPktRateModulation,
+                            POWER_MGMNT_NULL_PACKET_RATE_MOD_DEF_VALUE,
+                            POWER_MGMNT_NULL_PACKET_RATE_MOD_MIN_VALUE,
+                            POWER_MGMNT_NULL_PACKET_RATE_MOD_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.nullPktRateModulation,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.nullPktRateModulation);
+
+
+	/*--------------- Hang Over Configuration ------------------*/
+    regReadIntegerParameter(pAdapter,
+                            &STRHangOverPeriod,
                             HANGOVER_PERIOD_DEF_VALUE,
                             HANGOVER_PERIOD_MIN_VALUE,
                             HANGOVER_PERIOD_MAX_VALUE,
-                            sizeof p->twdInitParams.tPowerSrv.hangOverPeriod,
-                            (TI_UINT8*)&p->twdInitParams.tPowerSrv.hangOverPeriod);
-    /*-----------------------------------------------------------------------*/
+                            sizeof p->twdInitParams.tIniFilePsParams.hangOverPeriod,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.hangOverPeriod);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRDynamicHangoverMode,
+                            DYNAMIC_HANGOVER_MODE_DEF_VALUE,
+                            DYNAMIC_HANGOVER_MODE_MIN_VALUE,
+                            DYNAMIC_HANGOVER_MODE_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.bDynamicHangoverMode,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.bDynamicHangoverMode);
+
+	regReadIntegerParameter(pAdapter,
+                            &STREarlyTerminationMode,
+                            EARLY_TERMINATION_MODE_DEF_VALUE,
+                            EARLY_TERMINATION_MODE_MIN_VALUE,
+                            EARLY_TERMINATION_MODE_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.bEarlyTerminationMode,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.bEarlyTerminationMode);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRRecoverTime,
+                            PS_RECOVER_TIME_DEF_VALUE,
+                            PS_RECOVER_TIME_MIN_VALUE,
+                            PS_RECOVER_TIME_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.recoverTime,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.recoverTime);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRMaxHangOverPeriod,
+                            PS_MAX_HANG_OVER_PERIOD_DEF_VALUE,
+                            PS_MAX_HANG_OVER_PERIOD_MIN_VALUE,
+                            PS_MAX_HANG_OVER_PERIOD_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.maxHangOverPeriod,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.maxHangOverPeriod);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRMinHangOverPeriod,
+                            PS_MIN_HANG_OVER_PERIOD_DEF_VALUE,
+                            PS_MIN_HANG_OVER_PERIOD_MIN_VALUE,
+                            PS_MIN_HANG_OVER_PERIOD_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.minHangOverPeriod,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.minHangOverPeriod);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRIncreaseDeltaTimeFromHangOver,
+                            PS_INCR_DELTA_TIME_FROM_HANG_OVER_DEF_VALUE,
+                            PS_INCR_DELTA_TIME_FROM_HANG_OVER_MIN_VALUE,
+                            PS_INCR_DELTA_TIME_FROM_HANG_OVER_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.increaseDelatTimeFromHangover,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.increaseDelatTimeFromHangover);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRDecreaseDeltaTimeFromHangOver,
+                            PS_DECR_DELTA_TIME_FROM_HANG_OVER_DEF_VALUE,
+                            PS_DECR_DELTA_TIME_FROM_HANG_OVER_MIN_VALUE,
+                            PS_DECR_DELTA_TIME_FROM_HANG_OVER_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.decreaseDelatTimeFromHangover,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.decreaseDelatTimeFromHangover);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRQuietTimeForEarlyTermination,
+                            PS_QUIET_TIME_FOR_EARLY_TERMINATION_DEF_VALUE,
+                            PS_QUIET_TIME_FOR_EARLY_TERMINATION_MIN_VALUE,
+                            PS_QUIET_TIME_FOR_EARLY_TERMINATION_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.quietTimeForEarlyTermination,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.quietTimeForEarlyTermination);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRIncreaseHangoverTime,
+                            PS_INCREASE_HANG_OVER_TIME_DEF_VALUE,
+                            PS_INCREASE_HANG_OVER_TIME_MIN_VALUE,
+                            PS_INCREASE_HANG_OVER_TIME_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.increaseHangoverTime,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.increaseHangoverTime);
+
+	regReadIntegerParameter(pAdapter,
+                            &STRSlidingWindowSize,
+                            PS_SLIDING_WINDOW_SIZE_DEF_VALUE,
+                            PS_SLIDING_WINDOW_SIZE_MIN_VALUE,
+                            PS_SLIDING_WINDOW_SIZE_MAX_VALUE,
+                            sizeof p->twdInitParams.tIniFilePsParams.slidingWindowSize,
+                            (TI_UINT8*)&p->twdInitParams.tIniFilePsParams.slidingWindowSize);
+	{
+        /* Verify configured values*/
+		TPsParams *pPsParams =&p->twdInitParams.tIniFilePsParams;
+
+		if (pPsParams->hangOverPeriod > pPsParams->maxHangOverPeriod)
+		{
+			pPsParams->hangOverPeriod = HANGOVER_PERIOD_DEF_VALUE;
+			pPsParams->maxHangOverPeriod = PS_MAX_HANG_OVER_PERIOD_DEF_VALUE;
+		}
+		if (pPsParams->increaseDelatTimeFromHangover > pPsParams->minHangOverPeriod)
+		{
+			pPsParams->increaseDelatTimeFromHangover = PS_INCR_DELTA_TIME_FROM_HANG_OVER_DEF_VALUE;
+			pPsParams->minHangOverPeriod = PS_MIN_HANG_OVER_PERIOD_DEF_VALUE;
+		}
+		if (pPsParams->decreaseDelatTimeFromHangover <= pPsParams->increaseDelatTimeFromHangover)
+		{
+			pPsParams->increaseDelatTimeFromHangover = PS_INCR_DELTA_TIME_FROM_HANG_OVER_DEF_VALUE;
+			pPsParams->decreaseDelatTimeFromHangover = PS_DECR_DELTA_TIME_FROM_HANG_OVER_DEF_VALUE;
+		}
+		if (pPsParams->recoverTime % 2000)
+		{
+			pPsParams->recoverTime = PS_RECOVER_TIME_DEF_VALUE;
+		}
+	}
+
+	/*-----------------------------------------------------------------------*/
     
-
-    /* Scan SRV */
-    regReadIntegerParameter(pAdapter, &STRNumberOfNoScanCompleteToRecovery,
-                            SCAN_SRV_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_DEF,
-                            SCAN_SRV_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_MIN,
-                            SCAN_SRV_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_MAX,
-                            sizeof (p->twdInitParams.tScanSrv.numberOfNoScanCompleteToRecovery),
-                            (TI_UINT8*)&(p->twdInitParams.tScanSrv.numberOfNoScanCompleteToRecovery) );
-
-        regReadIntegerParameter(pAdapter, &STRTriggeredScanTimeOut,
-            SCAN_SRV_TRIGGERED_SCAN_TIME_OUT_DEF,
-            SCAN_SRV_TRIGGERED_SCAN_TIME_OUT_MIN,
-            SCAN_SRV_TRIGGERED_SCAN_TIME_OUT_MAX,
-            sizeof (p->twdInitParams.tScanSrv.uTriggeredScanTimeOut),
-            (TI_UINT8*)&(p->twdInitParams.tScanSrv.uTriggeredScanTimeOut) );
-
 
     /* Regulatory Domain */
 
@@ -3551,7 +3630,25 @@ regReadIntegerParameter(pAdapter, &STRSettings,
                             RX_MEM_BLKS_NUM_DEF, RX_MEM_BLKS_NUM_MIN, RX_MEM_BLKS_NUM_MAX,
                             sizeof p->twdInitParams.tGeneral.uRxMemBlksNum,
                             (TI_UINT8*)&p->twdInitParams.tGeneral.uRxMemBlksNum);
+    regReadIntegerParameter(pAdapter, &STRDynMemEnable,
+                            DYNAMIC_MEMORY_ENABLE_DEF, DYNAMIC_MEMORY_ENABLE_MIN, DYNAMIC_MEMORY_ENABLE_MAX,
+                            sizeof p->twdInitParams.tGeneral.uDynMemEnable,
+                            (TI_UINT8*)&p->twdInitParams.tGeneral.uDynMemEnable);
 
+    regReadIntegerParameter(pAdapter, &STRTxFreeReq,
+                            TX_FREE_REQ_DEF, TX_FREE_REQ_MIN, TX_FREE_REQ_MAX,
+                            sizeof p->twdInitParams.tGeneral.uTxFreeReq,
+                            (TI_UINT8*)&p->twdInitParams.tGeneral.uTxFreeReq);
+
+    regReadIntegerParameter(pAdapter, &STRRxFreeReq,
+                            RX_FREE_REQ_DEF, RX_FREE_REQ_MIN, RX_FREE_REQ_MAX,
+                            sizeof p->twdInitParams.tGeneral.uRxFreeReq,
+                            (TI_UINT8*)&p->twdInitParams.tGeneral.uRxFreeReq);
+
+    regReadIntegerParameter(pAdapter, &STRTxMin,
+                            TX_MIN_DEF, TX_MIN_MIN, TX_MIN_MAX,
+                            sizeof p->twdInitParams.tGeneral.uTxMin,
+                            (TI_UINT8*)&p->twdInitParams.tGeneral.uTxMin);
     regReadIntegerParameter(pAdapter, &STRWiFiMode,
                             WIFI_MODE_DEF, WIFI_MODE_MIN,
                             WIFI_MODE_MAX,
@@ -3602,11 +3699,10 @@ regReadIntegerParameter(pAdapter, &STRSettings,
         p->txDataInitParams.uTxSendPaceThresh           = TX_SEND_PACE_THRESH_DEF_WIFI_MODE;
 
         /* remove the flags of DRPw mode when WiFi active */
-#ifdef TNETW1283
+
         p->twdInitParams.tPlatformGenParams.GeneralSettings[0] &= ~DRPw_MASK_CHECK;
-#else
-        p->twdInitParams.tPlatformGenParams.GeneralSettings &= ~DRPw_MASK_CHECK;
-#endif
+        /* multicast filter is disable in WiFiMode*/
+        p->twdInitParams.tMacAddrFilter.isFilterEnabled = DEF_FILTER_ENABLE_VALUE;
     }
 
     /* If NOT in WiFi mode and IN performance-boost mode, optimize some traffic params for speed (on expense of QoS)  */
@@ -3748,6 +3844,12 @@ regReadIntegerParameter(pAdapter, &STRSettings,
                             (TI_UINT8*)&p->measurementInitParams.maxDurationOnNonServingChannel);  
 
 
+    regReadIntegerParameter(pAdapter, &STRRRMEnabled,
+                        STA_CAPABILITY_RRM_ENABLED_DEF, STA_CAPABILITY_RRM_ENABLED_MIN, STA_CAPABILITY_RRM_ENABLED_MAX,
+                        sizeof (p->measurementInitParams.rrmEnabled),
+                        (TI_UINT8*)&(p->measurementInitParams.rrmEnabled));
+
+    
     /*---------------------------
           XCC Manager parameters
     -----------------------------*/
@@ -3919,11 +4021,24 @@ regReadIntegerParameter(pAdapter, &STRSettings,
                             sizeof p->tScanCncnInitParams.uSraThreshold,
                             (TI_UINT8*)&p->tScanCncnInitParams.uSraThreshold);
 
-
     regReadIntegerParameter(pAdapter, &STRScanCncnRssiThreshold,
                             SCAN_CNCN_RSSI_DEF, SCAN_CNCN_RSSI_MIN, SCAN_CNCN_RSSI_MAX,
                             sizeof p->tScanCncnInitParams.nRssiThreshold,
                             (TI_UINT8*)&p->tScanCncnInitParams.nRssiThreshold);
+
+	regReadIntegerParameter(pAdapter, &STRNumOfNoScanCompleteToRecovery,
+                            SCAN_CNCN_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_DEF,
+                            SCAN_CNCN_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_MIN,
+                            SCAN_CNCN_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_MAX,
+                            sizeof p->tScanCncnInitParams.numberOfNoScanCompleteToRecovery,
+                            (TI_UINT8*)&(p->tScanCncnInitParams.numberOfNoScanCompleteToRecovery) );
+
+	regReadIntegerParameter(pAdapter, &STRSplitScanTimeOut,
+							SCAN_CNCN_SPLIT_SCAN_TIME_OUT_DEF,
+							SCAN_CNCN_SPLIT_SCAN_TIME_OUT_MIN,
+							SCAN_CNCN_SPLIT_SCAN_TIME_OUT_MAX,
+							sizeof p->twdInitParams.tGeneral.uSplitScanTimeOut,
+							(TI_UINT8*)&(p->twdInitParams.tGeneral.uSplitScanTimeOut) );
 
 /*----------------------------------
  WSC 
@@ -4131,13 +4246,67 @@ regReadIntegerTable (pAdapter, &STRTxPDVsRateOffsets_5G, RADIO_TX_PD_VS_RATE_OFF
                      (TI_UINT32*)&uTempEntriesCount, sizeof (TI_UINT8),TI_TRUE);
 
 regReadIntegerTable (pAdapter, &STRTxIbiasTable_2_4G, RADIO_TX_BIAS_2_4_DEF_TABLE,
-                     NUMBER_OF_RATE_GROUPS_E, NULL, (TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tDynRadioParams.TxIbiasTable_2_4G, 
+					 NUMBER_OF_2_4G_TX_IBIAS_RATE_GROUPS_E, NULL,
+					 (TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tDynRadioParams.TxIbiasTable_2_4G,
                      (TI_UINT32*)&uTempEntriesCount, sizeof (TI_UINT8),TI_TRUE);
 
 regReadIntegerTable (pAdapter, &STRTxIbiasTable_5G, RADIO_TX_BIAS_5_DEF_TABLE,
                      NUMBER_OF_RATE_GROUPS_E, NULL, (TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tDynRadioParams.TxIbiasTable_5G, 
                      (TI_UINT32*)&uTempEntriesCount, sizeof (TI_UINT8),TI_TRUE);
+#ifdef TNETW1283
+regReadIntegerParameter(pAdapter,
+  						&STRFemVendorAndOptions,
+						FEM_VENDOR_AND_OPTIONS_MIN,
+						FEM_VENDOR_AND_OPTIONS_DEF,
+						FEM_VENDOR_AND_OPTIONS_MAX,
+						sizeof (p->twdInitParams.tIniFileRadioParams.tStatRadioParams.FemVendorAndOptions),
+						(TI_UINT8*)&p->twdInitParams.tIniFileRadioParams.tStatRadioParams.FemVendorAndOptions);
+/*
 
+
+
+
+ */
+regReadIntegerTable(pAdapter,
+					&STRTxPDVsChannelOffsets_2_4G,
+					TX_PDVS_CHANNEL_OFFSETS_2_4G_DEF_TABLE,
+					NUMBER_OF_2_4_G_CHANNELS,
+					NULL,
+					(TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tDynRadioParams.TxPDVsChannelOffsets_2_4G,
+					(TI_UINT32*)&uTempEntriesCount,
+					sizeof (TI_INT8),
+					TI_TRUE);
+
+regReadIntegerTable(pAdapter,
+					&STRTxPDVsTemperature_2_4G,
+					TX_PDVS_TEMPERATURE_2_4G_DEF_TABLE,
+					PD_VS_TEMPERATURE_RANGES,
+					NULL,
+					(TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tDynRadioParams.TxPDVsTemperature_2_4G,
+					(TI_UINT32*)&uTempEntriesCount,
+					sizeof (TI_INT8),
+					TI_TRUE);
+
+regReadIntegerTable(pAdapter,
+					&STRTxPDVsChannelOffsets_5G,
+					TX_PDVS_CHANNEL_OFFSETS_5G_TABLE,
+					NUMBER_OF_5G_CHANNELS,
+					NULL,
+					(TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tDynRadioParams.TxPDVsChannelOffsets_5G,
+					(TI_UINT32*)&uTempEntriesCount,
+					sizeof (TI_INT8),
+					TI_TRUE);
+
+regReadIntegerTable(pAdapter,
+					&STRTxPDVsTemperature_5G,
+					TX_PDVS_TEMPERATURE_5G_DEF_TABLE,
+					NUMBER_OF_SUB_BANDS_IN_5G_BAND_E * PD_VS_TEMPERATURE_RANGES,  /*reference from public_radio.h */
+					NULL,
+					(TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tDynRadioParams.TxPDVsTemperature_5G,
+					(TI_UINT32*)&uTempEntriesCount,
+					sizeof (TI_INT8),
+					TI_TRUE);
+#endif
 regReadIntegerParameter(pAdapter, &STRTXBiPReferencePDvoltage_2_4G,
                         RADIO_RX_FEM_INSERT_LOSS_2_4_DEF, RADIO_RX_FEM_INSERT_LOSS_2_4_MIN,
                         RADIO_RX_FEM_INSERT_LOSS_2_4_MAX,
@@ -4157,17 +4326,30 @@ regReadIntegerParameter(pAdapter, &STRRxFemInsertionLoss_2_4G,
 regReadIntegerTable (pAdapter, &STRRxFemInsertionLoss_5G, RADIO_RX_FEM_INSERT_LOSS_5_DEF_TABLE,
                      NUMBER_OF_SUB_BANDS_IN_5G_BAND_E, NULL, (TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tDynRadioParams.RxFemInsertionLoss_5G,
                      (TI_UINT32*)&uTempEntriesCount, sizeof (TI_UINT8), TI_TRUE);
-
+//todo check duplicate of RADIO_RX_TRACE_INSERT_LOSS_2_4_DEF
 regReadIntegerParameter(pAdapter, &STRRxTraceInsertionLoss_2_4G,
                         RADIO_RX_TRACE_INSERT_LOSS_2_4_DEF, RADIO_RX_TRACE_INSERT_LOSS_2_4_MIN,
                         RADIO_RX_TRACE_INSERT_LOSS_2_4_MAX,
                         sizeof (TI_UINT8), (TI_UINT8*)&p->twdInitParams.tIniFileRadioParams.tStatRadioParams.RxTraceInsertionLoss_2_4G);
+#ifdef TNETW1283
+regReadIntegerTable (	pAdapter,
+						&STRTXTraceLoss_2_4G,
+						TX_TRACE_LOSS_2_4G_DEF_TABLE,
+						NUMBER_OF_2_4G_TX_TRACE_LOSS_CELLS,
+						NULL,
+						(TI_UINT8*)&p->twdInitParams.tIniFileRadioParams.tStatRadioParams.TXTraceLoss_2_4G,
+						(TI_UINT32*)&uTempEntriesCount,
+						sizeof (TI_UINT8),
+						TI_TRUE
+						);
 
+#else
+//todo check duplicate of RADIO_RX_TRACE_INSERT_LOSS_2_4_DEF
 regReadIntegerParameter(pAdapter, &STRTXTraceLoss_2_4G,
                         RADIO_RX_TRACE_INSERT_LOSS_2_4_DEF, RADIO_RX_TRACE_INSERT_LOSS_2_4_MIN,
                         RADIO_RX_TRACE_INSERT_LOSS_2_4_MAX,
                         sizeof (TI_UINT8), (TI_UINT8*)&p->twdInitParams.tIniFileRadioParams.tStatRadioParams.TXTraceLoss_2_4G);
-
+#endif
 regReadIntegerTable (pAdapter, &STRRxTraceInsertionLoss_5G, RADIO_RX_TRACE_INSERT_LOSS_5_DEF_TABLE,
                      NUMBER_OF_SUB_BANDS_IN_5G_BAND_E, NULL, (TI_INT8*)&p->twdInitParams.tIniFileRadioParams.tStatRadioParams.RxTraceInsertionLoss_5G, 
                      (TI_UINT32*)&uTempEntriesCount, sizeof (TI_UINT8), TI_TRUE);
@@ -4256,20 +4438,6 @@ regReadIntegerParameter(pAdapter, &STRNewPllAlgo,
                         sizeof p->twdInitParams.tGeneral.NewPllAlgo,
                        (TI_UINT8*)&p->twdInitParams.tGeneral.NewPllAlgo);
 
-regReadIntegerParameter(pAdapter, &STRPlatformConfiguration,
-						RADIO_PLATFORM_CONFIGURATION_DEF, RADIO_PLATFORM_CONFIGURATION_MIN,
-                        RADIO_PLATFORM_CONFIGURATION_MAX,
-                        sizeof p->twdInitParams.tGeneral.PlatformConfiguration,
-                        (TI_UINT8*)&p->twdInitParams.tGeneral.PlatformConfiguration);
-
-#else
-
-regReadIntegerParameter(pAdapter, &STRDC2DCMode,
-						0,0,1,
-                        sizeof p->twdInitParams.tPlatformGenParams.DC2DCMode,
-                        (TI_UINT8*)&p->twdInitParams.tPlatformGenParams.DC2DCMode);
-
-#endif
 regReadIntegerParameter(pAdapter, &STRTXBiPFEMAutoDetect,
 						0,0,1,                             
                         sizeof p->twdInitParams.tPlatformGenParams.TXBiPFEMAutoDetect,
@@ -4279,6 +4447,14 @@ regReadIntegerParameter(pAdapter, &STRTXBiPFEMManufacturer,
 						1,0,1,
                         sizeof p->twdInitParams.tPlatformGenParams.TXBiPFEMManufacturer,
                         (TI_UINT8*)&p->twdInitParams.tPlatformGenParams.TXBiPFEMManufacturer);
+#else
+
+regReadIntegerParameter(pAdapter, &STRDC2DCMode,
+						0,0,1,
+                        sizeof p->twdInitParams.tPlatformGenParams.DC2DCMode,
+                        (TI_UINT8*)&p->twdInitParams.tPlatformGenParams.DC2DCMode);
+
+#endif
 
 regReadIntegerParameter(pAdapter, &STRSingle_Dual_Band_Solution,
 						0,0,1,
@@ -4391,6 +4567,18 @@ regReadIntegerParameter(pAdapter, &STRFmCoexSwallowClkDif,
                         FM_COEX_SWALLOW_CLK_DIF_DEF, FM_COEX_SWALLOW_CLK_DIF_MIN, FM_COEX_SWALLOW_CLK_DIF_MAX,
                         sizeof (p->twdInitParams.tGeneral.tFmCoexParams.uSwallowClkDif),
                         (TI_UINT8*)&(p->twdInitParams.tGeneral.tFmCoexParams.uSwallowClkDif));
+
+
+
+/*--------------------------------------------------------*/
+/* 			WVE parameters (802.11k + 802.11r)	          */
+/*--------------------------------------------------------*/
+
+regReadIntegerParameter(pAdapter, &STRRRMEnabled,
+                        STA_CAPABILITY_RRM_ENABLED_DEF, STA_CAPABILITY_RRM_ENABLED_MIN, STA_CAPABILITY_RRM_ENABLED_MAX,
+                        sizeof (p->tStaCapabilityParams.bRRMEnabled),
+                        (TI_UINT8*)&(p->tStaCapabilityParams.bRRMEnabled));
+
 
 
 /*----------------------------------------------*/
@@ -5251,7 +5439,7 @@ regReadIntegerTable(
     regReadStringParameter(pAdapter,
                            pParameterName,
                            pDefaultValue,
-                           defaultLen,
+                           strlen(pDefaultValue),
                            (TI_UINT8*)pBuffer,
                            &bufferSize);
 

@@ -120,14 +120,11 @@ typedef enum
     ACX_PEER_HT_CAP             = 0x0057,
     ACX_HT_BSS_OPERATION        = 0x0058,
     ACX_COEX_ACTIVITY           = 0x0059,
-    ACX_SET_SMART_REFLEX_DEBUG  = 0x005A,
-	ACX_SET_SMART_REFLEX_STATE  = 0x005B,
-	ACX_SET_SMART_REFLEX_PARAMS = 0x005F,
 	ACX_BURST_MODE				= 0x005C,
 
     ACX_SET_RATE_MAMAGEMENT_PARAMS = 0x005D,
     ACX_GET_RATE_MAMAGEMENT_PARAMS = 0x005E,
-	
+
     ACX_SET_DCO_ITRIM_PARAMS   = 0x0061,
 	
     ACX_GEN_FW_CMD              = 0x0070,
@@ -140,8 +137,10 @@ typedef enum
     DOT11_GROUP_ADDRESS_TBL     = 0x1014,
     ACX_SET_RADIO_PARAMS		= 0x1015,
 	ACX_PM_CONFIG               = 0x1016,
+	ACX_CONFIG_PS               = 0x1017,
+ 	ACX_CONFIG_HANGOVER         = 0x1018,
      
-    MAX_DOT11_IE = ACX_PM_CONFIG,
+    MAX_DOT11_IE = ACX_CONFIG_HANGOVER,
     
     MAX_IE = 0xFFFF   /*force enumeration to 16bits*/
 } InfoElement_enum;
@@ -240,6 +239,15 @@ typedef struct
                                         /* Enables different profiles for different STAs */
 
     uint32  totalTxDescriptors;         /* Total TX Descriptors - in the past it was configured per AC */
+
+	uint8    dynMemEnable;              /* 0 - not supported */
+
+    uint8    txFreeReq;                 /* minimum required free memory blocks in TX pool*/
+
+    uint8    rxFreeReq;                 /* minimum required free memory blocks in TX pool*/
+
+    uint8    txMin;                     /* minimum required total TX memory blocks in TX pool*/
+
 } ACXConfigMemory_t;
 
 
@@ -295,8 +303,8 @@ typedef enum
     AC_CTS2SELF = 4,        /* CTS2Self fictitious AC,              */  
                             /* uses #4 to follow AC_VO, as          */
                             /* AC_BCAST does not seem to be in use. */
-        AC_ANY_TID = 0x1F,
-	AC_INVALID = 0xFF,  /* used for gTxACconstraint */
+    AC_ANY_TID = 0x1F,
+    AC_INVALID = 0xFF,  /* used for gTxACconstraint */
     NUM_ACCESS_CATEGORIES = 4
 } AccessCategory_enum;
 
@@ -710,15 +718,23 @@ typedef struct ACXCoexActivityIEStruct {
 
 #define ARP_FILTER_DISABLED                    (0)
 #define ARP_FILTER_ENABLED                  (0x01)
-#define ARP_FILTER_AUTO_ARP_ENABLED         (0x03)
+#define ARP_FILTER_AUTO_ARP_ENABLED			(0x02)
+
+#define ARP_FILTER_SUSPENDED_BY_FW			(0x80)		// Bit set/cleared by FW to indicate temporary suspention of Auto-ARP 
+														// (due to join, before template is configured)
+														// This is NEVER used by the Host itself
+
+#define ARP_FILTER_HOST_ENABLE_MASK			(0x03)		// Take only two lower bits of host configuration
 
 typedef struct  
 {    
     INFO_ELE_HDR
     uint8     ipVersion;       /* The IP version of the IP address: 4 - IPv4, 6 - IPv6.*/
-    uint8     arpFilterEnable; /* 0x00 - No ARP features */
-                               /* 0x01 - Only ARP filtering */
-                               /* 0x03 - Both ARP filtering and Auto-ARP */
+    uint8     arpFilterEnable; /* BITMAP (!) field containing all "enabled" ARP features */
+							   /* 0x00 - No ARP features */
+							   /* 0x01 - Only ARP filtering */
+							   /* 0x02 - Only Auto-ARP */
+	                           /* 0x03 - Both ARP filtering and Auto-ARP */
                                /* For IPv6 it MUST be 0 */
     uint8     padding[2];      /* alignment to 32bits boundry   */
     uint8     address[16];     /* The IP address used to filter ARP packets. ARP packets */
@@ -2366,6 +2382,8 @@ typedef enum
 	RATE_MGMT_RATE_CHECK_UP_PARAM,
 	RATE_MGMT_RATE_CHECK_DOWN_PARAM,
 	RATE_MGMT_RATE_RETRY_POLICY_PARAM,
+	RATE_MGMT_PER_WEIGHT_SHIFT_PARAM,
+	RATE_MGMT_TP_WEIGHT_SHIFT_PARAM,
 	RATE_MGMT_ALL_PARAMS = 0xff
 } rateAdaptParam_enum;
 
@@ -2375,6 +2393,8 @@ typedef uint8 rateAdaptParam_e;
 typedef rateAdaptParam_enum rateAdaptParam_e;
 #endif
 
+#define RATE_MGMT_NUM_OF_UC		(2)
+#define RATE_MGMT_NUM_OF_RATES  (13)
 typedef struct
 {
     INFO_ELE_HDR
@@ -2394,7 +2414,7 @@ typedef struct
 	uint8 PerBeta2Shift;
 	uint8 RateCheckUp;
 	uint8 RateCheckDown;
-	uint8 RateRetryPolicy[13]; 
+	uint8 RateRetryPolicy[RATE_MGMT_NUM_OF_RATES]; 
 }AcxRateMangeParams;
 
 /******************************************************************************
@@ -2417,69 +2437,6 @@ typedef struct
 }AcxRateMangeReadParams;
 
 
-
-/******************************************************************************
-
-    Name:	ACX_SET_SMART_REFLEX_STATE
-    Desc:   Configure smart reflex state (enable/disable).
-    Type:   Configuration
-    Access: Write Only
-    Length: 
-
-******************************************************************************/
-
-typedef struct
-{
-	INFO_ELE_HDR
-    Bool_e  enable;
-    uint8 padding [3];
-}ACXSmartReflexState_t;
-
-
-/******************************************************************************
-
-    Name:	ACX_SET_SMART_REFLEX_DEBUG
-    Desc:   Configure smart reflex mechanism parameters - for debug mode.
-    Type:   Configuration
-    Access: Write Only
-    Length: 
-
-******************************************************************************/
-typedef struct 
-{
-	uint8 len; //maximum length is 14
-	int8 upperLimit;
-	int8 values[14]; //this is the maximum length (in rows) of the error table
-}SmartReflexErrTable_t;
-
-typedef struct
-{
-	INFO_ELE_HDR
-	SmartReflexErrTable_t errorTable; 
-	uint16 senN_P;
-	uint16 senNRN;
-	uint16 senPRN;
-	uint16 senN_P_Gain;
-}ACXSmartReflexDebugParams_t;
-
-
-/******************************************************************************
-
-    Name:	ACX_SET_SMART_REFLEX_PARAMS
-    Desc:   Configure smart reflex mechanism tables - 1 for each FAB.
-			The FW will choose the correct FAB, according to what is burned in the Efuse.
-    Type:   Configuration
-    Access: Write Only
-    Length: 
-
-******************************************************************************/
-
-typedef struct
-{
-	INFO_ELE_HDR
-	SmartReflexErrTable_t errorTable[3]; 
-}ACXSmartReflexConfigParams_t;
-
 /******************************************************************************
 
     Name:   ACX_SET_DCO_ITRIM_PARAMS    
@@ -2499,6 +2456,101 @@ typedef struct
     Bool_e enable;
     uint32 moderation_timeout_usec;
 }ACXDCOItrimParams_t ;
+
+/******************************************************************************
+
+    Name:   ACX_CONFIG_PS    
+    Desc:   Configure PS operational parameters:               
+            numOfEnterPsRetries        -  Number of retries attempts when enter to PS.
+			numOfExitPsRetries         -  Number of retries attempts when exit from PS.
+			RequestedRateForNullDataTx - Rates requested for sending the Null Data packet.
+    Type:   Configuration
+    Access: Write Only
+    Length: 
+
+******************************************************************************/
+
+typedef struct
+{
+    INFO_ELE_HDR
+    uint8 	numOfExitPsRetries;
+    uint8	numOfEnterPsRetries;
+	uint8	temp1;
+    uint8   temp2;
+	EHwRateBitFiled RequestedRateForNullDataTx;
+}ACXConfigPsParams_t ;
+
+
+/******************************************************************************
+
+    Name:   ACX_CONFIG_HANGOVER    
+    Desc:   Configure Hangover operational parameters:               
+        	
+            bDynamicHangoverMode-          Enable/Disable dynamic hangover algorithm.
+       	    maxHangOverPeriod-             max time that hangover can be.
+        	minHangOverPeriod-             min time that hangover can be.
+                                           hangover is decreased to the next time: max hangover inside sliding
+                                           window + this parameter
+        	increaseDelatTimeFromHangover- if the time stamp of the last RX packet is bigger 
+                                           than (hangover - IncreaseDelatTimeFromHangover) means
+                                           the hangover is increased. 
+        	decreaseDelatTimeFromHangover- if the time stamp of the last RX packet is smaller than 
+                                           (hangover - DecreaseDelatTimeFromHangover) during all sliding window
+                                           means the hangover is decreased. 
+        	recoverTime-                   how often to return to the original hangover.If time is zero means
+                                           recover hangover feature is disabled
+        	bEarlyTerminationMode-         Enable/Disable early termination in dynamic hangover algorithm.
+        	quietTimeForEarlyTermination-  Duration that should be "quite" in the air in order to do early termination.
+        	IncreaseHangoverTime-          hangover is increased by this time
+            SlidingWindowSize-             the size of sliding window the decision is based on sliding window
+            hangOverPeriod-                original hangover - hangover time if bDynamicHangoverMode is disable,
+                                           hangover every restart of the algorithm(every join command)
+                                           hangover every recovery time
+                                           
+
+            NOTE -PAY ATTENTION  
+            all the times and periods are in units of half MSEC.
+            1  = 0.5 MSEC
+            2  = 1   MSEC
+            3  = 1.5 MSEC
+                    
+            for example:
+            if IncreaseDelatTimeFromHangover = 1 (value of host command) that means that the hangover will be
+            increase with 0.5 MSEC each time.
+            Because the module parameters are with USEC units 
+            there is a multiply by 500 to each host parameters which describes time
+            so in the the module IncreaseDelatTimeFromHangover will be 500 (500 USEC means 0.5 MSEC
+            means 1 in half MSEC units).
+
+  
+    Type:   Configuration
+    Access: Write Only
+    Length: 
+
+******************************************************************************/
+
+typedef struct
+{
+  INFO_ELE_HDR  
+  uint8  hangOverPeriod;
+  Bool_e bDynamicHangoverMode;
+  Bool_e bEarlyTerminationMode;
+  uint32 recoverTime;
+  uint8  maxHangOverPeriod;
+  uint8  minHangOverPeriod;
+  uint8  increaseDelatTimeFromHangover;
+  uint8  decreaseDelatTimeFromHangover;
+  uint8  quietTimeForEarlyTermination;
+  uint8  increaseHangoverTime;
+  uint8  slidingWindowSize;
+  uint8  spare1;
+  uint8  spare2;
+  uint8  spare3;
+
+}ACXConfigHangOverParams_t ;
+
+
+
 
 #endif /* PUBLIC_INFOELE_H */
 

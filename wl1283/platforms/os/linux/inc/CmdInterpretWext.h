@@ -71,6 +71,7 @@ typedef enum _TIWLAN_KEY_FLAGS
 	TIWLAN_KEY_FLAGS_AUTHENTICATOR	= 0x10000000            /* Not used currently */
 } TIWLAN_KEY_FLAGS;
 
+#define TKIP_MIC_LEN 8
 #define TKIP_KEY_LENGTH		32
 #define AES_KEY_LENGTH      16
 #define WEP_KEY_LENGTH_40   5
@@ -81,5 +82,6 @@ typedef enum _TIWLAN_KEY_FLAGS
 #define WEXT_OK					0
 #define WEXT_NOT_SUPPORTED		-EOPNOTSUPP
 #define WEXT_INVALID_PARAMETER  -EINVAL
+#define WEXT_SCAN_RESULT_TO_BIG -E2BIG
 
 #endif /* _CMD_INTERPRET_WEXT_H_ */

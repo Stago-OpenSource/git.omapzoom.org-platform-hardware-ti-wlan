@@ -51,7 +51,6 @@
 #include "qosMngrDbg.h"
 #include "PowerMgrDebug.h"
 #include "roamingMgrDebug.h"
-#include "scanCncnDbg.h"
 #include "ScanMngrDbg.h"
 #include "scrDbg.h"
 #include "SoftGeminiDbg.h"
@@ -262,6 +261,7 @@ void sendDataPacket (TI_HANDLE hOs)
 
 void sendMgmtPacket(TI_HANDLE hOs)
 {
+	 //This is a debug function that is called from a debug CLI for testing only. It is not part of the final product
     TI_UINT32           i;
     TI_UINT8            *pMsg;
     dot11MgmtSubType_e  eMsgType = DE_AUTH;

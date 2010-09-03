@@ -220,13 +220,18 @@ TI_STATUS roamingMngr_triggerRoamingCb(TI_HANDLE hRoamingMngr, void *pData, TI_U
 #endif
     if (roamingTrigger <= ROAMING_TRIGGER_BG_SCAN_GROUP)
     {
-        TI_BOOL    lowQuality = TI_FALSE;
+        ERssiQuality    rssiQuality = ROAMING_QUALITY_NORMAL;
         if (roamingTrigger == ROAMING_TRIGGER_LOW_QUALITY_FOR_BG_SCAN)
         {
-            lowQuality = TI_TRUE;
+            rssiQuality = ROAMING_QUALITY_LOW;
         }
-        TRACE1(pRoamingMngr->hReport, REPORT_SEVERITY_INFORMATION, "roamingMngr_triggerRoamingCb, lowQuality = %d \n", lowQuality);
-        scanMngr_qualityChangeTrigger(pRoamingMngr->hScanMngr, lowQuality);
+		else if (roamingTrigger == ROAMING_TRIGGER_HIGH_QUALITY_FOR_BG_SCAN)
+        {
+             rssiQuality = ROAMING_QUALITY_HIGH;
+        }
+
+        TRACE1(pRoamingMngr->hReport, REPORT_SEVERITY_INFORMATION, "roamingMngr_triggerRoamingCb, rssiQuality = %d \n", rssiQuality);
+        scanMngr_notifyChangeTrigger(pRoamingMngr->hScanMngr, rssiQuality);
     }
     else
     {
@@ -996,6 +1001,30 @@ TI_STATUS roamingMngr_getParam(TI_HANDLE hRoamingMngr, paramInfo_t *pParam)
         break;
 
 #endif /*TI_DBG*/
+
+    case ROAMING_MNGR_CURRENT_CANDIDATE_BUFFER_LEN:
+        if (pRoamingMngr->candidateApIndex < MAX_SIZE_OF_BSS_TRACK_LIST)
+        {
+            pParam->content.uCandidateBufferLen =
+                pRoamingMngr->pListOfAPs->BSSList[pRoamingMngr->candidateApIndex].bufferLength;
+        }
+        else
+        {
+            pParam->content.uCandidateBufferLen = 0;
+        }
+        break;
+
+    case ROAMING_MNGR_CURRENT_CANDIDATE_BUFFER:
+        if (pRoamingMngr->candidateApIndex < MAX_SIZE_OF_BSS_TRACK_LIST)
+        {
+            pParam->content.pCandidateBuffer =
+                pRoamingMngr->pListOfAPs->BSSList[pRoamingMngr->candidateApIndex].pBuffer;
+        }
+        else
+        {
+            pParam->content.pCandidateBuffer = NULL;
+        }
+        break;
 
     default:
         TRACE1(pRoamingMngr->hReport, REPORT_SEVERITY_ERROR, "roamingMngr_getParam  bad paramType= %X \n", pParam->paramType);

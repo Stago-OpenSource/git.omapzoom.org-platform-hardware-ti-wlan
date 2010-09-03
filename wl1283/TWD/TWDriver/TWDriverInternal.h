@@ -79,7 +79,7 @@ typedef struct
     TI_HANDLE           hReport;
     TI_HANDLE           hTimer;
     TI_HANDLE           hContext;
-    TI_HANDLE           hMacServices;
+    TI_HANDLE			hMeasurementSRV;
     TI_HANDLE           hTxCtrlBlk;
     TI_HANDLE           hTxHwQueue;
     TI_HANDLE           hHwIntr;

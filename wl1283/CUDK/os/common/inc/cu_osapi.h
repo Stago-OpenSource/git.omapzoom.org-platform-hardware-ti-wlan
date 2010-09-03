@@ -25,6 +25,7 @@
 #ifndef _CUOSAPI_H_
 #define _CUOSAPI_H_
 
+#include "cu_ostypes.h"
 /* defines */
 /***********/
 #define OK                      0
@@ -41,38 +42,34 @@
 /* replaces IFNAMSIZ in Linux */
 #define IF_NAME_SIZE    16
 
-/* types */
+
+/* Macros */
+#define PRINT_FORMAT_S8_VAL(signedVal) \
+(((U8)signedVal > 127) ? (0xFFFFFF00 | signedVal) : signedVal)
 /*********/
-#if !defined(VOID)
-typedef void                    VOID,*PVOID;
-#endif
-typedef unsigned char           U8,*PU8;
-typedef /*signed*/ char         S8,*PS8,**PPS8;
-typedef unsigned short          U16,*PU16;
-typedef signed short            S16,*PS16;
-typedef unsigned long           U32,*PU32;
-typedef signed long             S32,*PS32;
-typedef float                   F32,*PF32;
-typedef PVOID                   THandle;
-typedef int                     TI_SIZE_T;
+
+
+
+/* Macros */
+#define PRINT_FORMAT_S8_VAL(signedVal) \
+(((U8)signedVal > 127) ? (0xFFFFFF00 | signedVal) : signedVal)
+/***********/
+
 
 /* 
  * supp declares its OS abstarction with primitive types, so these must
  * be specifically declared here, and only if they weren't defined before by someone
  * including common.h
  */
-#if !defined(ANDR_SUPPL) && !defined(COMMON_H)
+#ifndef COMMON_H
 typedef unsigned char   u8;
 typedef unsigned short 	u16;
 typedef unsigned long   u32;
 typedef unsigned long long u64;
-
 #ifndef BIT
 #define BIT(x) (1 << (x))
 #endif
-
 #endif
-
 
 #ifndef NULL
 #define NULL    (0)

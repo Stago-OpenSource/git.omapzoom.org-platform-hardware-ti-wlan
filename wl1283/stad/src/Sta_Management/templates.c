@@ -167,6 +167,60 @@ TI_STATUS buildDisconnTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate)
 	return TI_OK;
 }
 
+
+TI_STATUS buildLinkMeasurementReportTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate)
+{
+    paramInfo_t		 param;
+    TI_UINT16		 fc;
+    TI_UINT8        *pBuffer = pTemplate->ptr;
+
+    os_memoryZero(pSiteMgr->hOs, pBuffer, sizeof(LinkMeasurementReportTemplate_t));
+    pTemplate->len = 0;
+
+    
+    fc = DOT11_FC_ACTION;
+    COPY_WLAN_WORD(pBuffer, &fc); /* copy with endianess handling. */
+    pTemplate->len += 2;
+    pBuffer += 2;
+    
+
+    pBuffer += 2; /* Duration to be filled by the driver */
+    pTemplate->len += 2;
+    
+    pBuffer += 6; /* DA to be filled by the FW */
+    pTemplate->len += 6;
+
+    
+    /* Build Source address */
+	param.paramType = CTRL_DATA_MAC_ADDRESS;
+	ctrlData_getParam(pSiteMgr->hCtrlData, &param);
+	MAC_COPY (pBuffer, param.content.ctrlDataDeviceMacAddress);  
+    pBuffer += 6;
+    pTemplate->len += 6;
+
+    pBuffer += 6; /* BSSID to be filled by the FW */
+    pTemplate->len += 6;
+
+    pBuffer += 2; /* Sequence contorl to be filled by the FW */
+    pTemplate->len += 2;
+
+    
+    *pBuffer++ = CATEGORY_RRM; /* category */
+    *pBuffer++ = LINK_MEASUREMENT_REPORT; /* action */
+    pBuffer++; /* Dialog token be filled by the FW */
+    pTemplate->len += 3;
+        
+    *pBuffer++ = DOT11_TPC_REPORT_ELE_ID;
+    *pBuffer++ = DOT11_TPC_REPORT_ELE_LEN;
+
+    pTemplate->len += 8; /* TPC IE + 4 last fields to be filled by the FW */
+     
+    return TI_OK;
+}
+
+
+
+
 /** 
  * \fn     setDefaultProbeReqTemplate 
  * \brief  set Default Probe Req Template tp the FW.
@@ -183,7 +237,7 @@ void setDefaultProbeReqTemplate (TI_HANDLE	hSiteMgr)
     TSetTemplate        tTemplateStruct;
     probeReqTemplate_t  tProbeReqTemplate;
     TSsid               tBroadcastSSID;
-
+    
     /* 
      * Setting probe request temapltes for both bands.
      * allocating EMPTY 32 bytes for the SSID IE, to reserve space for different SSIDs the FW will set
@@ -194,11 +248,15 @@ void setDefaultProbeReqTemplate (TI_HANDLE	hSiteMgr)
     tTemplateStruct.type = PROBE_REQUEST_TEMPLATE;
     tTemplateStruct.eBand = RADIO_BAND_2_4_GHZ;
     tTemplateStruct.uRateMask = RATE_MASK_UNSPECIFIED;
+
+
     buildProbeReqTemplate (hSiteMgr, &tTemplateStruct, &tBroadcastSSID, RADIO_BAND_2_4_GHZ);
     TWD_CmdTemplate (pSiteMgr->hTWD, &tTemplateStruct, NULL, NULL);
+
     tTemplateStruct.eBand = RADIO_BAND_5_0_GHZ;
     buildProbeReqTemplate (hSiteMgr, &tTemplateStruct, &tBroadcastSSID, RADIO_BAND_5_0_GHZ);
     TWD_CmdTemplate (pSiteMgr->hTWD, &tTemplateStruct, NULL, NULL);
+
 }
 
 /************************************************************************
@@ -225,14 +283,18 @@ TI_STATUS buildProbeReqTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate, TS
 	char				*pBuf;
 	int i;
 	probeReqTemplate_t	*pBuffer = (probeReqTemplate_t	*)pTemplate->ptr;
-	TI_UINT32			 size;
+	TI_UINT32			 size = 0;
 	dot11_RATES_t		*pDot11Rates;	
 	TI_UINT32			 len = 0, ofdmIndex = 0;
 	TI_UINT32			 suppRatesLen, extSuppRatesLen;
 	TI_UINT8			 ratesBuf[DOT11_MAX_SUPPORTED_RATES];
+#ifndef SUPPL_WPS_SUPPORT
 	TI_UINT8             WSCOuiIe[DOT11_OUI_LEN] = { 0x00, 0x50, 0xf2, 0x04};
+#endif
 	TI_UINT32			 supportedRateMask,basicRateMask;	
 	TI_UINT16			 fc = DOT11_FC_PROBE_REQ;
+    TI_UINT8             wifiOUI[3] = DOT11_TPC_REPORT_VS_ELE_OUI;
+
 
 	os_memoryZero(pSiteMgr->hOs, pBuffer, sizeof(probeReqTemplate_t));
 
@@ -278,6 +340,7 @@ TI_STATUS buildProbeReqTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate, TS
 	size += sizeof(dot11_eleHdr_t) + pSsid->len;
 	pBuf += sizeof(dot11_eleHdr_t) + pSsid->len;
 
+     
 	/* Rates */
 	pDot11Rates = (dot11_RATES_t *) pBuf;
 
@@ -346,12 +409,39 @@ TI_STATUS buildProbeReqTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate, TS
 		pBuf += suppRatesLen + extSuppRatesLen;		
 	}
 
+    if (TI_TRUE == StaCap_IsRRMCapabilityEnabled(pSiteMgr->hStaCap)) 
+    {
+        /* DS IE */
+        ((dot11_DS_PARAMS_t *)(pBuf))->hdr[0] = DOT11_DS_PARAMS_ELE_ID;
+        ((dot11_DS_PARAMS_t *)(pBuf))->hdr[1] = DOT11_DS_PARAMS_ELE_LEN;
+        ((dot11_DS_PARAMS_t *)(pBuf))->currChannel = 0; /* To be filled by the FW */
+        size += sizeof(dot11_eleHdr_t) + DOT11_DS_PARAMS_ELE_LEN;
+        pBuf += sizeof(dot11_eleHdr_t) + DOT11_DS_PARAMS_ELE_LEN;
+    }
 
     /* add HT capabilities IE */
     StaCap_GetHtCapabilitiesIe (pSiteMgr->hStaCap, (TI_UINT8 *)pBuf, &len);
     size += len;
     pBuf += len;
 
+
+    if (TI_TRUE == StaCap_IsRRMCapabilityEnabled(pSiteMgr->hStaCap))
+    {
+        /* TPC Report WiFi Vendor sepcific IE */
+        *pBuf++ = DOT11_TPC_REPORT_VS_ELE_ID;
+        *pBuf++ = DOT11_TPC_REPORT_VS_ELE_LEN;
+        os_memoryCopy(pSiteMgr->hOs, (void*)pBuf, (void *)wifiOUI, DOT11_OUI_TYPE_LEN);
+        pBuf += DOT11_OUI_TYPE_LEN;
+
+        *pBuf++ = DOT11_TPC_REPORT_VS_ELE_OUI_TYPE;
+        *pBuf++ = DOT11_TPC_REPORT_VS_ELE_OUI_SUB_TYPE;
+        *pBuf++ = 0; /* transmit power to be filled by FW*/
+        *pBuf++ = 0; /* link margin */
+  
+        size += sizeof(dot11_eleHdr_t) + DOT11_TPC_REPORT_VS_ELE_LEN;
+    }
+
+#ifndef SUPPL_WPS_SUPPORT
     /* WiFi Simple Config */
     if (pSiteMgr->includeWSCinProbeReq && (pSiteMgr->siteMgrWSCCurrMode != TIWLN_SIMPLE_CONFIG_OFF))
     {
@@ -366,9 +456,19 @@ TI_STATUS buildProbeReqTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate, TS
         size += sizeof(dot11_eleHdr_t) + pSiteMgr->uWscIeSize + DOT11_OUI_LEN;
         pBuf += sizeof(dot11_eleHdr_t) + pSiteMgr->uWscIeSize + DOT11_OUI_LEN;	
     }
+#endif /*SUPPL_WPS_SUPPORT*/
 
-	pTemplate->len = size;
-	
+	if (pSiteMgr->uProbeReqExtraIesLen != 0)
+	{
+		os_memoryCopy(pSiteMgr->hOs, pBuf, pSiteMgr->probeReqExtraIes, pSiteMgr->uProbeReqExtraIesLen);
+		size += pSiteMgr->uProbeReqExtraIesLen;
+		pBuf += pSiteMgr->uProbeReqExtraIesLen;
+	}
+
+    
+    pTemplate->len = size;
+
+    
 	return TI_OK;
 }
 

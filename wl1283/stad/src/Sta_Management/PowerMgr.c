@@ -60,6 +60,7 @@
 #include "DrvMainModules.h"
 #include "PowerMgrKeepAlive.h"
 #include "CmdBld.h"
+#include "healthMonitor.h"
 
 
 /*****************************************************************************
@@ -69,12 +70,14 @@
 #define BET_DISABLE 0
 #define BET_ENABLE  1
 
+#define POWER_SAVE_GUARD_TIME_MS            5000       /* The gaurd time used to protect from FW stuck */
+
 
 /*****************************************************************************
  **         Private Function prototypes                                      **
  *****************************************************************************/
 
-static void         powerSaveCompleteCB(TI_HANDLE hPowerMgr,TI_UINT8 PSMode,TI_UINT8 transStatus);
+static void 		powerSaveReportCB(TI_HANDLE hPowerMgr, char* str , TI_UINT32 strLen);
 static void         PowerMgrTMThresholdCrossCB( TI_HANDLE hPowerMgr, TI_UINT32 cookie );
 static void         powerMgrDisableThresholdsIndications(TI_HANDLE hPowerMgr);
 static void         powerMgrEnableThresholdsIndications(TI_HANDLE hPowerMgr);
@@ -87,7 +90,9 @@ static void         PowerMgr_PsPollFailureCB( TI_HANDLE hPowerMgr );
 static void 		powerMgr_PsPollFailureTimeout( TI_HANDLE hPowerMgr, TI_BOOL bTwdInitOccured );
 static void 		powerMgr_SGSetUserDesiredwakeUpCond( TI_HANDLE hPowerMgr );
 static TI_STATUS    powerMgrSendMBXWakeUpConditions(TI_HANDLE hPowerMgr,TI_UINT8 listenInterval, ETnetWakeOn tnetWakeupOn);
-static TI_STATUS    powerMgrNullPacketRateConfiguration(TI_HANDLE hPowerMgr);
+static void 		powerMgrGuardTimerExpired (TI_HANDLE hPowerMgr, TI_BOOL bTwdInitOccured);
+static void 		powerMgrSetPsMode (TI_HANDLE hPowerMgr, E80211PsMode psMode, TI_HANDLE hPowerSaveCompleteCb,
+									   TPowerSaveResponseCb fCb);
 static PowerMgr_PowerMode_e powerMgrGetHighestPriority(TI_HANDLE hPowerMgr);
 
 
@@ -154,6 +159,11 @@ TI_STATUS PowerMgr_destroy(TI_HANDLE hPowerMgr)
         tmr_DestroyTimer (pPowerMgr->hRetryPsTimer);
     }
 
+	if (pPowerMgr->hEnterPsGuardTimer)
+    {
+        tmr_DestroyTimer (pPowerMgr->hEnterPsGuardTimer);
+    }
+
     if ( pPowerMgr->hPsPollFailureTimer != NULL )
     {
         tmr_DestroyTimer(pPowerMgr->hPsPollFailureTimer);
@@ -179,17 +189,45 @@ void PowerMgr_init (TStadHandlesList *pStadHandles)
 {
     PowerMgr_t *pPowerMgr = (PowerMgr_t*)(pStadHandles->hPowerMgr);
 
-    pPowerMgr->hReport          = pStadHandles->hReport;
-    pPowerMgr->hTrafficMonitor  = pStadHandles->hTrafficMon;
-    pPowerMgr->hSiteMgr         = pStadHandles->hSiteMgr;
-    pPowerMgr->hTWD             = pStadHandles->hTWD;
-    pPowerMgr->hSoftGemini      = pStadHandles->hSoftGemini;
-    pPowerMgr->hTimer           = pStadHandles->hTimer;
-    pPowerMgr->psEnable         = TI_FALSE;
-
+    pPowerMgr->hReport          	= pStadHandles->hReport;
+    pPowerMgr->hTrafficMonitor  	= pStadHandles->hTrafficMon;
+	pPowerMgr->hHealthMonitor		= pStadHandles->hHealthMonitor;
+    pPowerMgr->hSiteMgr         	= pStadHandles->hSiteMgr;
+    pPowerMgr->hTWD             	= pStadHandles->hTWD;
+    pPowerMgr->hSoftGemini      	= pStadHandles->hSoftGemini;
+    pPowerMgr->hTimer           	= pStadHandles->hTimer;
+	pPowerMgr->hQosMngr			= pStadHandles->hQosMngr;
+    pPowerMgr->psEnable         	= TI_FALSE;
+	pPowerMgr->psCurrentMode		= POWER_SAVE_OFF;
+	pPowerMgr->psLastRequest		= POWER_SAVE_OFF;
+    pPowerMgr->hRetryPsTimer		= NULL;
+	pPowerMgr->hPsPollFailureTimer	= NULL;
+	pPowerMgr->hEnterPsGuardTimer	= NULL;
+    
     /* initialize the power manager keep-alive sub module */
     powerMgrKL_init (pPowerMgr->hPowerMgrKeepAlive, pStadHandles);
 
+}
+
+/***************************************************************************************
+*                        PowerMgr_recover                                              *
+****************************************************************************************
+DESCRIPTION: Power Manager recovery function, called upon recovery.
+                                                                                                                 
+INPUT:     hPowerMgr  - The power mgr module handle
+
+OUTPUT:     
+
+RETURN:    void
+****************************************************************************************/
+void PowerMgr_recover(TI_HANDLE hPowerMgr)
+{
+    PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
+
+    if (pPowerMgr->psEnable && pPowerMgr->hEnterPsGuardTimer)
+	{
+		tmr_StopTimer(pPowerMgr->hEnterPsGuardTimer);
+	}
 }
 
 
@@ -334,14 +372,25 @@ TI_STATUS PowerMgr_SetDefaults (TI_HANDLE hPowerMgr, PowerMgrInitParams_t* pPowe
 
     /*create the timers */
     pPowerMgr->hRetryPsTimer = tmr_CreateTimer(pPowerMgr->hTimer);
-
     pPowerMgr->hPsPollFailureTimer = tmr_CreateTimer(pPowerMgr->hTimer);
+	pPowerMgr->hEnterPsGuardTimer = tmr_CreateTimer(pPowerMgr->hTimer);
 
-    if ( (pPowerMgr->hPsPollFailureTimer == NULL) || (pPowerMgr->hRetryPsTimer == NULL))
+    if ( (pPowerMgr->hPsPollFailureTimer == NULL) ||
+		 (pPowerMgr->hRetryPsTimer == NULL) ||
+		 (pPowerMgr->hEnterPsGuardTimer == NULL))
     {
-TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INIT, "PowerMgr_SetDefaults - ERROR creating timers - ABROTING init!\n");
-        return TI_NOK;
+		TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INIT, "PowerMgr_SetDefaults - ERROR creating timers - ABROTING init!\n");
+		return TI_NOK;
     }
+
+
+	/* Register and Enable the PS report event */
+    TWD_RegisterEvent (pPowerMgr->hTWD,
+        TWD_OWN_EVENT_PS_REPORT,
+        (void *)powerSaveReportCB, 
+        hPowerMgr);
+    TWD_EnableEvent (pPowerMgr->hTWD, TWD_OWN_EVENT_PS_REPORT);
+
 
     /* Register and Enable the PsPoll failure */
     TWD_RegisterEvent (pPowerMgr->hTWD,
@@ -392,19 +441,18 @@ TI_STATUS PowerMgr_startPS(TI_HANDLE hPowerMgr)
     }
 
     pPowerMgr->psEnable = TI_TRUE;
-    /*set the correct rate after connection*/
-    powerMgrNullPacketRateConfiguration(hPowerMgr);
+    
     /*
     if in auto mode then need to refer to the threshold cross indication from the traffic monitor,
     else it need to refer to the configured power mode profile from the user.
     */
     pPowerMgr->desiredPowerModeProfile = powerMgrGetHighestPriority(hPowerMgr);
 
-    if ( pPowerMgr->desiredPowerModeProfile == POWER_MODE_AUTO )
+    if ( pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE)
     {
         powerMgrStartAutoPowerMode(hPowerMgr);
     }
-    else /*not auto mode - according to the current profle*/
+ 	if ( pPowerMgr->desiredPowerModeProfile != POWER_MODE_AUTO) /*not auto mode - according to the current profle*/
     {
         powerMgrPowerProfileConfiguration(hPowerMgr, pPowerMgr->desiredPowerModeProfile);
     }
@@ -455,7 +503,6 @@ RETURN:    TI_STATUS - TI_OK or PENDING on success else TI_NOK.\n
 TI_STATUS PowerMgr_stopPS(TI_HANDLE hPowerMgr, TI_BOOL bDisconnect)
 {
     PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
-    /*TI_STATUS status;*/
 
     TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "PowerMgr_stopPS - called\n");
 
@@ -472,6 +519,7 @@ TI_STATUS PowerMgr_stopPS(TI_HANDLE hPowerMgr, TI_BOOL bDisconnect)
 
     pPowerMgr->psEnable = TI_FALSE;
     tmr_StopTimer (pPowerMgr->hRetryPsTimer);
+	tmr_StopTimer(pPowerMgr->hEnterPsGuardTimer);
 
     /* Check if PsPoll work-around is currently enabled */
     if ( pPowerMgr->powerMngModePriority[POWER_MANAGER_PS_POLL_FAILURE_PRIORITY].priorityEnable == TI_TRUE)
@@ -481,13 +529,18 @@ TI_STATUS PowerMgr_stopPS(TI_HANDLE hPowerMgr, TI_BOOL bDisconnect)
         powerMgr_PsPollFailureTimeout( hPowerMgr, TI_FALSE );
     }
 
-    if ( pPowerMgr->desiredPowerModeProfile == POWER_MODE_AUTO )
+    if ( pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE)
     {
         powerMgrDisableThresholdsIndications(hPowerMgr);
     }
 
-    TWD_SetPsMode (pPowerMgr->hTWD, POWER_SAVE_OFF, TI_FALSE, NULL, NULL, NULL);
+    /*stop rx auto streaming*/
+	if ( pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE && pPowerMgr->desiredPowerModeProfile != POWER_MODE_AUTO)
+	{
+		qosMngr_UpdatePsTraffic(pPowerMgr->hQosMngr,TI_FALSE);
+	}
 
+    
     /* set the power policy of the system */
     TWD_CfgSleepAuth (pPowerMgr->hTWD, pPowerMgr->defaultPowerLevel);
     if ((pPowerMgr->betEnable)&&( pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE ))
@@ -502,25 +555,10 @@ TI_STATUS PowerMgr_stopPS(TI_HANDLE hPowerMgr, TI_BOOL bDisconnect)
    /* also stop the power manager keep-alive sub module */
     powerMgrKL_stop (pPowerMgr->hPowerMgrKeepAlive, bDisconnect);
 
+	pPowerMgr->psCurrentMode 	= POWER_SAVE_OFF;
+	pPowerMgr->psLastRequest 	= POWER_SAVE_OFF;
+
     return TI_OK;
-}
-
-
-/****************************************************************************************
- *                        PowerMgr_getPsStatus                                                          *
- ****************************************************************************************
-DESCRIPTION: returns the 802.11 power save status (enable / disable).
-                                                                                                                               
-INPUT:          - hPowerMgr             - Handle to the Power Manager
-
-OUTPUT:     
-RETURN:    TI_BOOL - TI_TRUE if enable else TI_FALSE.\n
-****************************************************************************************/
-TI_BOOL PowerMgr_getPsStatus(TI_HANDLE hPowerMgr)
-{
-    PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
-
-    return  TWD_GetPsStatus (pPowerMgr->hTWD);
 }
 
 
@@ -557,6 +595,16 @@ TI_STATUS PowerMgr_setPowerMode(TI_HANDLE hPowerMgr)
         previousPowerModeProfile = pPowerMgr->desiredPowerModeProfile;
         pPowerMgr->desiredPowerModeProfile = powerMode;
 
+		/* Disable the auto rx streaming mechanism in case we move from ps state*/
+		if (pPowerMgr->desiredPowerModeProfile == POWER_MODE_ACTIVE || pPowerMgr->desiredPowerModeProfile == POWER_MODE_AUTO)
+		{
+			qosMngr_UpdatePsTraffic(pPowerMgr->hQosMngr,TI_FALSE);
+		}
+		if (previousPowerModeProfile != POWER_MODE_ACTIVE)
+		{
+			powerMgrDisableThresholdsIndications(hPowerMgr);
+		}
+
         if ( pPowerMgr->desiredPowerModeProfile == POWER_MODE_AUTO )
         {
             if ( pPowerMgr->psEnable == TI_TRUE )
@@ -570,16 +618,14 @@ TI_STATUS PowerMgr_setPowerMode(TI_HANDLE hPowerMgr)
             */
             return TI_OK;
         }
-        else if ( previousPowerModeProfile == POWER_MODE_AUTO )
-        {
-            /*
-            if the old power mode is AUTO and the new power mode is NOT then need
-            to disable the thresholds indications from the traffic monitor.
-            */
-            powerMgrDisableThresholdsIndications(hPowerMgr);
-        }
+		
         if ( pPowerMgr->psEnable == TI_TRUE )
         {
+        	if (pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE)
+        	{
+        		/*active the performance monitor thresholds indication for auto rx streaming*/
+        		powerMgrStartAutoPowerMode(hPowerMgr); 
+        	}
             powerMgrPowerProfileConfiguration(hPowerMgr, powerMode);
         }
     }
@@ -675,20 +721,20 @@ TI_STATUS powerMgr_setParam(TI_HANDLE thePowerMgrHandle,
 
     switch ( theParamP->paramType )
     {
-    case POWER_MGR_POWER_MODE:
+	case POWER_MGR_POWER_MODE:
         pPowerMgr->powerMngModePriority[theParamP->content.powerMngPowerMode.PowerMngPriority].powerMode
                         = theParamP->content.powerMngPowerMode.PowerMode;
         PowerMgr_setPowerMode(thePowerMgrHandle);
         if (pPowerMgr->betEnable)
-        PowerMgrConfigBetToFw(thePowerMgrHandle, pPowerMgr->betEnable );
+			PowerMgrConfigBetToFw(thePowerMgrHandle, pPowerMgr->betEnable );
         break;
 
-    case POWER_MGR_DISABLE_PRIORITY:
+	case POWER_MGR_DISABLE_PRIORITY:
         pPowerMgr->powerMngModePriority[theParamP->content.powerMngPriority].priorityEnable = TI_FALSE;
         PowerMgr_setPowerMode(thePowerMgrHandle);
         break;
 
-    case POWER_MGR_ENABLE_PRIORITY:
+	case POWER_MGR_ENABLE_PRIORITY:
         pPowerMgr->powerMngModePriority[theParamP->content.powerMngPriority].priorityEnable = TI_TRUE;
         PowerMgr_setPowerMode(thePowerMgrHandle);
         break;
@@ -787,43 +833,49 @@ TI_STATUS powerMgr_getParam(TI_HANDLE thePowerMgrHandle,
 
 
 /****************************************************************************************
- *                        powerSaveCompleteCB                                                       *
+ *                        powerSaveReportCB                                             *
  ****************************************************************************************
-DESCRIPTION: Callback for the Power server complete - gets the result of the request 
-              for PS or exit PS.
+DESCRIPTION: Callback for the TWD_OWN_EVENT_PS_REPORT event - gets the result of the request 
+              for enter PS. Exit PS request will not result in event.
                                                                                                                                
-INPUT:          - hPowerMgr             - Handle to the Power Manager
-            - PSMode
-            - trasStatus            - result string form the FW.
+INPUT:      - hPowerMgr             - Handle to the Power Manager
+            - str					- Buffer containing the event result.
+            - strLen                - Event result length.
 OUTPUT:     
 RETURN:    void.\n
 ****************************************************************************************/
-static void powerSaveCompleteCB(TI_HANDLE hPowerMgr,TI_UINT8 PSMode,TI_UINT8 transStatus)
+static void powerSaveReportCB(TI_HANDLE hPowerMgr, char* str , TI_UINT32 strLen)
 {
     PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
+	TI_UINT8           PowerSaveStatus;
 
-    TRACE1( pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "powerSaveCompleteCB, statud = %d\n", transStatus);
+
+	/*Report was received - stop the timer*/
+	tmr_StopTimer(pPowerMgr->hEnterPsGuardTimer);
+
+    /*copy the report status*/
+    os_memoryCopy(pPowerMgr->hOS, (void *)&PowerSaveStatus, (void *)str, sizeof(TI_UINT8));
+
+    TRACE1( pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "powerSaveReportCB, status = %d\n", PowerSaveStatus);
 
     /* Handling the event*/
-    switch ( (EventsPowerSave_e)transStatus )
+    switch ( (EventsPowerSave_e)PowerSaveStatus )
     {
-    case ENTER_POWER_SAVE_FAIL:
-    case EXIT_POWER_SAVE_FAIL:
-        pPowerMgr->lastPsTransaction = transStatus;
-        tmr_StartTimer (pPowerMgr->hRetryPsTimer,
-                        powerMgrRetryPsTimeout,
-                        (TI_HANDLE)pPowerMgr,
-                      RE_ENTER_PS_TIMEOUT,
-                      TI_FALSE);
-        break;
+		case ENTER_POWER_SAVE_FAIL:
+            tmr_StartTimer (pPowerMgr->hRetryPsTimer,
+							powerMgrRetryPsTimeout,
+							(TI_HANDLE)pPowerMgr,
+							RE_ENTER_PS_TIMEOUT,
+							TI_FALSE);
+			break;
 
-    case ENTER_POWER_SAVE_SUCCESS:
-    case EXIT_POWER_SAVE_SUCCESS:
-        break;
+		case ENTER_POWER_SAVE_SUCCESS:
+            pPowerMgr->psCurrentMode = POWER_SAVE_ON;
+            break;
 
-    default:
-        TRACE1( pPowerMgr->hReport, REPORT_SEVERITY_ERROR, "powerSaveCompleteCB: invliad status: %d\n", transStatus);
-        break;
+		default:
+			TRACE1( pPowerMgr->hReport, REPORT_SEVERITY_ERROR, "powerSaveReportCB: invliad status: %d\n", PowerSaveStatus);
+			break;
     }
 }
 
@@ -861,6 +913,11 @@ static void PowerMgrTMThresholdCrossCB( TI_HANDLE hPowerMgr, TI_UINT32 cookie )
             break;
         }
     }
+	else if ((pPowerMgr->psEnable == TI_TRUE) && (pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE))
+	{
+		TI_BOOL bPsTrafficOn = ((PowerMgr_PowerMode_e)cookie == POWER_MODE_ACTIVE) ? TI_TRUE : TI_FALSE;
+		qosMngr_UpdatePsTraffic(pPowerMgr->hQosMngr,bPsTrafficOn);
+	}
     else
     {
         TRACE2( pPowerMgr->hReport, REPORT_SEVERITY_ERROR, "PowerMgrTMThresholdCrossCB: TM motification when psEnable is :%d or desired profile is: %d\n", pPowerMgr->psEnable, pPowerMgr->desiredPowerModeProfile);
@@ -946,13 +1003,30 @@ static void powerMgrStartAutoPowerMode(TI_HANDLE hPowerMgr)
     TRACE0( pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "powerMgrStartAutoPowerMode: Starting auto power mode,");
 
     /*Activates the correct profile*/
-    if ( frameCount >= pPowerMgr->autoModeActiveTH )
+    /*Activate the active profile just in case frame count bigger than active TH and bigger than 0*/
+    if ( frameCount >= pPowerMgr->autoModeActiveTH && frameCount > 0)
     {
-        powerMgrPowerProfileConfiguration(hPowerMgr, POWER_MODE_ACTIVE);
+    	if (pPowerMgr->desiredPowerModeProfile == POWER_MODE_AUTO)
+    		{
+	        	powerMgrPowerProfileConfiguration(hPowerMgr, POWER_MODE_ACTIVE);
+    		}
+		else if(pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE)
+			{
+				/*In power save mode inform the qos manager that auto rx streaming can be activated*/
+				qosMngr_UpdatePsTraffic(pPowerMgr->hQosMngr,TI_TRUE);
+			}
     }
     else
     {
-        powerMgrPowerProfileConfiguration(hPowerMgr, pPowerMgr->autoModeDozeMode);
+    	if (pPowerMgr->desiredPowerModeProfile == POWER_MODE_AUTO)
+    		{
+	        	powerMgrPowerProfileConfiguration(hPowerMgr, pPowerMgr->autoModeDozeMode);
+    		}
+		else if(pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE)
+			{
+				/*In power save mode inform the qos manager that auto rx streaming should be deactivated*/
+				qosMngr_UpdatePsTraffic(pPowerMgr->hQosMngr,TI_FALSE);
+			}
 
     }
     /* Activates the Trafic monitoe Events*/        
@@ -975,16 +1049,13 @@ static void powerMgrRetryPsTimeout(TI_HANDLE hPowerMgr, TI_BOOL bTwdInitOccured)
 {
     PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
 
-    TRACE0( pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "powerMgrRetryPsTimeout: timer expired.\n");
+    TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "powerMgrRetryPsTimeout: timer expired.\n");
 
-    if ( pPowerMgr->lastPsTransaction == ENTER_POWER_SAVE_FAIL )
+    if (pPowerMgr->lastPsTransaction == ENTER_POWER_SAVE_FAIL)
     {
-        TWD_SetPsMode (pPowerMgr->hTWD, POWER_SAVE_ON, TI_TRUE, hPowerMgr,powerSaveCompleteCB, NULL);/*NULL as GWSI callback*/
+		powerMgrSetPsMode (hPowerMgr, POWER_SAVE_ON, NULL, NULL);
     }
-    else
-    {
-        TWD_SetPsMode (pPowerMgr->hTWD, POWER_SAVE_OFF, TI_TRUE, hPowerMgr, powerSaveCompleteCB, NULL);/*NULL as GWSI callback*/
-    }
+    
 	return;
 }
 
@@ -1015,12 +1086,7 @@ static void powerMgrPowerProfileConfiguration(TI_HANDLE hPowerMgr, PowerMgr_Powe
 
     case POWER_MODE_ACTIVE:
         /* set AWAKE through */
-        TWD_SetPsMode (pPowerMgr->hTWD,
-                                          POWER_SAVE_OFF, 
-                                          TI_TRUE, 
-                                          hPowerMgr,
-                                          powerSaveCompleteCB,
-                                          NULL);
+        powerMgrSetPsMode (hPowerMgr, POWER_SAVE_OFF, NULL, NULL);
 
         TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "PowerMode==ACTIVE\n");
         break;
@@ -1035,13 +1101,8 @@ static void powerMgrPowerProfileConfiguration(TI_HANDLE hPowerMgr, PowerMgr_Powe
             powerMgrSendMBXWakeUpConditions(hPowerMgr,pPowerMgr->beaconListenInterval,TNET_WAKE_ON_BEACON);     
         }
 
-        TWD_SetPsMode (pPowerMgr->hTWD, 
-                                          POWER_SAVE_ON, 
-                                          TI_TRUE, 
-                                          hPowerMgr,
-                                          powerSaveCompleteCB,
-                                          NULL);
-
+        powerMgrSetPsMode (hPowerMgr, POWER_SAVE_ON, NULL, NULL);
+        
         TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "PowerMode==SHORT_DOZE\n");
         break;
 
@@ -1054,13 +1115,9 @@ static void powerMgrPowerProfileConfiguration(TI_HANDLE hPowerMgr, PowerMgr_Powe
         {
             powerMgrSendMBXWakeUpConditions(hPowerMgr,pPowerMgr->dtimListenInterval,TNET_WAKE_ON_DTIM);     
         }
-        TWD_SetPsMode (pPowerMgr->hTWD, 
-                                          POWER_SAVE_ON, 
-                                          TI_TRUE, 
-                                          hPowerMgr,
-                                          powerSaveCompleteCB,
-                                          NULL);
 
+        powerMgrSetPsMode (hPowerMgr, POWER_SAVE_ON, NULL, NULL);
+        
         TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "PowerMode==LONG_DOZE\n");
         break;
 
@@ -1068,13 +1125,8 @@ static void powerMgrPowerProfileConfiguration(TI_HANDLE hPowerMgr, PowerMgr_Powe
 		/* When in SG PS mode, configure the user desired wake-up condition */
 		powerMgr_SGSetUserDesiredwakeUpCond(pPowerMgr);
 
-        TWD_SetPsMode (pPowerMgr->hTWD, 
-                                          POWER_SAVE_ON, 
-                                          TI_TRUE, 
-                                          hPowerMgr,
-                                          powerSaveCompleteCB,
-                                          NULL);
-
+        powerMgrSetPsMode (hPowerMgr, POWER_SAVE_ON, NULL, NULL);
+        
         TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "PowerMode==PS_ONLY\n");
         break;
 
@@ -1082,7 +1134,6 @@ static void powerMgrPowerProfileConfiguration(TI_HANDLE hPowerMgr, PowerMgr_Powe
         TRACE1(pPowerMgr->hReport, REPORT_SEVERITY_ERROR, "PowerMgr_setWakeUpConfiguration - ERROR - PowerMode - unknown parameter: %d\n", desiredPowerMode);
         return;
     }
-
 }
 
 
@@ -1120,27 +1171,6 @@ static TI_STATUS powerMgrSendMBXWakeUpConditions(TI_HANDLE hPowerMgr,
 
 
 
-
-static TI_STATUS powerMgrNullPacketRateConfiguration(TI_HANDLE hPowerMgr)
-{
-    paramInfo_t     param;
-    PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
-
-    param.paramType = SITE_MGR_CURRENT_RATE_PAIR_PARAM;
-    if ( siteMgr_getParam(pPowerMgr->hSiteMgr, &param) == TI_OK )
-    {
-        TWD_SetNullRateModulation (pPowerMgr->hTWD, (TI_UINT16)param.content.siteMgrCurrentRateMask.basicRateMask);
-    }
-    else
-    {
-        TWD_SetNullRateModulation (pPowerMgr->hTWD, (DRV_RATE_MASK_1_BARKER | DRV_RATE_MASK_2_BARKER));
-        TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_ERROR, "powerMgrNullPacketRateConfiguration: error - faild to set rate so default was seted!\n");
-    }
-    return TI_OK;
-
-}
-
-
 static PowerMgr_PowerMode_e powerMgrGetHighestPriority(TI_HANDLE hPowerMgr)
 {
     PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
@@ -1176,9 +1206,12 @@ TI_STATUS PowerMgr_notifyFWReset(TI_HANDLE hPowerMgr)
 
     TRACE2(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "PowerMgr_notifyFWReset(): psEnable = %d, lastPowerModeProfile = %d\n", pPowerMgr->psEnable, pPowerMgr->lastPowerModeProfile);
 
+	pPowerMgr->psCurrentMode = POWER_SAVE_OFF;
+	pPowerMgr->psLastRequest = POWER_SAVE_OFF;
+
 	if (pPowerMgr->psEnable)
 	{
-		powerMgrPowerProfileConfiguration(hPowerMgr, pPowerMgr->lastPowerModeProfile);
+        powerMgrPowerProfileConfiguration(hPowerMgr, pPowerMgr->lastPowerModeProfile);
 	}
 	
     return TI_OK;
@@ -1397,7 +1430,7 @@ static void powerMgr_PsPollFailureTimeout( TI_HANDLE hPowerMgr, TI_BOOL bTwdInit
     paramInfo_t param;
 
     TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, " \n");
-    
+
     /* disable Ps-Poll priority */
     param.paramType = POWER_MGR_DISABLE_PRIORITY;
     param.content.powerMngPriority = POWER_MANAGER_PS_POLL_FAILURE_PRIORITY;
@@ -1410,4 +1443,74 @@ TI_BOOL PowerMgr_getReAuthActivePriority(TI_HANDLE thePowerMgrHandle)
 {
     PowerMgr_t *pPowerMgr = (PowerMgr_t*)thePowerMgrHandle;
 	return pPowerMgr->reAuthActivePriority;
+}
+
+/***************************************************************************************
+*                        powerMgrSetPsMode  										   *
+****************************************************************************************
+DESCRIPTION: Set the power save mode by calling TWD API.
+				                                                                                               
+INPUT:      	- hPowerMgr - Handle to the Power Manager	
+OUTPUT:		
+RETURN:    
+****************************************************************************************/
+static void powerMgrSetPsMode (TI_HANDLE hPowerMgr, E80211PsMode psMode,
+                               TI_HANDLE hPowerSaveCompleteCb, TPowerSaveResponseCb fCb)
+{
+	PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
+
+
+    
+    /* if already in rqeuired PS mode - don't send the request*/
+	if (pPowerMgr->psCurrentMode == pPowerMgr->psLastRequest)
+	{
+        if (pPowerMgr->psCurrentMode == psMode)
+			return;
+	}
+
+    /* timer might be running - stop it before sending the new request*/
+    tmr_StopTimer(pPowerMgr->hEnterPsGuardTimer);
+
+    
+	if (psMode == POWER_SAVE_ON)
+	{
+		pPowerMgr->psLastRequest = POWER_SAVE_ON;
+		/* if enter PS -> start the guard timer, which is used to protect from FW stuck */
+        tmr_StartTimer (pPowerMgr->hEnterPsGuardTimer,
+						powerMgrGuardTimerExpired,
+						hPowerMgr,
+						POWER_SAVE_GUARD_TIME_MS,
+						TI_FALSE);
+	}
+	else
+	{
+		pPowerMgr->psLastRequest = pPowerMgr->psCurrentMode = POWER_SAVE_OFF;
+	}
+
+    /* call the TWD API*/
+    TWD_SetPsMode (pPowerMgr->hTWD, psMode, hPowerSaveCompleteCb, fCb);
+}
+
+/****************************************************************************************
+*                               powerMgrGuardTimerExpired                               *
+*****************************************************************************************
+DESCRIPTION: This function is called upon timer expiry - when the FW has not returned
+             a response within the defined timeout
+                                                                                                                  
+INPUT:      hPowerMgr     - handle to the PowerMgr object.
+            bTwdInitOccured - Indicates if TWDriver recovery occured since timer started 
+
+OUTPUT:    None
+
+RETURN:    None
+****************************************************************************************/
+static void powerMgrGuardTimerExpired (TI_HANDLE hPowerMgr, TI_BOOL bTwdInitOccured)
+{
+    PowerMgr_t *pPowerMgr = (PowerMgr_t*)hPowerMgr;
+
+    /* Print an error message */
+	TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_ERROR, "PS guard timer expired!\n");
+    
+    /* Trigger PS recovery */
+    healthMonitor_sendFailureEvent(pPowerMgr->hHealthMonitor, POWER_SAVE_FAILURE);
 }

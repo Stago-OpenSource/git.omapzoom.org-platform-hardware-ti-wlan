@@ -136,7 +136,19 @@ extern void cmdBld_FinalizeDownload (TI_HANDLE hCmdBld, TBootAttr *pBootAttr, Fw
 #define DRIVE_STRENGTH_MASK 6
 /* time to wait till we check if fw is running */
 #define STALL_TIMEOUT   7
+
+#ifdef DOWNLOAD_TIMER_REQUIERD
 #define FIN_LOOP 10
+#endif
+
+
+#ifdef _VLCT_
+#define FIN_LOOP 10
+#else
+#define FIN_LOOP 20000
+#endif
+
+
 
 /************************************************************************
  * Macros
@@ -188,7 +200,7 @@ extern void cmdBld_FinalizeDownload (TI_HANDLE hCmdBld, TBootAttr *pBootAttr, Fw
                         SET_PARTITION(pPartition,PARTITION_WORK_MEM_ADDR1, PARTITION_WORK_MEM_SIZE1, PARTITION_WORK_MEM_ADDR2, PARTITION_WORK_MEM_SIZE2, PARTITION_WORK_MEM_ADDR3, PARTITION_WORK_MEM_SIZE3, PARTITION_WORK_MEM_ADDR4)
 
 /* Handle return status inside a state machine */
-#define EXCEPT(phwinit,status)                                   \
+#define EXCEPT(phwinit,status)                                  \
     switch (status) {                                           \
         case TI_OK:                                             \
         case TXN_STATUS_OK:                                     \
@@ -197,7 +209,8 @@ extern void cmdBld_FinalizeDownload (TI_HANDLE hCmdBld, TBootAttr *pBootAttr, Fw
         case TXN_STATUS_PENDING:                                \
              return TXN_STATUS_PENDING;                         \
         default:                                                \
-             TWD_FinalizeOnFailure (phwinit->hTWD);             \
+            if(phwinit != NULL)                                 \
+                TWD_FinalizeOnFailure (phwinit->hTWD);          \
              return TXN_STATUS_ERROR;                           \
     }
 
@@ -319,7 +332,6 @@ typedef struct
     TI_UINT32               uElpCmd;      
     /* Chip ID */
     TI_UINT32               uChipId;      
-    TI_BOOL                 bIsFREFClock;     
     /* Boot state machine temporary data */
     TI_UINT32               uBootData;    
     TI_UINT32               uSelfClearTime;
@@ -369,6 +381,7 @@ typedef struct
     TFwStaticTxn            tFwStaticTxn;
 
 #ifdef TNETW1283
+    TI_BOOL                 bIsFREFClock;  
     /* PLL config stage */
     TI_UINT32               uPllStage; 
     TI_UINT32               uPllPendingFlag; 
@@ -400,7 +413,9 @@ static TI_STATUS hwInit_InitTopRegisterWrite(TI_HANDLE hHwInit, TI_UINT32 uAddre
 #ifdef TNETW1283
 static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit);
 #endif
+#ifdef DOWNLOAD_TIMER_REQUIERD
 static void      hwInit_StallTimerCb                (TI_HANDLE hHwInit, TI_BOOL bTwdInitOccured);
+#endif
 
 /*******************************************************************************
 *                       PUBLIC  FUNCTIONS  IMPLEMENTATION                      *
@@ -456,7 +471,10 @@ TI_STATUS hwInit_Destroy (TI_HANDLE hHwInit)
 
         if (pHwInit->hStallTimer)
         {
-        tmr_DestroyTimer (pHwInit->hStallTimer);
+#ifdef DOWNLOAD_TIMER_REQUIERD
+		tmr_DestroyTimer (pHwInit->hStallTimer);
+#endif
+
         }        
 
     /* Free HwInit Module */
@@ -503,11 +521,13 @@ TI_STATUS hwInit_Init (TI_HANDLE      hHwInit,
         TXN_PARAM_SET(pTxn, TXN_LOW_PRIORITY, TXN_FUNC_ID_WLAN, TXN_DIRECTION_WRITE, TXN_INC_ADDR)
     }
 
+#ifdef DOWNLOAD_TIMER_REQUIERD
 	pHwInit->hStallTimer = tmr_CreateTimer (hTimer);
 	if (pHwInit->hStallTimer == NULL) 
 	{
 		return TI_NOK;
 	}
+#endif
 
     TRACE0(pHwInit->hReport, REPORT_SEVERITY_INIT, ".....HwInit configured successfully\n");
     
@@ -593,8 +613,9 @@ TI_STATUS hwInit_Boot (TI_HANDLE hHwInit)
     TWlanParams  *pWlanParams = &DB_WLAN(pTWD->hCmdBld);
     TBootAttr     tBootAttr;
 
-    tBootAttr.MacClock = pWlanParams->MacClock;
-    tBootAttr.ArmClock = pWlanParams->ArmClock;
+    tBootAttr.MacClock      = pWlanParams->MacClock;
+    tBootAttr.ArmClock      = pWlanParams->ArmClock;
+    tBootAttr.FirmwareDebug = TI_FALSE;
 
     /*
      * Initialize the status of download to  pending 
@@ -664,7 +685,7 @@ static TI_STATUS hwInit_BootSm (TI_HANDLE hHwInit)
 #endif
 
 #ifdef TNETW1283
-        WLAN_OS_REPORT(("hwInit_BootSm: NewPllAlgo = %d\n", pWlanParams->NewPllAlgo));
+        TRACE1(pHwInit->hReport, REPORT_SEVERITY_INIT ,"hwInit_BootSm: NewPllAlgo = %d\n", pWlanParams->NewPllAlgo);
         if (pWlanParams->NewPllAlgo)
         {
              /*
@@ -672,14 +693,14 @@ static TI_STATUS hwInit_BootSm (TI_HANDLE hHwInit)
               * Skip TRIO setting of register PLL_PARAMETERS(6040) and WU_COUNTER_PAUSE(6008)
               * Continue from WELP_ARM_COMMAND(6100) setting - Continue the ELP wake up sequence
               */
-            WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm: Call hwInit_PllConfigSm\n"));
+            TRACE0(pHwInit->hReport, REPORT_SEVERITY_INIT ,"NEW PLL ALGO - hwInit_BootSm: Call hwInit_PllConfigSm\n");
              /* Call PLL configuration state machine */
             pHwInit->uPllStage = 0;
             pHwInit->uPllPendingFlag = 0;
             pHwInit->uClockConfig = 0;
             status = hwInit_PllConfigSm(pHwInit);
         
-            WLAN_OS_REPORT(("hwInit_BootSm: hwInit_PllConfigSm return status = %d\n", status));
+            TRACE1(pHwInit->hReport, REPORT_SEVERITY_INIT ,"hwInit_BootSm: hwInit_PllConfigSm return status = %d\n", status);
 
             EXCEPT (pHwInit, status)
         }
@@ -732,7 +753,7 @@ static TI_STATUS hwInit_BootSm (TI_HANDLE hHwInit)
 #ifdef TNETW1283
         if (pWlanParams->NewPllAlgo)
         {
-            WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm: stage 1 entry\n"));
+            TRACE0(pHwInit->hReport, REPORT_SEVERITY_INIT ,"NEW PLL ALGO - hwInit_BootSm: stage 1 entry\n");
         }
         else
 #endif
@@ -804,25 +825,21 @@ static TI_STATUS hwInit_BootSm (TI_HANDLE hHwInit)
         pHwInit->uTxnIndex = 0; /* Reset index only after getting the last read value! */
         
 #ifdef TNETW1283 
-WLAN_OS_REPORT(("\n **** in BootSM, setting clkVal,  pHwInit->bIsFREFClock=%d  *****\n", pHwInit->bIsFREFClock));
+        TRACE1(pHwInit->hReport, REPORT_SEVERITY_INIT ,"\n **** in BootSM, setting clkVal,  pHwInit->bIsFREFClock=%d  *****\n", pHwInit->bIsFREFClock);
         if (pHwInit->bIsFREFClock == TI_TRUE)
         {
-            clkVal |= (pGenParams->RefClk << 1) << 4;
+            clkVal |= ((pGenParams->RefClk & 0x3) << 1) << 4;
         }
         else
         {
-            clkVal |= (pWlanParams->TcxoRefClk << 1) << 4;
+            clkVal |= ((pWlanParams->TcxoRefClk & 0x3) << 1) << 4;
         }
         
 #else
-        clkVal |= (pGenParams->RefClk << 1) << 4;
+        clkVal |= ((pGenParams->RefClk & 0x3) << 1) << 4;
 #endif
 
-#ifdef TNETW1283
-        if ((pGenParams->GeneralSettings[0] & DRPw_MASK_CHECK) > 0)
-#else
-        if ((pGenParams->GeneralSettings & DRPw_MASK_CHECK) > 0)
-#endif            
+        if ((pGenParams->GeneralSettings[0] & DRPw_MASK_CHECK) > 0)          
         {
             clkVal |= DRPw_MASK_SET;
         }
@@ -873,6 +890,10 @@ WLAN_OS_REPORT(("\n **** in BootSM, setting clkVal,  pHwInit->bIsFREFClock=%d  *
 		else if (pHwInit->uChipId == CHIP_ID_1283_PG10)
         {
             WLAN_OS_REPORT(("Working on a 1283 PG 1.0 board.\n"));
+        }
+        else if (pHwInit->uChipId == CHIP_ID_1283_PG20)
+        {
+            WLAN_OS_REPORT(("Working on a 1283 PG 2.0 board.\n"));
         }
         else 
         {
@@ -1127,13 +1148,13 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
 
     pHwInit->bIsFREFClock = TI_FALSE;
     
-    WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_PllConfigSm: entry, uPllStage=%d\n", pHwInit->uPllStage));
+    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_PllConfigSm: entry, uPllStage=%d\n", pHwInit->uPllStage);
     /*
      * Select FREF or TCXO clock 
      */
     while (TI_TRUE)
     {
-        WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_PllConfigSm( uPllStage = %d ): while\n", pHwInit->uPllStage));
+        TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_PllConfigSm( uPllStage = %d ): while\n", pHwInit->uPllStage);
         switch (pHwInit->uPllStage)
         {
 
@@ -1161,23 +1182,23 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
 
             
             
-            WLAN_OS_REPORT(("\n TCXO CLOCK=%d, FREF CLOCK=%d !!!!!! \n", pWlanParams->TcxoRefClk, pGenParams->RefClk));
-            WLAN_OS_REPORT(("\n CHIP ID Found --->>>  0x%x !!!!!! \n", pHwInit->uChipId));
-            WLAN_OS_REPORT(("pWlanParams->PlatformConfiguration = 0x%x  <------\n",pWlanParams->PlatformConfiguration));
+            TRACE2(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n TCXO CLOCK=%d, FREF CLOCK=%d !!!!!! \n", pWlanParams->TcxoRefClk, pGenParams->RefClk);
+            TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n CHIP ID Found --->>>  0x%x !!!!!! \n", pHwInit->uChipId);
+            TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"pWlanParams->PlatformConfiguration = 0x%x  <------\n",pWlanParams->PlatformConfiguration);
             
 
             
             if (CHIP_ID_1283_PG10 == pHwInit->uChipId) 
             {
-                WLAN_OS_REPORT(("\n CHIP PG1.0 Detected !!!!!!!!!!!!! \n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n CHIP PG1.0 Detected !!!!!!!!!!!!! \n");
             }
             else if (CHIP_ID_1283_PG20 == pHwInit->uChipId) 
             {
-                WLAN_OS_REPORT(("\n CHIP PG2.0 Detected !!!!!!!!!!!!1! \n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n CHIP PG2.0 Detected !!!!!!!!!!!!1! \n");
             }
             else
             {
-                WLAN_OS_REPORT(("\n ERROR!!!!!!!!: unrecognized chip ID found!!! \n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n ERROR!!!!!!!!: unrecognized chip ID found!!! \n");
             }   
 
             
@@ -1192,7 +1213,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
             
             
             
-            WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_PllConfigSm(1): read SYS_CLK_CFG_REG\n"));
+            TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_PllConfigSm(1): read SYS_CLK_CFG_REG\n");
 
             /* 
              * Read clock source FREF or TCXO 
@@ -1216,19 +1237,19 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
                 /* 
                  * if bit 4 is set - working with FREF clock, skip to FREF wait 15 msec stage
                  */
-                WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(2): bit 4 is set(SYS_CLK_CFG_REG=0x%x), working with FREF clock!!!\n", pHwInit->uClockConfig));
+                TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(2): bit 4 is set(SYS_CLK_CFG_REG=0x%x), working with FREF clock!!!\n", pHwInit->uClockConfig);
                 if (CHIP_ID_1283_PG10 == pHwInit->uChipId) 
                 {
-                    WLAN_OS_REPORT(("\n CHIP PG1.0 Detected, Moving to stage 6 (FREF Detection)!!! \n"));
+                    TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n CHIP PG1.0 Detected, Moving to stage 6 (FREF Detection)!!! \n");
                     pHwInit->uPllStage = 6; 
                 }
                 else if (CHIP_ID_1283_PG20 == pHwInit->uChipId) 
                 {
-                    WLAN_OS_REPORT(("\n CHIP PG2.0 Detected!!! \n"));
+                    TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n CHIP PG2.0 Detected!!! \n");
                 }
                 else
                 {
-                    WLAN_OS_REPORT(("\n ERROR!!!!!!!!: unrecognized chip ID found!!! \n"));
+                    TRACE0(pHwInit->hReport,REPORT_SEVERITY_ERROR,"\n ERROR!!!!!!!!: unrecognized chip ID found!!! \n");
                     continue;
                 }   
                 
@@ -1239,7 +1260,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
             /* 
              * if bit 3 is clear - working with TCXO clock
              */
-            WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(2): bit 3 is clear(SYS_CLK_CFG_REG=0x%x), working with TCXO clock, read TCXO_CLK_DETECT_REG\n", pHwInit->uClockConfig));
+            TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(2): bit 3 is clear(SYS_CLK_CFG_REG=0x%x), working with TCXO clock, read TCXO_CLK_DETECT_REG\n", pHwInit->uClockConfig);
             continue;
 
 #ifndef TNETW1283
@@ -1259,7 +1280,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
             pHwInit->uTxnIndex = 0;
 
 
-            WLAN_OS_REPORT(("\n In stage 3, pWlanParams->TcxoRefClk=%d \n", pWlanParams->TcxoRefClk));
+            TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n In stage 3, pWlanParams->TcxoRefClk=%d \n", pWlanParams->TcxoRefClk);
             
 #ifndef TNETW1283            
             /* 
@@ -1270,7 +1291,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
                 /* 
                  * if bit 4 is set - TCXO detect failure
                  */
-                WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(3): ERROR !!!!!!!! bit 4 is set, TCXO Detect failed\n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_ERROR,"NEW PLL ALGO - hwInit_BootSm(3): ERROR !!!!!!!! bit 4 is set, TCXO Detect failed\n");
             }
 #endif
 
@@ -1282,7 +1303,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
                 /* 
                  * not 16.368Mhz and not 32.736Mhz - skip to configure ELP stage
                  */
-                WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(3): TcxoRefClk=%d - not 16.368Mhz and not 32.736Mhz - skip to configure ELP stage\n", pWlanParams->TcxoRefClk));
+                TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(3): TcxoRefClk=%d - not 16.368Mhz and not 32.736Mhz - skip to configure ELP stage\n", pWlanParams->TcxoRefClk);
                 pHwInit->uPllStage = 6;
                 continue;
             }
@@ -1291,7 +1312,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
              * 2. TCXO to FREF switch
              * ----------------------
              */
-            WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(3): TcxoRefClk=%d - 16.368Mhz or 32.736Mhz - TCXO to FREF switch started: \n", pWlanParams->TcxoRefClk));
+            TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(3): TcxoRefClk=%d - 16.368Mhz or 32.736Mhz - TCXO to FREF switch started: \n", pWlanParams->TcxoRefClk);
 
             /* 
              * Write enable FREF_CLK_REQ 
@@ -1321,7 +1342,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
              */
             pHwInit->uPllStage++;
 
-            WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(3): Wait settling time, Read FREF_CLK_DETECT_REG\n"));
+            TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(3): Wait settling time, Read FREF_CLK_DETECT_REG\n");
 #ifdef TNETW1283
             os_StalluSec (pHwInit->hOs, 15000); /* Wait for 15 msec */
             continue;
@@ -1354,7 +1375,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
                 /* 
                  * if bit 4 is set - FREF detect failure
                  */
-                WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(5): FREF_CLK_DETECT_REG=0x%x, ERROR !!!!!!!! bit 4 is set, FREF Detect failed\n", uData));
+                TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(5): FREF_CLK_DETECT_REG=0x%x, ERROR !!!!!!!! bit 4 is set, FREF Detect failed\n", uData);
             }
 #endif
 
@@ -1366,7 +1387,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
             {
                 pHwInit->uClockConfig |= (MCS_PLL_CLK_SEL_FREF | PRCM_CM_EN_MUX_WLAN_FREF);
                 status = hwInit_InitTopRegisterWrite(hHwInit, SYS_CLK_CFG_REG, pHwInit->uClockConfig); 
-                WLAN_OS_REPORT(("\n NEW PLL ALGO - hwInit_BootSm(5): Configure MCS and WLAN to FREF. uClockConfig=0x%x \n", pHwInit->uClockConfig));           
+                TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n NEW PLL ALGO - hwInit_BootSm(5): Configure MCS and WLAN to FREF. uClockConfig=0x%x \n", pHwInit->uClockConfig);           
                 
             }
             continue;
@@ -1385,7 +1406,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
              */
             if (CHIP_ID_1283_PG10 == pHwInit->uChipId) 
             {
-                WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(6): Configure PLL_LOCK_COUNTERS_REG for PG1.0 only \n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(6): Configure PLL_LOCK_COUNTERS_REG for PG1.0 only \n");
                 uData = PLL_LOCK_COUNTERS_COEX | PLL_LOCK_COUNTERS_MCS;
                 status = hwInit_InitTopRegisterWrite(hHwInit, PLL_LOCK_COUNTERS_REG, uData);            
                 pHwInit->uTxnIndex++;  
@@ -1395,7 +1416,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
              * Read MCS PLL in order to set only bits[6:4]
              */
             
-            WLAN_OS_REPORT(("\n NEW PLL ALGO - hwInit_BootSm(6): Read MCS PLL in order to set only bits[6:4]\n"));
+            TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n NEW PLL ALGO - hwInit_BootSm(6): Read MCS PLL in order to set only bits[6:4]\n");
             status = hwInit_InitTopRegisterRead(hHwInit, MCS_PLL_CONFIG_REG);            
             if (status == TXN_STATUS_PENDING) pHwInit->uPllPendingFlag = 1;
     
@@ -1409,13 +1430,13 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
             uData = pHwInit->uTopRegValue; 
             pHwInit->uTxnIndex = 0;
 
-            WLAN_OS_REPORT(("\n [stage 7]: MCS_PLL_CONFIG_REG=0x%x ****** \n", pHwInit->uTopRegValue));
+            TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n [stage 7]: MCS_PLL_CONFIG_REG=0x%x ****** \n", pHwInit->uTopRegValue);
             
 
 
             if (CHIP_ID_1283_PG20 == pHwInit->uChipId) 
             {
-                WLAN_OS_REPORT(("\n Setting bit 2 in spare register to avoid illegal access \n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n Setting bit 2 in spare register to avoid illegal access \n");
                 uData = WL_SPARE_VAL; 
                 status = hwInit_InitTopRegisterWrite(hHwInit, WL_SPARE_REG, uData);  
 
@@ -1423,7 +1444,7 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
                 {
                     if ((CLOCK_CONFIG_16_8_M == pGenParams->TcxoRefClk) || (CLOCK_CONFIG_33_6_M == pGenParams->TcxoRefClk)) 
                     {
-                        WLAN_OS_REPORT(("\n 16_8_M or 33_6_M TCXO detected so configure the MCS PLL settings manually!!!! \n")); 
+                        TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n 16_8_M or 33_6_M TCXO detected so configure the MCS PLL settings manually!!!! \n"); 
                         status = hwInit_InitTopRegisterWrite(hHwInit, MCS_PLL_M_REG, MCS_PLL_M_REG_VAL);
                         status = hwInit_InitTopRegisterWrite(hHwInit, MCS_PLL_N_REG, MCS_PLL_N_REG_VAL);
                         status = hwInit_InitTopRegisterWrite(hHwInit, MCS_PLL_CONFIG_REG, MCS_PLL_CONFIG_REG_VAL);
@@ -1437,76 +1458,76 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
             /* 
              * Set the MCS PLL input frequency value according to the FREF/TCXO value detected/read
              */
-                WLAN_OS_REPORT(("!!!!!!!!    FREF CLOCK     !!!!!!!!!!\n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"!!!!!!!!    FREF CLOCK     !!!!!!!!!!\n");
                 uMcsPllConfig = HW_CONFIG_19_2_M; /* default */
                 if (pGenParams->RefClk == CLOCK_CONFIG_19_2_M)
                 {               
                     uMcsPllConfig = HW_CONFIG_19_2_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_19_2_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_19_2_M)\n",uMcsPllConfig);
                 }
                 if (pGenParams->RefClk == CLOCK_CONFIG_26_M)
                 {                
                    uMcsPllConfig = HW_CONFIG_26_M; 
-                   WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_26_M)\n",uMcsPllConfig));
+                   TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_26_M)\n",uMcsPllConfig);
                 }
                 if (pGenParams->RefClk == CLOCK_CONFIG_38_4_M) 
                 {                
                     uMcsPllConfig = HW_CONFIG_38_4_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_38_4_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_38_4_M)\n",uMcsPllConfig);
                 }
                 if (pGenParams->RefClk == CLOCK_CONFIG_52_M)
                 {                   
                     uMcsPllConfig = HW_CONFIG_52_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_52_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_52_M)\n",uMcsPllConfig);
                 }
 #ifdef TNETW1283
                 if (pGenParams->RefClk == CLOCK_CONFIG_38_4_M)
                 {                
                     uMcsPllConfig = HW_CONFIG_19_2_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_19_2_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_19_2_M)\n",uMcsPllConfig);
                 }
                 if (pGenParams->RefClk == CLOCK_CONFIG_52_M)  
                 {
                     uMcsPllConfig = HW_CONFIG_26_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_26_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_26_M)\n",uMcsPllConfig);
                 }
 #endif
            }
            else
            {
 
-                WLAN_OS_REPORT(("!!!!!!!!    TCXO CLOCK     !!!!!!!!!!\n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"!!!!!!!!    TCXO CLOCK     !!!!!!!!!!\n");
                 uMcsPllConfig = HW_CONFIG_19_2_M;
                 if (pGenParams->TcxoRefClk == CLOCK_CONFIG_19_2_M)
                 {  
                     uMcsPllConfig = HW_CONFIG_19_2_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_19_2_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_19_2_M)\n",uMcsPllConfig);
                 }
                 if (pGenParams->TcxoRefClk == CLOCK_CONFIG_26_M)  
                 {  
                     uMcsPllConfig = HW_CONFIG_26_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_26_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_26_M)\n",uMcsPllConfig);
                 }
                 if (pGenParams->TcxoRefClk == CLOCK_CONFIG_38_4_M)
                 {  
                     uMcsPllConfig = HW_CONFIG_38_4_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_38_4_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_38_4_M)\n",uMcsPllConfig);
                 }
                 if (pGenParams->TcxoRefClk == CLOCK_CONFIG_52_M)   
                 { 
                     uMcsPllConfig = HW_CONFIG_52_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_52_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_52_M)\n",uMcsPllConfig);
                 }
 #ifdef TNETW1283
                 if (pGenParams->TcxoRefClk == CLOCK_CONFIG_38_4_M) 
                 { 
                     uMcsPllConfig = HW_CONFIG_19_2_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_19_2_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_19_2_M)\n",uMcsPllConfig);
                 }
                 if (pGenParams->TcxoRefClk == CLOCK_CONFIG_52_M)    
                 {
                     uMcsPllConfig = HW_CONFIG_26_M;
-                    WLAN_OS_REPORT(("uMcsPllConfig = %d (HW_CONFIG_26_M)\n",uMcsPllConfig));
+                    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"uMcsPllConfig = %d (HW_CONFIG_26_M)\n",uMcsPllConfig);
                 }
 #endif          
             }
@@ -1516,17 +1537,17 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
             uData |= (uMcsPllConfig << (MCS_SEL_IN_FREQ_SHIFT)) & (MCS_SEL_IN_FREQ_MASK); /* Bits[6:4]  */
             if (CHIP_ID_1283_PG10 == pHwInit->uChipId) 
             {
-                WLAN_OS_REPORT(("\n Configuring MCS_PLL for CHIP_ID_1283_PG10!!!!! \n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n Configuring MCS_PLL for CHIP_ID_1283_PG10!!!!! \n");
                 uData |= 0x02;
             }
             else
             {
-                WLAN_OS_REPORT(("\n Configuring MCS_PLL for CHIP_ID_1283_PG20!!!!! \n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n Configuring MCS_PLL for CHIP_ID_1283_PG20!!!!! \n");
                 uData |= 0x03;
             }
            
             
-            WLAN_OS_REPORT(("\n NEW PLL ALGO - hwInit_BootSm(6): Write to MCS_PLL_CONFIG_REG value of (Data=0x%x), McsPllConfig=%d\n", uData, uMcsPllConfig));
+            TRACE2(pHwInit->hReport,REPORT_SEVERITY_INIT,"\n NEW PLL ALGO - hwInit_BootSm(6): Write to MCS_PLL_CONFIG_REG value of (Data=0x%x), McsPllConfig=%d\n", uData, uMcsPllConfig);
             status = hwInit_InitTopRegisterWrite(hHwInit, MCS_PLL_CONFIG_REG, uData);            
             continue;
 
@@ -1536,17 +1557,17 @@ static TI_STATUS hwInit_PllConfigSm (TI_HANDLE hHwInit)
             
             if (pHwInit->uPllPendingFlag == 1)
             {
-                WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(7): back to bootSm\n"));
+                TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(7): back to bootSm\n");
                 hwInit_BootSm (hHwInit);
             }
 
-            WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(7): return TXN_STATUS_COMPLETE\n"));
+            TRACE0(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(7): return TXN_STATUS_COMPLETE\n");
             return TXN_STATUS_COMPLETE;
         } /* switch */
     } /* while */
 
 
-    WLAN_OS_REPORT(("NEW PLL ALGO - hwInit_BootSm(%d): Exit\n", pHwInit->uPllStage));
+    TRACE1(pHwInit->hReport,REPORT_SEVERITY_INIT,"NEW PLL ALGO - hwInit_BootSm(%d): Exit\n", pHwInit->uPllStage);
     return TI_OK;
 }
 
@@ -1620,8 +1641,9 @@ static TI_STATUS hwInit_FinalizeDownloadSm (TI_HANDLE hHwInit)
     TTwd     *pTWD = (TTwd *)pHwInit->hTWD;
     TI_STATUS status = TI_OK;
     TTxnStruct* pTxn;
+#ifdef TNETW1283
     TWlanParams *pWlanParams = &DB_WLAN(pTWD->hCmdBld);
-
+#endif
 
     while (TI_TRUE)
     {
@@ -1688,9 +1710,10 @@ static TI_STATUS hwInit_FinalizeDownloadSm (TI_HANDLE hHwInit)
             {           
                 pHwInit->uFinStage = 4;
 
-                #ifdef _VLCT_
-					os_StalluSec (pHwInit->hOs, 50);
-                #endif
+                
+#ifndef DOWNLOAD_TIMER_REQUIERD
+				os_StalluSec (pHwInit->hOs, 50);
+#endif
 
                 /* Read interrupt status register */
                 BUILD_HW_INIT_TXN_DATA(pHwInit, pTxn, ACX_REG_INTERRUPT_NO_CLEAR, 0, 
@@ -1749,16 +1772,15 @@ static TI_STATUS hwInit_FinalizeDownloadSm (TI_HANDLE hHwInit)
                 pHwInit->uFinStage = 3;
                 pHwInit->uFinLoop ++;
 
-                #ifndef _VLCT_
+#ifdef DOWNLOAD_TIMER_REQUIERD
                 tmr_StartTimer (pHwInit->hStallTimer, hwInit_StallTimerCb, hHwInit, STALL_TIMEOUT, TI_FALSE);
                 return TXN_STATUS_PENDING;
 				#endif
             }
-
-            #ifdef _VLCT_     
+#ifndef DOWNLOAD_TIMER_REQUIERD
                 continue;
             #endif
-
+				
         case 5:  
             pHwInit->uFinStage++;
 
@@ -2459,14 +2481,18 @@ TI_STATUS hwInit_ReadRadioParamsSm (TI_HANDLE hHwInit)
              {
 	       val = (pHwInit->aHwInitTxn[pHwInit->uTxnIndex].uData);                  
 	       val &= 0x20000;
-	       if(val)
-	      {
-		   pGenParams->TXBiPFEMManufacturer = FEM_TRIQUINT_TYPE_E;
-	      }
-	      else
-	      {
-	  	   pGenParams->TXBiPFEMManufacturer = FEM_RFMD_TYPE_E;
-	      }
+           if(1 == pGenParams->TXBiPFEMAutoDetect)
+           {
+               if(val)
+    	      {
+    		   pGenParams->TXBiPFEMManufacturer = FEM_TRIQUINT_TYPE_E;
+    	      }
+    	      else
+    	      {
+    	  	   pGenParams->TXBiPFEMManufacturer = FEM_RFMD_TYPE_E;
+    	      }
+          }
+
                WLAN_OS_REPORT (("FEM Type %d \n",pGenParams->TXBiPFEMManufacturer));
 			   pHwInit->uTxnIndex = 0;
                pHwInit->uRegSeqStage = 1;
@@ -2719,7 +2745,7 @@ TI_STATUS hwInit_InitTopRegisterWrite(TI_HANDLE hHwInit, TI_UINT32 uAddress, TI_
 {
   THwInit      *pHwInit = (THwInit *)hHwInit;
 
-  WLAN_OS_REPORT(("hwInit_InitTopRegisterWrite: address = 0x%x, value = 0x%x\n", uAddress, uValue));
+  TRACE2(pHwInit->hReport,REPORT_SEVERITY_INIT,"hwInit_InitTopRegisterWrite: address = 0x%x, value = 0x%x\n", uAddress, uValue);
   pHwInit->uTopStage = 0;
   uAddress = (TI_UINT32)(uAddress / 2);
   uAddress = (uAddress & TOP_REG_ADDR_MASK);  
@@ -2810,7 +2836,7 @@ TI_STATUS hwInit_InitTopRegisterRead(TI_HANDLE hHwInit, TI_UINT32 uAddress)
 {
   THwInit      *pHwInit = (THwInit *)hHwInit;
 
-  WLAN_OS_REPORT(("hwInit_InitTopRegisterRead: address = 0x%x\n", uAddress));
+  TRACE1(pHwInit->hReport, REPORT_SEVERITY_INIT ,"hwInit_InitTopRegisterRead: address = 0x%x\n", uAddress);
   pHwInit->uTopStage = 0;
   uAddress = (TI_UINT32)(uAddress / 2);
   uAddress = (uAddress & TOP_REG_ADDR_MASK);  
@@ -2949,11 +2975,12 @@ TI_STATUS hwInit_InitTopRegisterRead(TI_HANDLE hHwInit, TI_UINT32 uAddress)
 * 
 * RETURNS: None
 ****************************************************************************/
+#ifdef DOWNLOAD_TIMER_REQUIERD
  static void hwInit_StallTimerCb (TI_HANDLE hHwInit, TI_BOOL bTwdInitOccured)
 {
 	hwInit_FinalizeDownloadSm(hHwInit);
 }
 
-
+#endif
 
 

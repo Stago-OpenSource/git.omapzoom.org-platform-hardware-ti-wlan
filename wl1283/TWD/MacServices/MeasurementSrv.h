@@ -51,7 +51,8 @@
  ***********************************************************************
  */
 /* Time in milliseconds to receive a command complete for measure start / stop from the FW */
-#define MSR_FW_GUARD_TIME   100 
+#define MSR_FW_GUARD_TIME_START   5000 
+#define MSR_FW_GUARD_TIME_STOP    100 
 #define DEF_SAMPLE_INTERVAL             (100)   /* expressed in microsec */
 #define NOISE_HISTOGRAM_THRESHOLD           100
 /* Get param callback flags  */
@@ -88,7 +89,6 @@ typedef struct
     /* module handles */
     TI_HANDLE           hOS;                            /**< OS object handle */
     TI_HANDLE           hReport;                        /**< report object handle */
-    TI_HANDLE           hPowerSaveSRV;                  /**< power save SRV object handle */
     TI_HANDLE           hCmdBld;                        /**< Command Builder object handle */
     TI_HANDLE           hEventMbox;                     /**< Event Mbox handle */
     TI_HANDLE           hTimer    ;                     /**< Timer Module handle */
@@ -143,9 +143,6 @@ typedef struct
                                                          * Holds the return code to the upper layer
                                                          * Used to save errors during SM operation.
                                                          */
-    TI_BOOL             bSendNullDataWhenExitPs;        /**< whether to send NULL data frame when exiting
-                                                         * driver mode
-                                                         */
     /* state machine */
     fsm_stateMachine_t* SM;                            /**< 
                                                          * state machines for different
@@ -179,47 +176,6 @@ typedef struct
  *  External functions definitions
  ***********************************************************************
  */
-
-/**
- * \\n
- * \date 08-November-2005\n
- * \brief Creates the measurement SRV object
- *
- * Function Scope \e Public.\n
- * \param hOS - handle to the OS object.\n
- * \return a handle to the measurement SRV object, NULL if an error occurred.\n
- */
-TI_HANDLE MacServices_measurementSRV_create( TI_HANDLE hOS );
-
-/**
- * \\n
- * \date 08-November-2005\n
- * \brief Initializes the measurement SRV object
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSRV - handle to the measurement SRV object.\n
- * \param hReport - handle to the report object.\n
- * \param hCmdBld - handle to the Command Builder object.\n
- * \param hEventMbox - handle to the Event Mbox object.\n
- * \param hPowerSaveSRV - handle to the power save SRV object.\n
- * \param hTimer - handle to the Timer module object.\n
- */
-TI_STATUS MacServices_measurementSRV_init (TI_HANDLE hMeasurementSRV, 
-                                           TI_HANDLE hReport, 
-                                           TI_HANDLE hCmdBld,
-                                           TI_HANDLE hEventMbox,
-                                           TI_HANDLE hPowerSaveSRV,
-                                           TI_HANDLE hTimer);
-
-/**
- * \\n
- * \date 08-November-2005\n
- * \brief Destroys the measurement SRV object
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSRV - handle to the measurement SRV object.\n
- */
-void MacServices_measurementSRV_destroy( TI_HANDLE hMeasurementSRV );
 
 /** 
  * \\n
@@ -303,24 +259,6 @@ TI_BOOL measurementSRVIsMeasurementComplete( TI_HANDLE hMeasurementSRV );
  * \return the type index, -1 if not found.\n
  */
 TI_INT32 measurementSRVFindIndexByType( TI_HANDLE hMeasurementSRV, EMeasurementType type );
-
-/****************************************************************************************
- *                        measurementSRVRegisterFailureEventCB                                                  *
- ****************************************************************************************
-DESCRIPTION: Registers a failure event callback for scan error notifications.
-                
-                                                                                                                   
-INPUT:      - hMeasurementSRV   - handle to the Measurement SRV object.     
-            - failureEventCB        - the failure event callback function.\n
-            - hFailureEventObj  - handle to the object passed to the failure event callback function.
-
-OUTPUT: 
-RETURN:    void.
-****************************************************************************************/
-void measurementSRVRegisterFailureEventCB( TI_HANDLE hMeasurementSRV, 
-                                     void * failureEventCB, TI_HANDLE hFailureEventObj );
-
-void measurementSRV_restart( TI_HANDLE hMeasurementSRV);
 
 
 #endif /* __MEASUREMENT_SRV_H__ */

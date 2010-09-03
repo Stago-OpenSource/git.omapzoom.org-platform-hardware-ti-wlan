@@ -44,10 +44,10 @@
 #include "report.h"
 #include "timer.h"
 #include "osApi.h"
-#include "MacServices.h"
 #include "measurementSrvDbgPrint.h"
 #include "eventMbox_api.h"
 #include "CmdBld.h"
+
 
 /**
  * \\n
@@ -97,13 +97,11 @@ TI_HANDLE MacServices_measurementSRV_create( TI_HANDLE hOS )
  * \param hMeasurementSRV - handle to the measurement SRV object.\n
  * \param hReport - handle to the report object.\n
  * \param hCmdBld - handle to the Command Builder object.\n
- * \param hPowerSaveSRV - handle to the power save SRV object.\n
  */
 TI_STATUS MacServices_measurementSRV_init (TI_HANDLE hMeasurementSRV, 
                                            TI_HANDLE hReport, 
                                            TI_HANDLE hCmdBld,
                                            TI_HANDLE hEventMbox,
-                                           TI_HANDLE hPowerSaveSRV,
                                            TI_HANDLE hTimer)
 { 
     measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
@@ -113,7 +111,6 @@ TI_STATUS MacServices_measurementSRV_init (TI_HANDLE hMeasurementSRV,
     pMeasurementSRV->hReport = hReport;
     pMeasurementSRV->hCmdBld = hCmdBld;
     pMeasurementSRV->hEventMbox = hEventMbox;
-    pMeasurementSRV->hPowerSaveSRV = hPowerSaveSRV;
     pMeasurementSRV->hTimer = hTimer;
 
     /* Initialize the state machine */
@@ -127,7 +124,7 @@ TI_STATUS MacServices_measurementSRV_init (TI_HANDLE hMeasurementSRV,
 		return TI_NOK;
 	}
     pMeasurementSRV->bStartStopTimerRunning = TI_FALSE;
-
+    
     for (i = 0; i < MAX_NUM_OF_MSR_TYPES_IN_PARALLEL; i++)
     {
         pMeasurementSRV->hRequestTimer[i] = tmr_CreateTimer (pMeasurementSRV->hTimer);
@@ -177,12 +174,12 @@ TI_STATUS MacServices_measurementSRV_init (TI_HANDLE hMeasurementSRV,
  * Function Scope \e Public.\n
  * \param hMeasurementSRV - handle to the measurement SRV object.\n
  */
-void measurementSRV_restart( TI_HANDLE hMeasurementSRV)
+void MacServices_measurementSRV_restart( TI_HANDLE hMeasurementSRV)
 {
     measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
 	TI_INT32 i;
 
-	/* if a timer is running, stop it */
+    /* if a timer is running, stop it */
 	if (pMeasurementSRV->bStartStopTimerRunning)
 	{
 		tmr_StopTimer (pMeasurementSRV->hStartStopTimer);
@@ -259,7 +256,7 @@ void MacServices_measurementSRV_destroy( TI_HANDLE hMeasurementSRV )
  * \brief Starts a measurement operation.\n
  *
  * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
+ * \param hMeasurementSRV - handle to the MeasurementSRV object.\n
  * \param pMsrRequest - a structure containing measurement parameters.\n
  * \param timeToRequestexpiryMs - the time (in milliseconds) the measurement SRV has to start the request.\n
  * \param cmdResponseCBFunc - callback function to used for command response.\n
@@ -268,7 +265,7 @@ void MacServices_measurementSRV_destroy( TI_HANDLE hMeasurementSRV )
  * \param cmdCompleteCBObj - handle to pass to command complete CB.\n
  * \return TI_OK if successful (various, TBD codes if not).\n
  */ 
-TI_STATUS MacServices_measurementSRV_startMeasurement( TI_HANDLE hMacServices, 
+TI_STATUS MacServices_measurementSRV_startMeasurement( TI_HANDLE hMeasurementSRV, 
                                                        TMeasurementRequest* pMsrRequest,
 													   TI_UINT32 timeToRequestExpiryMs,
                                                        TCmdResponseCb cmdResponseCBFunc,
@@ -276,8 +273,9 @@ TI_STATUS MacServices_measurementSRV_startMeasurement( TI_HANDLE hMacServices,
                                                        TMeasurementSrvCompleteCb cmdCompleteCBFunc,
                                                        TI_HANDLE cmdCompleteCBObj )
 {
-    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)((MacServices_t*)hMacServices)->hMeasurementSRV;
+    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
 	TI_INT32 i;
+
 
 #ifdef TI_DBG
 TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": Received measurement request.\n");
@@ -286,16 +284,13 @@ TRACE3( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "time to expiry: 
 TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "cmd complete CB: 0x%x, cmd complete handle: 0x%x\n",							  cmdCompleteCBFunc,							  cmdCompleteCBObj);
 #endif
 
+
 	/* mark that request is in progress */
     pMeasurementSRV->bInRequest = TI_TRUE;
 
-	/* mark to send NULL data when exiting driver mode (can be changed to TI_FALSE
-	   only when explictly stopping the measurement */
-	pMeasurementSRV->bSendNullDataWhenExitPs = TI_TRUE;
-
     /* Nullify return status */
     pMeasurementSRV->returnStatus = TI_OK;
-
+    
     /* copy request parameters */
     os_memoryCopy (pMeasurementSRV->hOS, 
                    (void *)&pMeasurementSRV->msrRequest, 
@@ -339,18 +334,18 @@ TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "cmd complete CB:
  * \brief Stops a measurement operation in progress.\n
  *
  * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
+ * \param hMeasurementSRV - handle to the MeasurementSRV object.\n
  * \param bSendNullData - whether to send NULL data when exiting driver mode.\n
  * \param cmdResponseCBFunc - callback function to used for command response.\n
  * \param cmdResponseCBObj - handle to pass to command response CB.\n
  * \return TI_OK if successful (various, TBD codes if not).\n
  */
-TI_STATUS MacServices_measurementSRV_stopMeasurement( TI_HANDLE hMacServices,
+TI_STATUS MacServices_measurementSRV_stopMeasurement( TI_HANDLE hMeasurementSRV,
 													  TI_BOOL bSendNullData,
                                                       TCmdResponseCb cmdResponseCBFunc,
                                                       TI_HANDLE cmdResponseCBObj )
 {
-    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)((MacServices_t*)hMacServices)->hMeasurementSRV;
+    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
     
 TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": Received measurement stop request.\n");
 TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "Send null data:, cmd response CB: 0x%x, cmd response handle: 0x%x\n",							  cmdResponseCBFunc,							  cmdResponseCBObj);
@@ -358,9 +353,6 @@ TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "Send null data:,
 	/* store callbacks */
     pMeasurementSRV->commandResponseCBFunc = cmdResponseCBFunc;
     pMeasurementSRV->commandResponseCBObj = cmdResponseCBObj;
-
-	/* store NULL data indication */
-	pMeasurementSRV->bSendNullDataWhenExitPs = bSendNullData;
 
     /* mark that current return status is TI_OK */
     pMeasurementSRV->returnStatus = TI_OK;
@@ -384,11 +376,11 @@ TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "Send null data:,
  * \brief Notifies the measurement SRV of a FW reset (recovery).\n
  *
  * Function Scope \e Public.\n
- * \param hMacServices - handle to the MacServices object.\n
+ * \param hMeasurementSRV - handle to the MeasurementSRV object.\n
  */
-void MacServices_measurementSRV_FWReset( TI_HANDLE hMacServices )
+void MacServices_measurementSRV_FWReset( TI_HANDLE hMeasurementSRV )
 {
-    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)((MacServices_t*)hMacServices)->hMeasurementSRV;
+    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
     TI_INT32 i;
 
 TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": Received FW reset indication.\n");
@@ -410,45 +402,6 @@ TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": Received FW re
 
     /* change SM state to idle */
     pMeasurementSRV->SMState = MSR_SRV_STATE_IDLE;
-}
-
-/** 
- * \\n
- * \date 09-November-2005\n
- * \brief callback function used by the power manager to notify driver mode result
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSRV - handle to the measurement SRV object.\n
- * \param PSMode - the power save mode the STA is currently in.\n
- * \param psStatus - the power save request status.\n
- */
-void MacServices_measurementSRV_powerSaveCB( TI_HANDLE hMeasurementSRV, TI_UINT8 PSMode, TI_UINT8 psStatus )
-{
-    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
-
-TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": Power save SRV CB called. PS mode:%d status: %d\n", PSMode, psStatus);
-
-	/* if driver mode entry succeedded */
-    if ( ENTER_POWER_SAVE_SUCCESS == psStatus )
-    {
-        TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": PS successful.\n");
-
-        /* send a RIVER_MODE_SUCCESS event */
-        measurementSRVSM_SMEvent( (TI_HANDLE)pMeasurementSRV, &(pMeasurementSRV->SMState), 
-                                  MSR_SRV_EVENT_DRIVER_MODE_SUCCESS );
-    }
-    /* driver mode entry failed */
-    else
-    {
-        TRACE1( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": PS failed, status %d.\n", psStatus);
-
-        /* Set the return status to TI_NOK */
-        pMeasurementSRV->returnStatus = (TI_STATUS)psStatus;
-
-        /* send a DRIVER_MODE_FAILURE event */
-        measurementSRVSM_SMEvent( (TI_HANDLE)pMeasurementSRV, &(pMeasurementSRV->SMState), 
-								  MSR_SRV_EVENT_DRIVER_MODE_FAILURE );
-    }
 }
 
 /** 
@@ -487,15 +440,29 @@ void MacServices_measurementSRV_measureStartCB( TI_HANDLE hMeasurementSRV )
  * Function Scope \e Public.\n
  * \param hMeasurementSRV - handle to the measurement SRV object.\n
  */
-void MacServices_measurementSRV_measureCompleteCB( TI_HANDLE hMeasurementSRV )
+void MacServices_measurementSRV_measureCompleteCB( TI_HANDLE hMeasurementSRV, char* str, TI_UINT32 strLen )
 {
     measurementSRV_t *pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
+	scanCompleteResults_t result;
+    
+	os_memoryCopy (pMeasurementSRV->hOS, (void *)&result, (void *)str, strLen);
 
     TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": measure complete CB called.\n");
 
 	/* stop the FW guard timer */
     tmr_StopTimer (pMeasurementSRV->hStartStopTimer);
 	pMeasurementSRV->bStartStopTimerRunning = TI_FALSE;
+
+	/* Check Result to distinguish PS failure*/
+	if (SCHEDULED_SCAN_COMPLETED_OK != result.scheduledScanStatus)
+	{
+		TI_INT32 i;
+        /* Failed to enter PS - Measurement didn't start*/
+		for ( i = 0; i < MAX_NUM_OF_MSR_TYPES_IN_PARALLEL; i++ )
+		{
+			pMeasurementSRV->msrReply.msrTypes[ i ].status = TI_NOK;
+		}
+	}
 
     measurementSRVSM_SMEvent( hMeasurementSRV, &(pMeasurementSRV->SMState), 
 							  MSR_SRV_EVENT_STOP_COMPLETE );
@@ -583,18 +550,21 @@ TRACE1( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": request timer 
 	/* mark that the timer is not running and that this request has completed */
     pMeasurementSRV->bRequestTimerRunning[ requestIndex ] = TI_FALSE;
 
+    TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "MacServices_measurementSRV_requestTimerExpired: Stop measurment\n");
+
     /* collect results and send stop command if necessary */
     switch (pMeasurementSRV->msrRequest.msrTypes[ requestIndex ].msrType)
     {
-    case MSR_TYPE_BEACON_MEASUREMENT:
+    case MSR_TYPE_XCC_BEACON_MEASUREMENT:
+    case MSR_TYPE_RRM_BEACON_MEASUREMENT:
         measurementSRVHandleBeaconMsrComplete( hMeasurementSRV, requestIndex );
         break;
 
-    case MSR_TYPE_CCA_LOAD_MEASUREMENT:
+    case MSR_TYPE_XCC_CCA_LOAD_MEASUREMENT:
         measurementSRVHandleChannelLoadComplete( hMeasurementSRV, requestIndex );
         break;
 
-    case MSR_TYPE_NOISE_HISTOGRAM_MEASUREMENT:
+    case MSR_TYPE_XCC_NOISE_HISTOGRAM_MEASUREMENT:
         measurementSRVHandleNoiseHistogramComplete( hMeasurementSRV, requestIndex );
         break;
 
@@ -632,7 +602,8 @@ TI_BOOL measurementSRVIsBeaconMeasureIncluded( TI_HANDLE hMeasurementSRV )
 
     for ( i = 0; i < MAX_NUM_OF_MSR_TYPES_IN_PARALLEL; i++ )
     {
-        if ( MSR_TYPE_BEACON_MEASUREMENT == pMeasurementSRV->msrRequest.msrTypes[ i ].msrType )
+        if (( MSR_TYPE_XCC_BEACON_MEASUREMENT == pMeasurementSRV->msrRequest.msrTypes[ i ].msrType ) ||
+            ( MSR_TYPE_RRM_BEACON_MEASUREMENT == pMeasurementSRV->msrRequest.msrTypes[ i ].msrType ) )
         {
             return TI_TRUE;
         }
@@ -841,7 +812,7 @@ TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "result address (
 	pMeasurementSRV->pendingParamCBs &= ~MSR_SRV_WAITING_CHANNEL_LOAD_RESULTS;
 
 	/* find the request index */
-	requestIndex = measurementSRVFindIndexByType( hMeasurementSRV, MSR_TYPE_CCA_LOAD_MEASUREMENT );
+	requestIndex = measurementSRVFindIndexByType( hMeasurementSRV, MSR_TYPE_XCC_CCA_LOAD_MEASUREMENT );
 	if ( -1 == requestIndex )
 	{
 		/* indicates we can't find the request in the requets array. Shouldn't happen, but nothing to do */
@@ -933,7 +904,7 @@ TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "result address (
 	pMeasurementSRV->pendingParamCBs &= ~MSR_SRV_WAITING_NOISE_HIST_RESULTS;
 
 	/* find the request index */
-	requestIndex = measurementSRVFindIndexByType( hMeasurementSRV, MSR_TYPE_NOISE_HISTOGRAM_MEASUREMENT );
+	requestIndex = measurementSRVFindIndexByType( hMeasurementSRV, MSR_TYPE_XCC_NOISE_HISTOGRAM_MEASUREMENT );
 	if ( -1 == requestIndex )
 	{
 		/* indicates we can't find the request in the requets array. Shouldn't happen, but nothing to do */
@@ -1055,7 +1026,7 @@ TI_INT32 measurementSRVFindIndexByType( TI_HANDLE hMeasurementSRV, EMeasurementT
 
 
 /****************************************************************************************
- *                        measurementSRVRegisterFailureEventCB													*
+ *                        MacServices_measurementSRV_registerFailureEventCB  			*
  ****************************************************************************************
 DESCRIPTION: Registers a failure event callback for scan error notifications.
 			    
@@ -1068,8 +1039,9 @@ OUTPUT:
 RETURN:    void.
 ****************************************************************************************/
 
-void measurementSRVRegisterFailureEventCB( TI_HANDLE hMeasurementSRV, 
-                                     void * failureEventCB, TI_HANDLE hFailureEventObj )
+void MacServices_measurementSRV_registerFailureEventCB( TI_HANDLE hMeasurementSRV, 
+														void * failureEventCB,
+														TI_HANDLE hFailureEventObj )
 {
     measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
 
