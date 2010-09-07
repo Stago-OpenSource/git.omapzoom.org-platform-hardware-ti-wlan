@@ -297,6 +297,7 @@ TI_HANDLE apConn_create(TI_HANDLE hOs)
         if (pAPConnection->hAPConnSM == NULL)
         {
             WLAN_OS_REPORT(("FATAL ERROR: apConn_create(): Error allocating Connection StateMachine! - aborting\n"));
+            os_memoryFree(hOs, pAPConnection, sizeof(apConn_t));
             return NULL;
         }
 
