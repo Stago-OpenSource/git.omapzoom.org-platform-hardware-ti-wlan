@@ -45,9 +45,18 @@
 #include "ScanCncnSm.h"
 #include "ScanCncnPrivate.h"
 #include "apConn.h"
+#include "timer.h"
+
+
+
+
+static TI_STATUS scanCncnSm_Scan (TI_HANDLE hScanCncnClient, TScanParams *pScanParams,
+								  EScanResultTag eScanTag, TI_BOOL bHighPriority,
+								  TI_BOOL bForceScan, TCmdResponseCb fResponseCb,
+								  TI_HANDLE hResponseC);
 
 /* 
- * Aplication one-shot scan
+ * Application one-shot scan
  */
 /** 
  * \fn     scanCncnSmApp1Shot_ScrRequest 
@@ -71,8 +80,8 @@ void scanCncnSmApp1Shot_ScrRequest (TI_HANDLE hScanCncnClient)
     case SCR_CRS_PEND:
         /* send a reject event to the SM */
         TRACE1(pScanCncnClient->hReport, REPORT_SEVERITY_INFORMATION , "scanCncnSmApp1Shot_ScrRequest: SCR pending, pend reason: %d.\n", eScrPendReason);
-        pScanCncnClient->eScanResult = SCAN_CRS_SCAN_FAILED;
-        genSM_Event (pScanCncnClient->hGenSM, SCAN_CNCN_SM_EVENT_REJECT, hScanCncnClient);
+/*        pScanCncnClient->eScanResult = SCAN_CRS_SCAN_FAILED;
+        genSM_Event (pScanCncnClient->hGenSM, SCAN_CNCN_SM_EVENT_REJECT, hScanCncnClient);*/
         break;
 
     case SCR_CRS_RUN:
@@ -126,10 +135,9 @@ void scanCncnSmApp1Shot_StartScan (TI_HANDLE hScanCncnClient)
     /* if the STA is connected, it is rquired to enter PS before scan */
     bPsRequired = (STA_CONNECTED == pScanCncn->eConnectionStatus ? TI_TRUE : TI_FALSE);
 
-    /* call the TWD start scan - enter driver mode (PS) only if station is connected */
-    tStatus = TWD_Scan (pScanCncnClient->hTWD, &(pScanCncnClient->uScanParams.tOneShotScanParams), SCAN_RESULT_TAG_APPLICATION_ONE_SHOT,
-                       TI_FALSE, bPsRequired, TI_FALSE, POWER_SAVE_ON, /* this parameter is used only when driver mode requested */
-                       bPsRequired, NULL, NULL);
+    /* request the scan */
+	tStatus = scanCncnSm_Scan (hScanCncnClient, &(pScanCncnClient->uScanParams.tOneShotScanParams),
+							   SCAN_RESULT_TAG_APPLICATION_ONE_SHOT, TI_FALSE, TI_FALSE, NULL, NULL);
 
     if (TI_OK != tStatus)
     {
@@ -159,15 +167,8 @@ void scanCncnSmApp1Shot_StopScan (TI_HANDLE hScanCncnClient)
     TI_STATUS       tStatus;
 
     /* call the TWD stop scan function */
-    if (pScanCncn->eConnectionStatus != STA_CONNECTED)
-    {
-        tStatus = TWD_StopScan (pScanCncnClient->hTWD, SCAN_RESULT_TAG_APPLICATION_ONE_SHOT, TI_FALSE, NULL, NULL);
-    }
-    else
-    {
-        tStatus = TWD_StopScan (pScanCncnClient->hTWD, SCAN_RESULT_TAG_APPLICATION_ONE_SHOT, pScanCncnClient->bSendNullDataOnStop, NULL, NULL);
-    }
-
+    tStatus = TWD_StopScan (pScanCncnClient->hTWD, SCAN_RESULT_TAG_APPLICATION_ONE_SHOT, pScanCncn->eLatestScanType, NULL, NULL);
+    
     /* if stop scan operation failed, send a scan complete event to reset the SM */
     if (TI_OK != tStatus)
     {
@@ -176,25 +177,9 @@ void scanCncnSmApp1Shot_StopScan (TI_HANDLE hScanCncnClient)
     }
 }
 
-/** 
- * \fn     scanCncnSmApp1Shot_Recovery
- * \brief  Handles recovery during scan for one-shot application scan
- * 
- * Notifies the scan SRV to stop its timer
- * 
- * \param  hScanCncnClient - handle to the specific client object
- * \return None
- */ 
-void scanCncnSmApp1Shot_Recovery (TI_HANDLE hScanCncnClient)
-{
-    TScanCncnClient *pScanCncnClient = (TScanCncnClient*)hScanCncnClient;
-
-    /* Notify scan SRV to stop its timer */
-    TWD_StopScanOnFWReset (pScanCncnClient->hTWD);
-}
 
 /*
- * Aplication Periodic scan
+ * Application Periodic scan
  */
 /** 
  * \fn     scanCncnSmAppP_ScrRequest 
@@ -310,18 +295,6 @@ void scanCncnSmAppP_StopScan (TI_HANDLE hScanCncnClient)
     }
 }
 
-/** 
- * \fn     scanCncnSmAppP_Recovery
- * \brief  Handles recovery during scan for periodic application scan
- * 
- * Handles recovery during scan for periodic application scan
- * 
- * \param  hScanCncnClient - handle to the specific client object
- * \return None
- */ 
-void scanCncnSmAppP_Recovery (TI_HANDLE hScanCncnClient)
-{
-}
 
 /*
  * Driver periodic scan
@@ -450,19 +423,6 @@ void scanCncnSmDrvP_StopScan (TI_HANDLE hScanCncnClient)
     }
 }
 
-/** 
- * \fn     scanCncnSmApp1Shot_Recovery
- * \brief  Handles recovery during scan for periodic driver scan
- * 
- * Handles recovery during scan for periodic driver scan
- * 
- * \param  hScanCncnClient - handle to the specific client object
- * \return None
- */ 
-void scanCncnSmDrvP_Recovery (TI_HANDLE hScanCncnClient)
-{
-}
-
 /*
  * Continuous one-shot scan
  */
@@ -543,11 +503,10 @@ void scanCncnSmCont1Shot_StartScan (TI_HANDLE hScanCncnClient)
     TScanCncnClient *pScanCncnClient = (TScanCncnClient*)hScanCncnClient;
     TI_STATUS       status;
 
-    /* call the TWD start scan function */
-    status = TWD_Scan (pScanCncnClient->hTWD, &(pScanCncnClient->uScanParams.tOneShotScanParams), 
-                       SCAN_RESULT_TAG_CONTINUOUS, TI_FALSE, TI_TRUE, TI_FALSE, POWER_SAVE_ON, TI_TRUE,
-                       NULL, NULL);
-
+    /* request the scan */
+	status = scanCncnSm_Scan (hScanCncnClient, &(pScanCncnClient->uScanParams.tOneShotScanParams),
+							  SCAN_RESULT_TAG_CONTINUOUS, TI_FALSE, TI_FALSE, NULL, NULL);
+                           
     if (TI_OK != status)
     {
         TRACE1(pScanCncnClient->hReport, REPORT_SEVERITY_ERROR , "scanCncnSmCont1Shot_StartScan: TWD returned status %d, quitting continuous scan.\n", status);
@@ -572,10 +531,11 @@ void scanCncnSmCont1Shot_StartScan (TI_HANDLE hScanCncnClient)
 void scanCncnSmCont1Shot_StopScan (TI_HANDLE hScanCncnClient)
 {
     TScanCncnClient *pScanCncnClient = (TScanCncnClient*)hScanCncnClient;
+	TScanCncn       *pScanCncn = (TScanCncn*)pScanCncnClient->hScanCncn;
     TI_STATUS       status;
 
     /* send a stop scan command to FW */
-    status = TWD_StopScan (pScanCncnClient->hTWD, SCAN_RESULT_TAG_CONTINUOUS, pScanCncnClient->bSendNullDataOnStop, NULL, NULL);
+    status = TWD_StopScan (pScanCncnClient->hTWD, SCAN_RESULT_TAG_CONTINUOUS, pScanCncn->eLatestScanType, NULL, NULL);
 
     /* if stop scan operation failed, send a scan complete event to reset the SM */
     if (TI_OK != status)
@@ -585,22 +545,6 @@ void scanCncnSmCont1Shot_StopScan (TI_HANDLE hScanCncnClient)
     }
 }
 
-/** 
- * \fn     scanCncnSmCont1Shot_Recovery
- * \brief  Handles recovery during scan for one-shot continuous scan
- * 
- * Notifies the scan SRV to stop its timer
- * 
- * \param  hScanCncnClient - handle to the specific client object
- * \return None
- */ 
-void scanCncnSmCont1Shot_Recovery (TI_HANDLE hScanCncnClient)
-{
-    TScanCncnClient *pScanCncnClient = (TScanCncnClient*)hScanCncnClient;
-
-    /* Notify scan SRV to stop its timer */
-    TWD_StopScanOnFWReset (pScanCncnClient->hTWD);
-}
 
 /*
  * Immediate one-shot scan
@@ -681,19 +625,16 @@ void scanCncnSmImmed1Shot_ScrRelease (TI_HANDLE hScanCncnClient)
 void scanCncnSmImmed1Shot_StartScan (TI_HANDLE hScanCncnClient)
 {
     TScanCncnClient *pScanCncnClient = (TScanCncnClient*)hScanCncnClient;
-    TI_BOOL         bPsRequired, bTriggeredScan;
+    TI_BOOL         bPsRequired;
     TI_STATUS       status;
+
 
     /* check whether enter PS is required - according to the roaming reason severity */
     bPsRequired = apConn_isPsRequiredBeforeScan (pScanCncnClient->hApConn);
-    bTriggeredScan = ((SCAN_TYPE_TRIGGERED_ACTIVE == pScanCncnClient->uScanParams.tOneShotScanParams.scanType) ||
-                      (SCAN_TYPE_TRIGGERED_PASSIVE == pScanCncnClient->uScanParams.tOneShotScanParams.scanType) 
-                      ? TI_TRUE : TI_FALSE);
 
-    status = TWD_Scan (pScanCncnClient->hTWD, &(pScanCncnClient->uScanParams.tOneShotScanParams),
-                       SCAN_RESULT_TAG_IMMEDIATE, !bTriggeredScan, /* Triggered scan cannot be high priority */
-                       TI_TRUE, TI_TRUE, (bPsRequired ? POWER_SAVE_ON : POWER_SAVE_KEEP_CURRENT),
-                       bPsRequired, NULL, NULL);
+	/* request the scan */
+    status = scanCncnSm_Scan (hScanCncnClient, &(pScanCncnClient->uScanParams.tOneShotScanParams),
+							  SCAN_RESULT_TAG_IMMEDIATE, !bPsRequired, TI_TRUE,  NULL, NULL); 
 
     /* call the scan SRV start scan */
     if (TI_OK != status)
@@ -720,10 +661,11 @@ void scanCncnSmImmed1Shot_StartScan (TI_HANDLE hScanCncnClient)
 void scanCncnSmImmed1Shot_StopScan (TI_HANDLE hScanCncnClient)
 {
     TScanCncnClient *pScanCncnClient = (TScanCncnClient*)hScanCncnClient;
+	TScanCncn       *pScanCncn = (TScanCncn*)pScanCncnClient->hScanCncn;
     TI_STATUS       status;
 
     /* call the TWD stop scan */
-    status = TWD_StopScan (pScanCncnClient->hTWD, SCAN_RESULT_TAG_IMMEDIATE, pScanCncnClient->bSendNullDataOnStop, NULL, NULL);
+    status = TWD_StopScan (pScanCncnClient->hTWD, SCAN_RESULT_TAG_IMMEDIATE, pScanCncn->eLatestScanType, NULL, NULL);
 
     /* if stop scan operation failed, send a scan complete event to reset the SM */
     if (TI_OK != status)
@@ -733,8 +675,21 @@ void scanCncnSmImmed1Shot_StopScan (TI_HANDLE hScanCncnClient)
     }
 }
 
+
 /** 
- * \fn     scanCncnSmImmed1Shot_Recovery
+ * \fn     scanCncnSm_NoOp
+ * \brief  Dummy function
+ * 
+ * \param  hScanCncnClient - handle to the specific client
+ * object \return None
+ */ 
+void scanCncnSm_NoOp (TI_HANDLE hScanCncnClient)
+{
+}
+
+
+/** 
+ * \fn     scanCncnSm_Scan
  * \brief  Handles recovery during scan for one-shot immediate scan
  * 
  * Notifies the scan SRV to stop its timer
@@ -742,11 +697,34 @@ void scanCncnSmImmed1Shot_StopScan (TI_HANDLE hScanCncnClient)
  * \param  hScanCncnClient - handle to the specific client object
  * \return None
  */ 
-void scanCncnSmImmed1Shot_Recovery (TI_HANDLE hScanCncnClient)
+static TI_STATUS scanCncnSm_Scan (TI_HANDLE hScanCncnClient, TScanParams *pScanParams,
+								  EScanResultTag eScanTag, TI_BOOL bHighPriority,
+								  TI_BOOL bForceScan, TCmdResponseCb fResponseCb, TI_HANDLE hResponseC)
 {
     TScanCncnClient *pScanCncnClient = (TScanCncnClient*)hScanCncnClient;
+	TScanCncn       *pScanCncn = (TScanCncn*)pScanCncnClient->hScanCncn;
+    TI_STATUS       tStatus;
 
-    /* Notify scan SRV to stop its timer */
-    TWD_StopScanOnFWReset (pScanCncnClient->hTWD);
+
+    pScanCncn->eLatestScanTag = eScanTag;
+	pScanCncn->eLatestScanType = pScanParams->scanType;
+	pScanCncn->bScanCompleteFlag = TI_TRUE;
+
+    tmr_StartTimer (pScanCncn->hScanGuardTimer,
+					scanCncn_TimerExpired,
+                    (TI_HANDLE)pScanCncn,
+                    SCAN_GUARD_TIME_MS, 
+                    TI_FALSE);
+    
+    /* call the TWD start scan */
+    tStatus = TWD_Scan (pScanCncnClient->hTWD, pScanParams, eScanTag, bHighPriority,
+						bForceScan, fResponseCb, hResponseC);
+
+	if (TI_OK != tStatus)
+	{
+        tmr_StopTimer(pScanCncn->hScanGuardTimer);
+	}
+
+	return tStatus;
 }
 

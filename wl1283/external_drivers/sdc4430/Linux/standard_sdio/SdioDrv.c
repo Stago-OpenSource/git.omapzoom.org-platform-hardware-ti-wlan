@@ -414,7 +414,7 @@ int __init sdioDrv_init(void)
 		goto out;
 	}
 
-	printk(KERN_INFO "TI WiLink 1271 SDIO: Driver loaded\n");
+	printk(KERN_INFO "TI WiLink 1283 SDIO: Driver loaded\n");
 
 out:
 	return ret;
@@ -424,7 +424,7 @@ void __exit sdioDrv_exit(void)
 {
 	sdio_unregister_driver(&tiwlan_sdio_drv);
 
-	printk(KERN_INFO "TI WiLink 1271 SDIO Driver unloaded\n");
+	printk(KERN_INFO "TI WiLink 1283 SDIO Driver unloaded\n");
 }
 
 
@@ -447,7 +447,7 @@ EXPORT_SYMBOL(sdioDrv_DisableInterrupt);
 EXPORT_SYMBOL(sdioDrv_SetBlockSize);
 EXPORT_SYMBOL(sdioDrv_Register_Notification);
 
-MODULE_DESCRIPTION("TI WLAN 1271 SDIO interface");
+MODULE_DESCRIPTION("TI WLAN 1283 SDIO interface");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS(SDIO_DRIVER_NAME);
 MODULE_AUTHOR("Ohad Ben-Cohen <ohad@wizery.com>");

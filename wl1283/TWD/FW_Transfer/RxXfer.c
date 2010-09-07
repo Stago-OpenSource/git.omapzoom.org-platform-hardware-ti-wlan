@@ -1028,6 +1028,7 @@ void rxXfer_ClearStats (TI_HANDLE hRxXfer)
  ****************************************************************************/
 void rxXfer_PrintStats (TI_HANDLE hRxXfer)
 {
+#ifdef REPORT_LOG
     TRxXfer *pRxXfer = (TRxXfer *)hRxXfer;
     
     WLAN_OS_REPORT(("Print RX Xfer module info\n"));
@@ -1058,6 +1059,7 @@ void rxXfer_PrintStats (TI_HANDLE hRxXfer)
                    aDbgTrace[(aDbgIndex + i) % DBG_TBL_SIZE].uData2));
         }
     }
+#endif
 #endif
 }
 #endif

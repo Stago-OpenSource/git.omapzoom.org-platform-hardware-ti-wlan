@@ -624,7 +624,7 @@ void sme_ScanResultCB (TI_HANDLE hSme, EScanCncnResultStatus eStatus,
 
                     if (TI_OK != scanResultTable_UpdateEntry (pSme->hScanResultTable, pFrameInfo->bssId, pFrameInfo))
                     {
-                        TRACE6(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_ScanResultCB: unable to update specific enrty for BSSID %02x:%02x:%02x:%02x:%02x:%02x\n", (*pFrameInfo->bssId)[ 0 ], (*pFrameInfo->bssId)[ 1 ], (*pFrameInfo->bssId)[ 2 ], (*pFrameInfo->bssId)[ 3 ], (*pFrameInfo->bssId)[ 4 ], (*pFrameInfo->bssId)[ 5 ]);
+                        TRACE6(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_ScanResultCB: unable to update specific entry for BSSID %02x:%02x:%02x:%02x:%02x:%02x\n", (*pFrameInfo->bssId)[ 0 ], (*pFrameInfo->bssId)[ 1 ], (*pFrameInfo->bssId)[ 2 ], (*pFrameInfo->bssId)[ 3 ], (*pFrameInfo->bssId)[ 4 ], (*pFrameInfo->bssId)[ 5 ]);
                     }
                 }
             }
@@ -633,7 +633,7 @@ void sme_ScanResultCB (TI_HANDLE hSme, EScanCncnResultStatus eStatus,
 
                 if (TI_OK != scanResultTable_UpdateEntry (pSme->hScanResultTable, pFrameInfo->bssId, pFrameInfo))
                 {
-                    TRACE6(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_ScanResultCB: unable to update enrty for BSSID %02x:%02x:%02x:%02x:%02x:%02x because table is full\n", (*pFrameInfo->bssId)[ 0 ], (*pFrameInfo->bssId)[ 1 ], (*pFrameInfo->bssId)[ 2 ], (*pFrameInfo->bssId)[ 3 ], (*pFrameInfo->bssId)[ 4 ], (*pFrameInfo->bssId)[ 5 ]);
+                    TRACE6(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_ScanResultCB: unable to update entry for BSSID %02x:%02x:%02x:%02x:%02x:%02x because table is full\n", (*pFrameInfo->bssId)[ 0 ], (*pFrameInfo->bssId)[ 1 ], (*pFrameInfo->bssId)[ 2 ], (*pFrameInfo->bssId)[ 3 ], (*pFrameInfo->bssId)[ 4 ], (*pFrameInfo->bssId)[ 5 ]);
                 }
             }
         }
@@ -642,7 +642,7 @@ void sme_ScanResultCB (TI_HANDLE hSme, EScanCncnResultStatus eStatus,
         {
             if (TI_OK != scanResultTable_UpdateEntry (pSme->hSmeScanResultTable, pFrameInfo->bssId, pFrameInfo))
             {
-                TRACE6(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_ScanResultCB: unable to update application scan enrty for BSSID %02x:%02x:%02x:%02x:%02x:%02x\n", (*pFrameInfo->bssId)[ 0 ], (*pFrameInfo->bssId)[ 1 ], (*pFrameInfo->bssId)[ 2 ], (*pFrameInfo->bssId)[ 3 ], (*pFrameInfo->bssId)[ 4 ], (*pFrameInfo->bssId)[ 5 ]);
+                TRACE6(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_ScanResultCB: unable to update application scan entry for BSSID %02x:%02x:%02x:%02x:%02x:%02x\n", (*pFrameInfo->bssId)[ 0 ], (*pFrameInfo->bssId)[ 1 ], (*pFrameInfo->bssId)[ 2 ], (*pFrameInfo->bssId)[ 3 ], (*pFrameInfo->bssId)[ 4 ], (*pFrameInfo->bssId)[ 5 ]);
             }
         }
         break;
@@ -771,7 +771,7 @@ void sme_MeansurementScanResult (TI_HANDLE hSme, EScanCncnResultStatus eStatus, 
     
         if (TI_OK != scanResultTable_UpdateEntry (pSme->hSmeScanResultTable, pFrameInfo->bssId, pFrameInfo))
         {
-            TRACE6(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_MeansurementScanResult: unable to update enrty for BSSID %02x:%02x:%02x:%02x:%02x:%02x because table is full\n", (*pFrameInfo->bssId)[ 0 ], (*pFrameInfo->bssId)[ 1 ], (*pFrameInfo->bssId)[ 2 ], (*pFrameInfo->bssId)[ 3 ], (*pFrameInfo->bssId)[ 4 ], (*pFrameInfo->bssId)[ 5 ]);
+            TRACE6(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_MeansurementScanResult: unable to update entry for BSSID %02x:%02x:%02x:%02x:%02x:%02x because table is full\n", (*pFrameInfo->bssId)[ 0 ], (*pFrameInfo->bssId)[ 1 ], (*pFrameInfo->bssId)[ 2 ], (*pFrameInfo->bssId)[ 3 ], (*pFrameInfo->bssId)[ 4 ], (*pFrameInfo->bssId)[ 5 ]);
         }
         break;
 
@@ -829,7 +829,9 @@ void sme_ReportConnStatus (TI_HANDLE hSme, mgmtStatus_e eStatusType, TI_UINT32 u
     case STATUS_AP_DEAUTHENTICATE:
     case STATUS_AP_DISASSOCIATE:
     case STATUS_ROAMING_TRIGGER:
+    case STATUS_DISCONNECT_DURING_CONNECT:
     case STATUS_AUTH_REJECT:
+
         /* Indicate the authentication and/or association was sent to the AP */
         pSme->bAuthSent = TI_TRUE;
 
@@ -839,6 +841,7 @@ void sme_ReportConnStatus (TI_HANDLE hSme, mgmtStatus_e eStatusType, TI_UINT32 u
 
         /* try to find the next connection candidate */
         pSme->pCandidate = sme_Select (hSme);
+
         /* if the next connection candidate exists */
         if (NULL != pSme->pCandidate)
         {
@@ -895,7 +898,7 @@ void sme_ReportApConnStatus (TI_HANDLE hSme, mgmtStatus_e eStatusType, TI_UINT32
 
     /* shouldn't happen (not from AP conn) */
     case STATUS_SUCCESSFUL:
-        TRACE0(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_ReportApConnStatus: received STATUS_SUCCESSFUL\n");
+        TRACE0(pSme->hReport, REPORT_SEVERITY_ERROR, "sme_ReportApConnStatus: received STATUS_SUCCESSFUL\n");
         break;
 
     case STATUS_UNSPECIFIED:
@@ -905,19 +908,16 @@ void sme_ReportApConnStatus (TI_HANDLE hSme, mgmtStatus_e eStatusType, TI_UINT32
     case STATUS_AP_DEAUTHENTICATE:
     case STATUS_AP_DISASSOCIATE:
     case STATUS_ROAMING_TRIGGER:
-       
+
         /* keep the disassociation status and code, for sending event to user-mode */
         pSme->tDisAssoc.eMgmtStatus = eStatusType;
         pSme->tDisAssoc.uStatusCode = uStatusCode;
         sme_SmEvent (pSme->hSmeSm, SME_SM_EVENT_CONNECT_FAILURE, hSme);
         break;
 
-    case STATUS_DISCONNECT_DURING_CONNECT:
-        sme_SmEvent (pSme->hSmeSm, SME_SM_EVENT_DISCONNECT, hSme);
-        break;
-
     default:
-        TRACE1(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_ReportApConnStatus: received unrecognized status: %d\n", eStatusType);
+
+        TRACE1(pSme->hReport, REPORT_SEVERITY_ERROR, "sme_ReportApConnStatus: received unrecognized status: %d\n", eStatusType);
 
     }
 }

@@ -90,9 +90,6 @@ typedef struct
 
 
 /* (Re)Association response frame structure */
-#define ASSOC_RESP_FIXED_DATA_LEN 6
-#define ASSOC_RESP_AID_MASK  0x3FFF  /* The AID is only in 14 LS bits. */
-
 typedef struct
 {
     TI_UINT16                   capabilities;      
@@ -154,6 +151,10 @@ typedef struct
     dot11_TIM_t                 *pTIM;                  /* for beacons only */
     TI_UINT8                    *pUnknownIe;
     TI_UINT16                   unknownIeLen;
+
+    dot11_NEIGHBOR_REPORT_IE_t              *pNeighborReport;
+    dot11_RM_ENABLED_CAPABILITIES_IE_t      *pRRMCapabilities;
+    
 } beacon_probeRsp_t; 
 
 
@@ -228,6 +229,10 @@ typedef struct
     dot11_QOS_CAPABILITY_IE_t   QosCapParams;
 	Tdot11HtCapabilitiesUnparse tHtCapabilities;
 	Tdot11HtInformationUnparse	tHtInformation;
+
+    dot11_RM_ENABLED_CAPABILITIES_IE_t  tRRMEnabledCap;
+    dot11_NEIGHBOR_REPORT_IE_t          tNeighborReport;
+    
     TI_UINT8                rxChannel;
     TI_UINT8                band;
     TI_BOOL                 myBssid;
@@ -244,21 +249,22 @@ typedef struct
 typedef void (*mlme_resultCB_t)( TI_HANDLE hObj, TMacAddr* bssid, mlmeFrameInfo_t* pFrameInfo,
                                  TRxAttr* pRxAttr, TI_UINT8* frame, TI_UINT16 frameLength );
 
+
 /* External data definitions */
 
 /* External functions definitions */
 
 /* Function prototypes */
 
-/* MLME SM API */
+/* MLME API */
 
 TI_HANDLE mlme_create(TI_HANDLE hOs);
 
-TI_STATUS mlme_unload(TI_HANDLE hMlme);
+TI_STATUS mlme_destroy(TI_HANDLE hMlme);
 
 void      mlme_init (TStadHandlesList *pStadHandles);
 
-void      mlme_SetDefaults (TI_HANDLE hMlmeSm, TMlmeInitParams *pMlmeInitParams);
+void      mlme_SetDefaults (TI_HANDLE hMlme, TMlmeInitParams *pMlmeInitParams);
 
 TI_STATUS mlme_setParam(TI_HANDLE           hMlmeSm,
                         paramInfo_t         *pParam);
@@ -266,11 +272,19 @@ TI_STATUS mlme_setParam(TI_HANDLE           hMlmeSm,
 TI_STATUS mlme_getParam(TI_HANDLE           hMlmeSm, 
                         paramInfo_t         *pParam);
 
-TI_STATUS mlme_start(TI_HANDLE hMlme);
+TI_STATUS mlme_start(TI_HANDLE hMlme, TI_UINT8 connectionType);
 
 TI_STATUS mlme_stop(TI_HANDLE hMlme, DisconnectType_e disConnType, mgmtStatus_e reason);
 
-TI_STATUS mlme_reportAuthStatus(TI_HANDLE hMlme, TI_UINT16 status);
+TI_STATUS mlme_assocRecv(TI_HANDLE hMlme, mlmeFrameInfo_t *pFrame);
+
+TI_STATUS mlme_authRecv(TI_HANDLE hMlme, mlmeFrameInfo_t *pFrame);
+
+
+TI_STATUS mlme_saveAssocReqMessage(TI_HANDLE hMlme, TI_UINT8 *pAssocBuffer, TI_UINT32 length);
+
+TI_STATUS mlme_saveAssocRespMessage(TI_HANDLE hMlme, TI_UINT8 *pAssocBuffer, TI_UINT32 length);
+
 
 TI_STATUS mlme_reportAssocStatus(TI_HANDLE hMlme, TI_UINT16 status);
 
@@ -292,33 +306,5 @@ void mlmeParser_readXCCOui (TI_UINT8 *pData,
 #endif
 
 mlmeIEParsingParams_t *mlmeParser_getParseIEsBuffer(TI_HANDLE *hMlme);
-
-/* Association SM API */
-
-TI_HANDLE assoc_create(TI_HANDLE pOs);
-
-TI_STATUS assoc_unload(TI_HANDLE pAssoc);
-
-void      assoc_init (TStadHandlesList *pStadHandles);
-
-TI_STATUS assoc_SetDefaults (TI_HANDLE hAssoc, assocInitParams_t *pAssocInitParams);
-
-TI_STATUS assoc_setParam(TI_HANDLE hCtrlData, paramInfo_t   *pParam);
-
-TI_STATUS assoc_getParam(TI_HANDLE hCtrlData, paramInfo_t   *pParam);
-
-/* Authentication SM API */
-
-TI_HANDLE auth_create(TI_HANDLE hOs);
-
-TI_STATUS auth_unload(TI_HANDLE hAuth);
-
-void      auth_init (TStadHandlesList *pStadHandles);
-
-TI_STATUS auth_SetDefaults (TI_HANDLE hAuth, authInitParams_t *pAuthInitParams);
-
-TI_STATUS auth_setParam(TI_HANDLE hCtrlData, paramInfo_t    *pParam);
-
-TI_STATUS auth_getParam(TI_HANDLE hCtrlData, paramInfo_t    *pParam);
 
 #endif /* __MLME_API_H__*/

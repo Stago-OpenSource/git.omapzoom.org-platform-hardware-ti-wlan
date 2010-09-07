@@ -124,6 +124,17 @@ TI_STATUS PowerMgr_SetDefaults (TI_HANDLE hPowerMgr, PowerMgrInitParams_t* pPowe
 /**
  * \
  * \date 24-Oct-2005\n
+ * \brief Recovery of the PowerMgr module.
+ *
+ * Function Scope \e Public.\n
+ * Parameters:    hPowerMgr - The powerMgr module handle  \n
+ * Return Value:  void  \n
+ */
+void PowerMgr_recover(TI_HANDLE hPowerMgr);
+
+/**
+ * \
+ * \date 24-Oct-2005\n
  * \brief Start the power save algorithm of the driver and also the 802.11 PS.
  *
  * Function Scope \e Public.\n
@@ -150,17 +161,6 @@ TI_STATUS PowerMgr_startPS(TI_HANDLE thePowerMgrHandle);
  */
 TI_STATUS PowerMgr_stopPS(TI_HANDLE thePowerMgrHandle, TI_BOOL bDisconnect);
 
-/**
- * \
- * \date 24-Oct-2005\n
- * \brief returns the 802.11 power save status (enable / disable).
- *
- * Function Scope \e Public.\n
- * Parameters:\n
- * 1) TI_HANDLE - handle to the PowerMgr object.\n
- * Return Value: TI_BOOL - TI_TRUE if enable else TI_FALSE.\n
-*/
-TI_BOOL PowerMgr_getPsStatus(TI_HANDLE thePowerMgrHandle);
 
 
 

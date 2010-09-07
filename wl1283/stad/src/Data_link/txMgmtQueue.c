@@ -92,12 +92,14 @@ typedef enum
 /* State-Machine States */
 typedef enum
 {
-	SM_STATE_CLOSE,			/* All Tx path is closed. */
-	SM_STATE_MGMT,			/* Only mgmt Tx is permitted. */
-	SM_STATE_EAPOL,			/* Only mgmt and EAPOL Tx is permitted. */
-	SM_STATE_OPEN_MGMT,		/* All Tx permitted and Mgmt aQueues are currently active (date disabled). */
-	SM_STATE_OPEN_DATA		/* All Tx permitted and Data aQueues are currently active (mgmt disabled). */
+    SM_STATE_CLOSE,			/* All Tx path is closed. */
+    SM_STATE_MGMT,			/* Only mgmt Tx is permitted. */
+    SM_STATE_EAPOL,			/* Only mgmt and EAPOL Tx is permitted. */
+    SM_STATE_OPEN_MGMT,		/* All Tx permitted and Mgmt aQueues are currently active (date disabled). */
+    SM_STATE_OPEN_DATA		/* All Tx permitted and Data aQueues are currently active (mgmt disabled). */
 } ESmState;
+
+
 
 /* State-Machine Actions */
 typedef enum
@@ -133,7 +135,7 @@ typedef struct
 	TI_HANDLE       hTWD;
 		
 	TI_BOOL			bMgmtPortEnable;/* Port open for mgmt-aQueues or not. */
-	ESmState		eSmState;	    /* The current state of the SM. */	
+	ESmState	    eSmState;/* The current state of the SM. */	
 	ETxConnState	eTxConnState;   /* See typedef in module API. */
     TI_UINT32       uContextId;     /* ID allocated to this module on registration to context module */
 	
@@ -156,6 +158,26 @@ static void updateQueuesBusyMap (TTxMgmtQ *pTxMgmtQ, TI_UINT32 tidBitMap);
 /*******************************************************************************
 *                       PUBLIC  FUNCTIONS  IMPLEMENTATION					   *
 ********************************************************************************/
+
+
+
+/** 
+ * \fn     txMgmtQ_GetConnState 
+ * \brief  Get the Conection SM current state
+ * 
+ * Get the Connection SM current state.
+ * 
+ * \note   
+ * \param  hTxMgmtQ - Handle of the Tx Mgmt Queue module 
+ * \return Connection SM current state
+ * \sa     
+ */ 
+ETxConnState  txMgmtQ_GetConnState (TI_HANDLE hTxMgmtQ)
+{
+    TTxMgmtQ *pTxMgmtQ = (TTxMgmtQ *)hTxMgmtQ;
+    
+    return pTxMgmtQ->eTxConnState;
+}
 
 
 /** 
@@ -270,8 +292,6 @@ TI_STATUS txMgmtQ_Destroy (TI_HANDLE hTxMgmtQ)
     TI_STATUS  eStatus = TI_OK;
     int        uQueId;
 
-    /* Dequeue and free all queued packets */
-    txMgmtQ_ClearQueues (hTxMgmtQ);
 
     /* free Mgmt queues */
     for (uQueId = 0 ; uQueId < NUM_OF_MGMT_QUEUES ; uQueId++)
@@ -311,17 +331,14 @@ void txMgmtQ_ClearQueues (TI_HANDLE hTxMgmtQ)
     /* Dequeue and free all queued packets */
     for (uQueId = 0 ; uQueId < NUM_OF_MGMT_QUEUES ; uQueId++)
     {
-        while (1)
-        {
+        do {
             context_EnterCriticalSection (pTxMgmtQ->hContext);
             pPktCtrlBlk = (TTxCtrlBlk *) que_Dequeue (pTxMgmtQ->aQueues[uQueId]);
             context_LeaveCriticalSection (pTxMgmtQ->hContext);
-            if (pPktCtrlBlk == NULL) 
-            {
-                break;
-            }
+            if (pPktCtrlBlk != NULL) {
             txCtrl_FreePacket (pTxMgmtQ->hTxCtrl, pPktCtrlBlk, TI_NOK);
         }
+        } while (pPktCtrlBlk != NULL);
     }
 }
 
@@ -953,6 +970,7 @@ void txMgmtQ_PrintModuleParams (TI_HANDLE hTxMgmtQ)
  */ 
 void txMgmtQ_PrintQueueStatistics (TI_HANDLE hTxMgmtQ)
 {
+#ifdef REPORT_LOG
 	TTxMgmtQ *pTxMgmtQ = (TTxMgmtQ *)hTxMgmtQ;
 	TI_UINT32 uQueId;
 
@@ -980,6 +998,7 @@ void txMgmtQ_PrintQueueStatistics (TI_HANDLE hTxMgmtQ)
         WLAN_OS_REPORT(("Que[%d]:  %d\n", uQueId, pTxMgmtQ->tDbgCounters.aDroppedPackets[uQueId]));
 
 	WLAN_OS_REPORT(("==========================================================\n\n"));
+#endif    
 }
 
 

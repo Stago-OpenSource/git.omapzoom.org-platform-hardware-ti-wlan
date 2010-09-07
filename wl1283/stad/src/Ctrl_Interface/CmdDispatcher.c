@@ -93,7 +93,7 @@ typedef struct
     TI_HANDLE    hSme;
     TI_HANDLE    hScanCncn;
     TI_HANDLE    hScanMngr;
-    TI_HANDLE    hMlmeSm;
+    TI_HANDLE    hMlme;
     TI_HANDLE    hRegulatoryDomain;
     TI_HANDLE    hMeasurementMgr;
     TI_HANDLE    hRoamingMngr;
@@ -180,8 +180,6 @@ void cmdDispatch_Init (TStadHandlesList *pStadHandles)
     
     /* Save modules handles */
     pCmdDispatch->hReport           = pStadHandles->hReport;
-    pCmdDispatch->hAuth             = pStadHandles->hAuth;
-    pCmdDispatch->hAssoc            = pStadHandles->hAssoc;
     pCmdDispatch->hRxData           = pStadHandles->hRxData;
     pCmdDispatch->hTxCtrl           = pStadHandles->hTxCtrl;
     pCmdDispatch->hCtrlData         = pStadHandles->hCtrlData;
@@ -191,7 +189,7 @@ void cmdDispatch_Init (TStadHandlesList *pStadHandles)
     pCmdDispatch->hSme              = pStadHandles->hSme;
     pCmdDispatch->hScanCncn         = pStadHandles->hScanCncn;
     pCmdDispatch->hScanMngr         = pStadHandles->hScanMngr;
-    pCmdDispatch->hMlmeSm           = pStadHandles->hMlmeSm; 
+    pCmdDispatch->hMlme             = pStadHandles->hMlme; 
     pCmdDispatch->hRegulatoryDomain = pStadHandles->hRegulatoryDomain;
     pCmdDispatch->hMeasurementMgr   = pStadHandles->hMeasurementMgr;
     pCmdDispatch->hRoamingMngr      = pStadHandles->hRoamingMngr;
@@ -255,14 +253,6 @@ TI_STATUS cmdDispatch_Destroy (TI_HANDLE hCmdDispatch)
  */ 
 static void cmdDispatch_ConfigParamsAccessTable (TCmdDispatchObj *pCmdDispatch)
 {
-    pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(AUTH_MODULE_PARAM) - 1].set = auth_setParam;
-    pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(AUTH_MODULE_PARAM) - 1].get = auth_getParam;
-    pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(AUTH_MODULE_PARAM) - 1].handle = pCmdDispatch->hAuth;
-
-    pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(ASSOC_MODULE_PARAM) - 1].set = assoc_setParam;
-    pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(ASSOC_MODULE_PARAM) - 1].get = assoc_getParam;
-    pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(ASSOC_MODULE_PARAM) - 1].handle = pCmdDispatch->hAssoc;
-
     pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(RX_DATA_MODULE_PARAM) - 1].set = rxData_setParam;
     pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(RX_DATA_MODULE_PARAM) - 1].get = rxData_getParam;
     pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(RX_DATA_MODULE_PARAM) - 1].handle = pCmdDispatch->hRxData;
@@ -309,7 +299,7 @@ static void cmdDispatch_ConfigParamsAccessTable (TCmdDispatchObj *pCmdDispatch)
     
     pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(MLME_SM_MODULE_PARAM) - 1].set = mlme_setParam;
     pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(MLME_SM_MODULE_PARAM) - 1].get = mlme_getParam;
-    pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(MLME_SM_MODULE_PARAM) - 1].handle = pCmdDispatch->hMlmeSm;
+    pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(MLME_SM_MODULE_PARAM) - 1].handle = pCmdDispatch->hMlme;
 
     pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(REGULATORY_DOMAIN_MODULE_PARAM) - 1].set = regulatoryDomain_setParam;
     pCmdDispatch->paramAccessTable[GET_PARAM_MODULE_NUMBER(REGULATORY_DOMAIN_MODULE_PARAM) - 1].get = regulatoryDomain_getParam;

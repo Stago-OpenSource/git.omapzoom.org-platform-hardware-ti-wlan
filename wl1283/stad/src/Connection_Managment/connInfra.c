@@ -358,18 +358,24 @@ static TI_STATUS JoinWait_to_mlmeWait(void *pData)
     pParam->paramType = MLME_RE_ASSOC_PARAM;
 
     if( pConn->connType == CONN_TYPE_ROAM )
+	{
         pParam->content.mlmeReAssoc = TI_TRUE;
+	}
     else 
+	{
         pParam->content.mlmeReAssoc = TI_FALSE;
+	}
 
-    status = mlme_setParam(pConn->hMlmeSm, pParam);
+    status = mlme_setParam(pConn->hMlme, pParam);
 
     if (status != TI_OK)
     {
         TRACE1( pConn->hReport, REPORT_SEVERITY_FATAL_ERROR, "JoinWait_to_mlmeWait: mlme_setParam return 0x%x.\n", status);
     }
-    os_memoryFree(pConn->hOs, pParam, sizeof(paramInfo_t));
-    return mlme_start(pConn->hMlmeSm);
+	os_memoryFree(pConn->hOs, pParam, sizeof(paramInfo_t));
+
+	/* TODO - YD - check the association type and then start mlme */
+	return mlme_start(pConn->hMlme, pConn->connType);
 }
 
 
@@ -380,7 +386,7 @@ static TI_STATUS mlmeWait_to_WaitDisconnect(void *pData)
     paramInfo_t *pParam;
     conn_t      *pConn = (conn_t *)pData;
 
-    status = mlme_stop( pConn->hMlmeSm, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP );
+    status = mlme_stop( pConn->hMlme, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP );
     if (status != TI_OK)
         return status;
 
@@ -489,7 +495,7 @@ static TI_STATUS rsnWait_to_disconnect(void *pData)
     /* Update TxMgmtQueue SM to close Tx path for all except Mgmt packets. */
     txMgmtQ_SetConnState (pConn->hTxMgmtQ, TX_CONN_STATE_MGMT);
 
-    status = mlme_stop( pConn->hMlmeSm, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP );
+    status = mlme_stop( pConn->hMlme, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP );
 
     if (status != TI_OK)
         return status;
@@ -526,7 +532,7 @@ static TI_STATUS configHW_to_disconnect(void *pData)
         /* Update TxMgmtQueue SM to close Tx path for all except Mgmt packets. */
         txMgmtQ_SetConnState (pConn->hTxMgmtQ, TX_CONN_STATE_MGMT);
 
-        status = mlme_stop( pConn->hMlmeSm, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP );
+        status = mlme_stop( pConn->hMlme, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP );
         if (status == TI_OK) 
         {
             pParam->paramType = REGULATORY_DOMAIN_DISCONNECT_PARAM;
@@ -572,7 +578,7 @@ static TI_STATUS connInfra_ScrWaitDisconn_to_disconnect(void *pData)
         pParam->paramType = REGULATORY_DOMAIN_DISCONNECT_PARAM;
         regulatoryDomain_setParam(pConn->hRegulatoryDomain, pParam);
 
-        status = mlme_stop( pConn->hMlmeSm, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP );
+        status = mlme_stop( pConn->hMlme, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP );
         if (status == TI_OK) 
         {
             /* Must be called AFTER mlme_stop. since De-Auth packet should be sent with the
@@ -689,6 +695,8 @@ static TI_STATUS configHW_to_connected(void *pData)
     siteMgr_printPrimarySiteDesc(pConn->hSiteMgr);
      TRACE0(pConn->hReport, REPORT_SEVERITY_CONSOLE, "****************************************\n"); 
     WLAN_OS_REPORT(("****************************************\n"));
+#else
+    os_printf("%s: *** NEW CONNECTION ***\n", __func__);
 #endif
 
     return TI_OK;
@@ -732,8 +740,7 @@ static TI_STATUS connInfra_ScrWait(void *pData)
         pConn->scrRequested[ uResourceIndex ] = TI_TRUE;
 
         /* sanity check */
-        if ((scrReplyStatus[ uResourceIndex ] > SCR_CRS_PEND) ||
-            (scrReplyStatus[ uResourceIndex ] < SCR_CRS_RUN))
+        if (scrReplyStatus[ uResourceIndex ] > SCR_CRS_PEND)
         {
             TRACE2(pConn->hReport, REPORT_SEVERITY_ERROR , "Idle_to_ScrWait: SCR for resource %d returned status %d\n", uResourceIndex, scrReplyStatus[ uResourceIndex ]);
             return TI_NOK;
@@ -752,7 +759,7 @@ static TI_STATUS connInfra_ScrWait(void *pData)
     else
     {
         /* mark which resource is pending (or both) */
-        for (uResourceIndex = SCR_RESOURCE_PERIODIC_SCAN;
+        for (uResourceIndex = SCR_RESOURCE_SERVING_CHANNEL;
              uResourceIndex < SCR_RESOURCE_NUM_OF_RESOURCES;
              uResourceIndex++)
         {
@@ -796,8 +803,12 @@ void InfraConnSM_ScrCB( TI_HANDLE hConn, EScrClientRequestStatus requestStatus,
         }
         break;
 
-    case SCR_CRS_FW_RESET:
-        /* Ignore FW reset, the MLME SM will handle re-try of the conn */
+	case SCR_CRS_FW_RESET:
+        if (pConn->state == STATE_CONN_INFRA_WAIT_JOIN_CMPLT)
+		{
+			connInfra_JoinCmpltNotification((TI_HANDLE) pConn);
+		}
+
         TRACE0( pConn->hReport, REPORT_SEVERITY_INFORMATION, "Infra Conn: Recovery occured.\n");
         break;
 
@@ -956,7 +967,7 @@ static TI_STATUS connect_to_ScrWait(void *pData)
         /* Update TxMgmtQueue SM to close Tx path. */
         txMgmtQ_SetConnState (((conn_t *)pData)->hTxMgmtQ, TX_CONN_STATE_CLOSE);
 
-        status = mlme_stop(pConn->hMlmeSm, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP);
+        status = mlme_stop(pConn->hMlme, DISCONNECT_IMMEDIATE, pConn->disConnReasonToAP);
         if (status == TI_OK)
         {
             pParam->paramType = REGULATORY_DOMAIN_DISCONNECT_PARAM;

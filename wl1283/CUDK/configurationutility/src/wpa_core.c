@@ -49,7 +49,7 @@
 
 /* defines */
 /***********/
-#ifdef CONFIG_EAP_WSC
+#ifdef CONFIG_WPS
 #define WSC_MODE_OFF	0
 #define WSC_MODE_PIN	1
 #define WSC_MODE_PBC	2
@@ -70,7 +70,7 @@ typedef struct
 	U8 wep_key[4][32];
 	U8 default_wep_key;
 	U8 wep_key_length;
-#ifdef CONFIG_EAP_WSC
+#ifdef CONFIG_WPS
 	U8	WscMode;
 	PS8 pWscPin;
 #endif
@@ -119,7 +119,7 @@ static VOID WpaCore_InitWpaParams(TWpaCore* pWpaCore)
 	  pWpaCore->WpaSupplParams.pair_wise = WPA_CIPHER_NONE;
 	  pWpaCore->WpaSupplParams.group = WPA_CIPHER_NONE; 
       pWpaCore->WpaSupplParams.anyWpaMode = 0;
-      #ifdef CONFIG_EAP_WSC
+      #ifdef CONFIG_WPS
 	pWpaCore->WpaSupplParams.pWscPin = NULL;
 	pWpaCore->WpaSupplParams.WscMode = WSC_MODE_OFF;
 #endif
@@ -153,7 +153,7 @@ THandle WpaCore_Create(PS32 pRes, PS8 pSupplIfFile)
 	pWpaCore->CurrentNetwork = -1;
 
 	/* send default configuration to the supplicant */
-	IpcWpa_Command(pWpaCore->hIpcWpa, (PS8)"AP_SCAN 2", FALSE);	
+	IpcWpa_Command(pWpaCore->hIpcWpa, (PS8)"AP_SCAN 1", FALSE);	
 
 	return pWpaCore;
 }
@@ -164,7 +164,7 @@ VOID WpaCore_Destroy(THandle hWpaCore)
 
 	if(pWpaCore->hIpcWpa)
 		IpcWpa_Destroy(pWpaCore->hIpcWpa);
-#ifdef CONFIG_EAP_WSC
+#ifdef CONFIG_WPS
 	if(pWpaCore->WpaSupplParams.pWscPin)
 		os_MemoryFree(pWpaCore->WpaSupplParams.pWscPin);	
 #endif
@@ -414,12 +414,18 @@ S32 WpaCore_GetDefaultKey(THandle hWpaCore, U32* pDefaultKeyIndex)
 	return OK;
 }
 
-#ifdef CONFIG_EAP_WSC
+#ifdef CONFIG_WPS
 S32 WpaCore_StartWpsPIN(THandle hWpaCore)
 {
 	TWpaCore* pWpaCore = (TWpaCore*)hWpaCore;
+	S8 cmd[100];
 
 	pWpaCore->WpaSupplParams.WscMode = WSC_MODE_PIN;
+
+#ifdef SUPPL_WPS_SUPPORT
+	os_sprintf(cmd, "WPS_PIN any");
+	IpcWpa_Command(pWpaCore->hIpcWpa, cmd, TRUE);
+#endif
 	
 	return OK;
 }
@@ -427,9 +433,15 @@ S32 WpaCore_StartWpsPIN(THandle hWpaCore)
 S32 WpaCore_StartWpsPBC(THandle hWpaCore)
 {
 	TWpaCore* pWpaCore = (TWpaCore*)hWpaCore;
-	
+	S8 cmd[100];
+
 	pWpaCore->WpaSupplParams.WscMode = WSC_MODE_PBC;
 	
+#ifdef SUPPL_WPS_SUPPORT
+	os_sprintf(cmd, (PS8)"WPS_PBC");
+	IpcWpa_Command(pWpaCore->hIpcWpa, cmd, TRUE);
+#endif
+
 	return OK;
 }
 
@@ -458,7 +470,7 @@ S32 WpaCore_SetPin(THandle hWpaCore, PS8 pPinStr)
 
 	return OK;
 }
-#endif /* CONFIG_EAP_WSC */
+#endif /* CONFIG_WPS */
 
 S32 WpaCore_SetAnyWpaMode(THandle hWpaCore, U8 anyWpaMode)
 {
@@ -758,6 +770,7 @@ S32 WpaCore_SetSsid(THandle hWpaCore, OS_802_11_SSID* ssid, TMacAddr bssid)
 
       Len = os_strlen ((PS8)pWpaCore->WpaSupplParams.client_cert);
       os_memcpy(pWpaCore->WpaSupplParams.private_key,pWpaCore->WpaSupplParams.client_cert,Len);
+      if (Len > 3)
       os_memcpy(&pWpaCore->WpaSupplParams.private_key[Len-3],"pem",3);
     
       os_sprintf(cmd, (PS8)"SET_NETWORK %d private_key \"%s\"", NetworkID,pWpaCore->WpaSupplParams.private_key);
@@ -785,6 +798,7 @@ S32 WpaCore_SetSsid(THandle hWpaCore, OS_802_11_SSID* ssid, TMacAddr bssid)
         }
       
     }
+
 
     if (pWpaCore->WpaSupplParams.eap == OS_EAP_TYPE_FAST) 
     {
@@ -843,7 +857,7 @@ S32 WpaCore_SetSsid(THandle hWpaCore, OS_802_11_SSID* ssid, TMacAddr bssid)
 	}
 
    
-#ifdef CONFIG_EAP_WSC
+#ifdef CONFIG_WPS
 	if (pWpaCore->WpaSupplParams.WscMode)
 	{
 		os_sprintf(cmd, (PS8)"SET_NETWORK %d wsc_mode %d", NetworkID, pWpaCore->WpaSupplParams.WscMode);

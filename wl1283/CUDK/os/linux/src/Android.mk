@@ -3,7 +3,7 @@ include $(CLEAR_VARS)
 
 STATIC_LIB ?= y
 DEBUG ?= y
-BUILD_SUPPL ?= y
+BUILD_SUPPL = y
 WPA_ENTERPRISE ?= y
 
 ifeq ($(DEBUG),y)
@@ -57,14 +57,6 @@ LOCAL_SRC_FILES:= \
 	os_trans.c \
 	ParsEvent.c \
 	osapi.c
-
-ifeq ($(BUILD_SUPPL), y)
-	ifeq ($(WPA_SUPPLICANT_VERSION),VER_0_5_X)
-	LOCAL_SRC_FILES += ../../../../../../../../$(WPA_SUPPL_DIR)/wpa_ctrl.c
-	else
-	LOCAL_SRC_FILES += ../../../../../../../../$(WPA_SUPPL_DIR)/src/common/wpa_ctrl.c
-	endif
-endif
 
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/../inc \

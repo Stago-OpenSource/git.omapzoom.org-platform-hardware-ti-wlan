@@ -122,7 +122,8 @@ typedef enum
 typedef enum
 {
     SCHEDULED_SCAN_COMPLETED_OK = 0,
-    SCHEDULED_SCAN_TSF_ERROR    = 1
+    SCHEDULED_SCAN_TSF_ERROR    = 1,
+    SCHEDULED_SCAN_FAIL         = 2
 } ScheduledScanReportStatus_enum;
 
 
@@ -137,8 +138,6 @@ typedef enum
 {
     ENTER_POWER_SAVE_FAIL    =  0,
     ENTER_POWER_SAVE_SUCCESS =  1,
-    EXIT_POWER_SAVE_FAIL     =  2,
-    EXIT_POWER_SAVE_SUCCESS  =  3,
     POWER_SAVE_STATUS_NUMBER
 } EventsPowerSave_enum;
 

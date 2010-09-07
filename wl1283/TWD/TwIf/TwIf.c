@@ -47,6 +47,7 @@
 
 #define __FILE_ID__  FILE_ID_121
 #include "tidef.h"
+#include "osApi.h"
 #include "report.h"
 #include "context.h"
 #include "timer.h"
@@ -486,7 +487,15 @@ void twIf_SetPartition (TI_HANDLE hTwIf,
 
     /* Allocate memory for the current 4 partition transactions */
     pPartitionRegTxn = (TPartitionRegTxn *) os_memoryAlloc (pTwIf->hOs, 7*sizeof(TPartitionRegTxn));
-    pTxnHdr       = &(pPartitionRegTxn->tHdr);
+
+    /* Sanity - Make sure allocation did not fail */
+    if(NULL == pPartitionRegTxn)
+    {
+        TRACE0(pTwIf->hReport, REPORT_SEVERITY_FATAL_ERROR, "twIf_SetPartition() - Allocation for pPartitionRegTxn has failed! Return.\n");
+        return;
+    }
+
+    pTxnHdr = &(pPartitionRegTxn->tHdr);
 
     /* Zero the allocated memory to be certain that unused fields will be initialized */
     os_memoryZero(pTwIf->hOs, pPartitionRegTxn, 7*sizeof(TPartitionRegTxn));
@@ -748,6 +757,9 @@ TRACE2(pTwIf->hReport, REPORT_SEVERITY_ERROR, "twIf_SendTransaction: Unaligned H
     /* If Txn status is PENDING issue Start event to the SM */
     if (eStatus == TXN_STATUS_PENDING)
     {
+        /* Prevent system suspend one more second after WLAN task completion (to cover DMA transaction) */
+        os_wake_lock_timeout_enable(pTwIf->hOs);
+
         twIf_HandleSmEvent (pTwIf, SM_EVENT_START);
     }
 
@@ -1113,6 +1125,7 @@ TI_BOOL	twIf_isValidRegAddr(TI_HANDLE hTwIf, TI_UINT32 Address, TI_UINT32 Length
  */ 
 void twIf_PrintModuleInfo (TI_HANDLE hTwIf) 
 {
+#ifdef REPORT_LOG
     TTwIfObj *pTwIf = (TTwIfObj*)hTwIf;
 	
 	WLAN_OS_REPORT(("-------------- TwIf Module Info-- ------------------------\n"));
@@ -1134,6 +1147,7 @@ void twIf_PrintModuleInfo (TI_HANDLE hTwIf)
 	WLAN_OS_REPORT(("uDbgCountTxnComplete = %d\n",   pTwIf->uDbgCountTxnComplete    ));
 	WLAN_OS_REPORT(("uDbgCountTxnDone     = %d\n",   pTwIf->uDbgCountTxnDoneCb      ));
 	WLAN_OS_REPORT(("==========================================================\n\n"));
+#endif
 } 
 
 

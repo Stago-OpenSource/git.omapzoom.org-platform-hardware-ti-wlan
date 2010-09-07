@@ -61,7 +61,9 @@ void measurementSRVPrintRequest( TI_HANDLE hMeasurementSRV, TMeasurementRequest 
 	TI_INT32 i;
 
 TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "Measurement request:\n");
-TRACE5( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "band: %d, channel:%d, TX power level: %d, start time: %x-%x\n", pMsrRequest->band, pMsrRequest->channel, pMsrRequest->txPowerDbm, INT64_HIGHER(pMsrRequest->startTime), INT64_LOWER(pMsrRequest->startTime));
+/*
+TRACE5( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, "band: %d, channel:%d, TX power level: %d, start time: %x-%x\n", pMsrRequest->msrTypes[i].band, pMsrRequest->channel, pMsrRequest->msrTypes[i].channelListBandBG.txPowerDbm[0], INT64_HIGHER(pMsrRequest->startTime), INT64_LOWER(pMsrRequest->startTime));
+*/
 	for ( i = 0; i < pMsrRequest->numberOfTypes; i++ )
 	{
 		measurementSRVPrintTypeRequest( hMeasurementSRV, &(pMsrRequest->msrTypes[ i ]));

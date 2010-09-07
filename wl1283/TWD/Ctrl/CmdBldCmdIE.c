@@ -140,6 +140,7 @@ TI_STATUS cmdBld_CmdIeStartBss (TI_HANDLE hCmdBld, BSS_e BssType, void *fJoinCom
     TI_UINT8 *BssId;
     TI_UINT8 *cmdBssId;
     EHwRateBitFiled HwBasicRatesBitmap;
+	EHwRateBitFiled HwSupportedRatesBitmap;
     TI_UINT32 i; 
     
     os_memoryZero (pCmdBld->hOs, (void *)pCmd, sizeof(StartJoinRequest_t));
@@ -165,6 +166,8 @@ TI_STATUS cmdBld_CmdIeStartBss (TI_HANDLE hCmdBld, BSS_e BssType, void *fJoinCom
      */
     cmdBld_ConvertAppRatesBitmap (pBssInfoParams->BasicRateSet, 0, &HwBasicRatesBitmap);
     pCmd->basicRateSet = ENDIAN_HANDLE_LONG(HwBasicRatesBitmap);
+	cmdBld_ConvertAppRatesBitmap (pBssInfoParams->SupportedRateSet, 0, &HwSupportedRatesBitmap);
+    pCmd->supportedRateSet = ENDIAN_HANDLE_LONG(HwSupportedRatesBitmap);
 
     /* BSS ID - reversed order (see wlan hardware spec) */
     BssId = DB_BSS(hCmdBld).BssId;
@@ -532,9 +535,9 @@ TI_STATUS cmdBld_CmdIeSetSplitScanTimeOut (TI_HANDLE hCmdBld, TI_UINT32 uTimeOut
 	enhancedTriggerTO_t Cmd_enhancedTrigger;
 	enhancedTriggerTO_t *pCmd = &Cmd_enhancedTrigger;
 
-TRACE1(pCmdBld->hReport, REPORT_SEVERITY_INFORMATION, "cmdBld_CmdIeSetSplitScanTimeOut: uTimeOut=%d -------------- \n", uTimeOut);
+	TRACE1(pCmdBld->hReport, REPORT_SEVERITY_INFORMATION, "cmdBld_CmdIeSetSplitScanTimeOut: uTimeOut=%d -------------- \n", uTimeOut);
 
-	pCmd->slicedScanTimeOut = uTimeOut;
+    pCmd->slicedScanTimeOut = uTimeOut;
 
 	return cmdQueue_SendCommand(pCmdBld->hCmdQueue, CMD_TRIGGER_SCAN_TO, (char *)pCmd, sizeof(*pCmd), fCB, hCb, NULL);
 }
@@ -687,29 +690,22 @@ TI_STATUS cmdBld_CmdIeNoiseHistogram (TI_HANDLE hCmdBld, TNoiseHistogram *pNoise
  * 
  * RETURNS: TI_OK or TI_NOK
  ****************************************************************************/
-TI_STATUS cmdBld_CmdIeSetPsMode (TI_HANDLE hCmdBld, TPowerSaveParams* powerSaveParams, void *fCb, TI_HANDLE hCb)
+TI_STATUS cmdBld_CmdIeSetPsMode (TI_HANDLE hCmdBld, TI_BOOL psEnable, void *fCb, TI_HANDLE hCb)
 {
     TCmdBld *pCmdBld = (TCmdBld *)hCmdBld;
     PSModeParameters_t   Cmd_PowerMgmtCnf;
     PSModeParameters_t * pCmd = &Cmd_PowerMgmtCnf;
 
-    os_memoryZero(pCmdBld->hOs, (void *)pCmd, sizeof(*pCmd));
-
-    if (powerSaveParams->ps802_11Enable)
+    if (psEnable)
     {
-        pCmd->mode = 1;
+        pCmd->mode = STATION_POWER_SAVE_MODE;
     }
     else
     {
-        pCmd->mode = 0;
+        pCmd->mode = STATION_ACTIVE_MODE;
     }
     
-    pCmd->hangOverPeriod            = powerSaveParams->hangOverPeriod;
-    pCmd->needToSendNullData        = powerSaveParams->needToSendNullData;
-    pCmd->rateToTransmitNullData    = ENDIAN_HANDLE_LONG(powerSaveParams->NullPktRateModulation);
-    pCmd->numberOfRetries           = powerSaveParams->numNullPktRetries;
-
-  	return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_SET_PS_MODE, (TI_CHAR *)pCmd, sizeof(*pCmd), fCb, hCb, NULL);
+    return cmdQueue_SendCommand (pCmdBld->hCmdQueue, CMD_SET_PS_MODE, (TI_CHAR *)pCmd, sizeof(*pCmd), fCb, hCb, NULL);
 }
 
 
@@ -820,6 +816,7 @@ TI_STATUS cmdBld_CmdIeMeasurement (TI_HANDLE          hCmdBld,
     pCmd->rxFilter.ConfigOptions =  ENDIAN_HANDLE_LONG(pMeasurementParams->ConfigOptions);
     pCmd->rxFilter.FilterOptions =  ENDIAN_HANDLE_LONG(pMeasurementParams->FilterOptions);
     pCmd->scanTag =                 (TI_UINT8)pMeasurementParams->eTag;
+	pCmd->EnterPS = 				(TI_UINT8)pMeasurementParams->enterPS;
 
     return cmdQueue_SendCommand (pCmdBld->hCmdQueue, 
                              CMD_MEASUREMENT, 
@@ -870,20 +867,95 @@ TI_STATUS cmdBld_CmdIeMeasurementStop (TI_HANDLE hCmdBld, void* fMeasureResponse
  ****************************************************************************/
 TI_STATUS cmdBld_CmdIeApDiscovery (TI_HANDLE hCmdBld, TApDiscoveryParams *pApDiscoveryParams, void *fCb, TI_HANDLE hCb)
 {
-    TCmdBld *pCmdBld = (TCmdBld *)hCmdBld;
+    TCmdBld                 *pCmdBld = (TCmdBld *)hCmdBld;
     ApDiscoveryParameters_t Cmd_ApDiscovery;
     ApDiscoveryParameters_t *pCmd = &Cmd_ApDiscovery;
-
-    os_memoryZero (pCmdBld->hOs, (void *)pCmd, sizeof(*pCmd));
+    TI_UINT32               durationPerChannel = 0;
+    TI_UINT8                i =0;
     
-    pCmd->txPowerAttenuation = pApDiscoveryParams->txPowerDbm;
-    pCmd->numOfProbRqst = pApDiscoveryParams->numOfProbRqst;
-    pCmd->scanDuration  =  ENDIAN_HANDLE_LONG(pApDiscoveryParams->scanDuration);
-    pCmd->scanOptions   =  ENDIAN_HANDLE_WORD(pApDiscoveryParams->scanOptions);
-    pCmd->txdRateSet    =  ENDIAN_HANDLE_LONG(pApDiscoveryParams->txdRateSet);
-    pCmd->rxFilter.ConfigOptions =  ENDIAN_HANDLE_LONG(pApDiscoveryParams->ConfigOptions);
-    pCmd->rxFilter.FilterOptions =  ENDIAN_HANDLE_LONG(pApDiscoveryParams->FilterOptions);
+    os_memoryZero (pCmdBld->hOs, (void *)pCmd, sizeof(*pCmd));
 
+    
+    pCmd->basicScanParams.numOfProbRqst = pApDiscoveryParams->numOfProbRqst;
+    pCmd->basicScanParams.rxCfg.ConfigOptions =  ENDIAN_HANDLE_LONG(pApDiscoveryParams->ConfigOptions);
+    pCmd->basicScanParams.rxCfg.FilterOptions =  ENDIAN_HANDLE_LONG(pApDiscoveryParams->FilterOptions);
+
+    pCmd->basicScanParams.scanOptions = ENDIAN_HANDLE_WORD(pApDiscoveryParams->scanOptions);
+    pCmd->basicScanParams.ssidLength = pApDiscoveryParams->ssid.len;
+
+    if (pCmd->basicScanParams.ssidLength > 0) 
+    {
+        os_memoryCopy(pCmdBld->hOs, pCmd->basicScanParams.ssidStr, pApDiscoveryParams->ssid.str,pApDiscoveryParams->ssid.len);
+        pCmd->basicScanParams.useSsidList = (TI_UINT8)TI_TRUE;
+    }
+    
+    
+    pCmd->txdRateSetBG = ENDIAN_HANDLE_LONG(pApDiscoveryParams->txdRateSetBandBG);
+    pCmd->txdRateSetA  = ENDIAN_HANDLE_LONG(pApDiscoveryParams->txdRateSetBandA);
+
+    
+    durationPerChannel = (TI_UINT32)(pApDiscoveryParams->scanDuration/(pApDiscoveryParams->channelListBandBG.uActualNumOfChannels
+                                                                       + (pApDiscoveryParams->channelListBandA.uActualNumOfChannels)));
+
+    
+    pCmd->channelParamsBandGeneral.scanMaxDuration = ENDIAN_HANDLE_LONG(durationPerChannel);
+    pCmd->channelParamsBandGeneral.scanMinDuration = ENDIAN_HANDLE_LONG((TI_UINT32)(durationPerChannel/2));
+    pCmd->channelParamsBandGeneral.bssIdH = 0xFFFF;
+    pCmd->channelParamsBandGeneral.bssIdL = 0xFFFFFFFF;
+    pCmd->channelParamsBandGeneral.ETCondCount = 0;
+
+
+    for(i=0; i < pApDiscoveryParams->channelListBandBG.uActualNumOfChannels; i++)
+    {
+        pCmd->channelParamsBandBG[i].channel = pApDiscoveryParams->channelListBandBG.channelList[i];
+        pCmd->channelParamsBandBG[i].txPowerAttenuation = pApDiscoveryParams->channelListBandBG.txPowerDbm[i];
+        pCmd->channelParamsBandBG[i].padding = 0;
+
+        TRACE3(pCmdBld->hReport, REPORT_SEVERITY_INFORMATION, "cmdBld_CmdIeApDiscovery: BG Channel[%d]=%d , txpower = %d \n",
+               i, pCmd->channelParamsBandBG[i].channel, pCmd->channelParamsBandBG[i].txPowerAttenuation);
+
+    }
+
+    for(i=0; i < pApDiscoveryParams->channelListBandA.uActualNumOfChannels; i++)
+    {
+        pCmd->channelParamsBandA[i].channel = pApDiscoveryParams->channelListBandA.channelList[i];
+        pCmd->channelParamsBandA[i].txPowerAttenuation = pApDiscoveryParams->channelListBandA.txPowerDbm[i];
+        pCmd->channelParamsBandA[i].padding = 0;
+
+
+        TRACE3(pCmdBld->hReport, REPORT_SEVERITY_INFORMATION, "cmdBld_CmdIeApDiscovery: A Channel[%d]=%d, txpower = %d \n" ,
+               i, pCmd->channelParamsBandA[i].channel, pCmd->channelParamsBandA[i].txPowerAttenuation);
+    }
+
+    pCmd->numOfChannelsBandBG = pApDiscoveryParams->channelListBandBG.uActualNumOfChannels;
+    pCmd->numOfChannelsBandA = pApDiscoveryParams->channelListBandA.uActualNumOfChannels;
+
+    
+    pApDiscoveryParams->ssid.str[pApDiscoveryParams->ssid.len] = 0;
+
+    
+     TRACE10(pCmdBld->hReport, REPORT_SEVERITY_INFORMATION,"cmdBld_CmdIeApDiscovery: "
+                    "Min Duration per channel = %d [usec] "
+                    "Max Duration per channel = %d [usec] "
+                    "numOfProbRqst = %d "
+                    "ssidLength = %d "
+                    "use SSID=%d "
+                    "scan option =%d "
+                    "channelListBandBG.uActualNumOfChannels = %d "
+                    "channelListBandA.uActualNumOfChannels = %d "
+                    "bssIdH=0x%x, bssIdL=0x%x\n", 
+                    pCmd->channelParamsBandGeneral.scanMinDuration,
+                    pCmd->channelParamsBandGeneral.scanMaxDuration,
+                    pCmd->basicScanParams.numOfProbRqst,
+                    pCmd->basicScanParams.ssidLength,
+                    pCmd->basicScanParams.useSsidList,
+                    pCmd->basicScanParams.scanOptions,
+                    pCmd->numOfChannelsBandBG,
+                    pCmd->numOfChannelsBandA,
+                    pCmd->channelParamsBandGeneral.bssIdH,
+                    pCmd->channelParamsBandGeneral.bssIdL);
+
+   
 	return cmdQueue_SendCommand (pCmdBld->hCmdQueue, 
                              CMD_AP_DISCOVERY, 
                              (void *)pCmd, 

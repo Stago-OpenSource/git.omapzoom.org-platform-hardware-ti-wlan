@@ -59,7 +59,6 @@
 #include "CmdBld.h"
 #include "RxQueue_api.h"
 
-void TWD_CheckSRConfigParams(TTwd  *pTWD, ACXSmartReflexConfigParams_t *tSmartReflexParams);
 
 
 #define TWD_CB_MODULE_OWNER_MASK    0xff00
@@ -103,12 +102,13 @@ TI_HANDLE TWD_Create (TI_HANDLE hOs)
         return NULL;
     }
 
-    /* Create the MAC Services module */
-    pTWD->hMacServices = MacServices_create (hOs);
-    if (pTWD->hMacServices == NULL)
+
+    /* Create the measurement server modules */
+    pTWD->hMeasurementSRV = MacServices_measurementSRV_create(hOs);
+	if (pTWD->hMeasurementSRV == NULL)
     {
-        TRACE0(pTWD->hReport, REPORT_SEVERITY_CONSOLE, "TWD MacServices_create failed!!!\n");
-        WLAN_OS_REPORT(("TWD MacServices_create failed!!!\n"));
+		TRACE0(pTWD->hReport, REPORT_SEVERITY_CONSOLE, "TWD MacServices_measurementSRV_create failed!!!\n");
+        WLAN_OS_REPORT(("TWD MacServices_measurementSRV_create failed!!!\n"));
         TWD_Destroy ((TI_HANDLE)pTWD);
         return NULL;
     }
@@ -262,13 +262,13 @@ TI_STATUS TWD_Destroy (TI_HANDLE hTWD)
     }
     WLAN_INIT_REPORT(("TWD_Destroy: Command Builder released\n"));
     
-    /* Free the MAC Services */
-    if (pTWD->hMacServices != NULL)
+    /* Free the measurement server */
+    if (pTWD->hMeasurementSRV != NULL)
     {
-        MacServices_destroy(pTWD->hMacServices);
-        pTWD->hMacServices = NULL;
+        MacServices_measurementSRV_destroy(pTWD->hMeasurementSRV);
+        pTWD->hMeasurementSRV = NULL;
     }
-    WLAN_INIT_REPORT(("TWD_Destroy: Mac Services released\n"));
+    WLAN_INIT_REPORT(("TWD_Destroy: Measurement Server released\n"));
     
     /*
      * Free the Ctrl modules
@@ -430,15 +430,16 @@ void TWD_Init (TI_HANDLE    hTWD,
                    hTWD, 
                    pTWD->hEventMbox, 
                    pTWD->hCmdQueue,
-                   pTWD->hTwIf);
+                   pTWD->hTwIf,
+                   pTWD->hTxHwQueue);
 
     hwInit_Init (pTWD->hHwInit,
-                   pTWD->hReport, 
+                 pTWD->hReport, 
                  pTWD->hTimer, 
-                   hTWD, 
-	               hTWD, 
-		           (TFinalizeCb)TWD_FinalizeDownload, 
-                   TWD_InitHwCb);
+                 hTWD, 
+	             hTWD, 
+		         (TFinalizeCb)TWD_FinalizeDownload, 
+                 TWD_InitHwCb);
 
     /*
      * Initialize the FW-Transfer modules
@@ -452,16 +453,15 @@ void TWD_Init (TI_HANDLE    hTWD,
     RxQueue_Init (pTWD->hRxQueue, pTWD->hReport, pTWD->hTimer);
 
 #ifdef TI_DBG
-    fwDbg_Init (pTWD->hFwDbg, pTWD->hReport, pTWD->hTwIf);
+    fwDbg_Init (pTWD->hFwDbg, pTWD->hReport, pTWD->hTwIf, pTWD->hFwEvent);
 #endif /* TI_DBG */
 
-    /* Initialize the MAC Services */
-    MacServices_init (pTWD->hMacServices, 
-                      pTWD->hReport, 
-                      hTWD, 
-                      pTWD->hCmdBld, 
-                      pTWD->hEventMbox,
-                      pTWD->hTimer);
+    /* Initialize the measurement server */
+    MacServices_measurementSRV_init (pTWD->hMeasurementSRV, 
+                                     pTWD->hReport, 
+                                     pTWD->hCmdBld, 
+                                     pTWD->hEventMbox, 
+                                     pTWD->hTimer);
 
     /*
      * Initialize the Data-Services modules
@@ -602,6 +602,9 @@ static TI_STATUS TWD_ConfigFwCb (TI_HANDLE hTWD, TI_STATUS status)
     /* Provide number of HW Tx-blocks and descriptors to Tx-HW-Queue module */
     txHwQueue_SetHwInfo (pTWD->hTxHwQueue, pDmaParams);
 
+    /* call all the CB stored in the aRecoveryQueue */
+    cmdQueue_EndReconfig(pTWD->hCmdQueue);
+
     /* If the configure complete function was registered, we call it here - end of TWD_Configure stage */
     if (pTWD->fConfigFwCb) 
     {
@@ -627,6 +630,7 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
     IniFileGeneralParam 		*pGenParams = &DB_GEN(pTWD->hCmdBld);
 	TRateMngParams      		*pRateMngParams = &DB_RM(pTWD->hCmdBld);
     TDmaParams          		*pDmaParams = &DB_DMA(pTWD->hCmdBld);
+	TPsParams				    *pPsParams = &DB_PS(pTWD->hCmdBld);
 
     TI_UINT32            k, uIndex;
     int iParam;
@@ -644,7 +648,10 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
     pWlanParams->nullTemplateSize           = pInitParams->tGeneral.nullTemplateSize;
     pWlanParams->disconnTemplateSize        = pInitParams->tGeneral.disconnTemplateSize;
     pWlanParams->ArpRspTemplateSize         = pInitParams->tGeneral.ArpRspTemplateSize;
+    pWlanParams->LinkMeasTemplateSize       = pInitParams->tGeneral.LinkMeasReportTemplateSize;
+    pWlanParams->bIsLinkMeasRequestEnabled  = pInitParams->tGeneral.bIsLinkMeasRequestEnabled;
 
+    
     /* Beacon broadcast options */
     pWlanParams->BcnBrcOptions.BeaconRxTimeout      = pInitParams->tGeneral.BeaconRxTimeout;
     pWlanParams->BcnBrcOptions.BroadcastRxTimeout   = pInitParams->tGeneral.BroadcastRxTimeout;
@@ -684,7 +691,7 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
     pWlanParams->TcxoValidOnWakeup      = pInitParams->tGeneral.TcxoValidOnWakeup;
     pWlanParams->TcxoLdoVoltage         = pInitParams->tGeneral.TcxoLdoVoltage;
     pWlanParams->NewPllAlgo             = pInitParams->tGeneral.NewPllAlgo;
-    pWlanParams->PlatformConfiguration  = pInitParams->tGeneral.PlatformConfiguration;
+    pWlanParams->PlatformConfiguration  = pInitParams->tPlatformGenParams.Platform_configuration;
 #endif
     /* No used */
     pWlanParams->FragmentThreshold          = pInitParams->tGeneral.halCtrlFragThreshold;
@@ -702,8 +709,16 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
     pWlanParams->RxIntrPacingThreshold      = pInitParams->tGeneral.RxIntrPacingThreshold;     
     pWlanParams->RxIntrPacingTimeout        = pInitParams->tGeneral.RxIntrPacingTimeout;      
 
+    /* Split Scan Timeout*/
+	pWlanParams->uSlicedScanTimeOut = pInitParams->tGeneral.uSplitScanTimeOut;
+
+
     /* Number of Rx mem-blocks to allocate in FW */
     pDmaParams->NumRxBlocks                 = pInitParams->tGeneral.uRxMemBlksNum;
+    pDmaParams->uDynMemEnable               = pInitParams->tGeneral.uDynMemEnable;
+    pDmaParams->uTxFreeReq                  = pInitParams->tGeneral.uTxFreeReq;
+    pDmaParams->uRxFreeReq                  = pInitParams->tGeneral.uRxFreeReq;
+    pDmaParams->uTxMin                      = pInitParams->tGeneral.uTxMin;
 
 
     /* GenFwCmd */
@@ -781,8 +796,6 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
     /* Configure the rxXfer module */
     rxXfer_Config (pTWD->hRxXfer, pInitParams);
 
-    MacServices_config (pTWD->hMacServices, pInitParams);   
-
     /* 
      * 802.11n
      */
@@ -827,6 +840,9 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
 #endif
     os_memoryCopy(pTWD->hOs, (void*)pGenParams, (void*)&pInitParams->tPlatformGenParams, sizeof(IniFileGeneralParam));
 
+    /* Configure Power Save Params*/
+	os_memoryCopy(pTWD->hOs, (void*)pPsParams, (void*)&pInitParams->tIniFilePsParams, sizeof(TPsParams));
+    
     
     os_memoryCopy (pTWD->hOs,
                    (void*)&(pWlanParams->tFmCoexParams),
@@ -862,40 +878,6 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
     return TI_OK;
 }
 
-/*
-#define MAX_SR_PARAM_LEN  14
-
-void TWD_CheckSRConfigParams(TTwd  *pTWD, ACXSmartReflexConfigParams_t *tSmartReflexParams)
-{
-  int i,j;
-  TI_UINT8 len; 
-  TI_BOOL flag = TI_FALSE;
-
-
-  for (i = 0; i<3; i++)
-  {
-    len = tSmartReflexParams->errorTable[i].len;
-     if (len > MAX_SR_PARAM_LEN)
-          flag = TI_TRUE;
-     for (j=0;j<len-1;j++)
-     {
-      if (tSmartReflexParams->errorTable[i].values[j] == 0) 
-         flag = TI_TRUE;
-     }
-     if (flag == TI_TRUE)
-      {
-        tSmartReflexParams->errorTable[i].len= 0 ;
-        tSmartReflexParams->errorTable[i].upperLimit = 0;
-        os_memoryZero(pTWD->hOs,tSmartReflexParams->errorTable[i].values,MAX_SR_PARAM_LEN) ;
-      }
-
-  }
-
-
-
-} */
-
-
 TI_STATUS TWD_ConfigFw (TI_HANDLE hTWD)
 {
     TTwd *pTWD = (TTwd *)hTWD;
@@ -917,12 +899,15 @@ void TWD_FinalizeDownload (TI_HANDLE hTWD)
 {
     TTwd *pTWD = (TTwd *)hTWD;
 
-    TRACE0(pTWD->hReport, REPORT_SEVERITY_INIT , "TWD_FinalizeDownload: called\n");
 
 	if ( pTWD == NULL )
 	{
 		return;
 	}
+
+    TRACE0(pTWD->hReport, REPORT_SEVERITY_INIT , "TWD_FinalizeDownload: called\n");
+
+
     /* Here at the end call the Initialize Complete callback that will release the user Init semaphore */
     TRACE0(pTWD->hReport, REPORT_SEVERITY_INIT, "Before sending the Init Complet callback !!!!!\n");
 
@@ -1012,8 +997,8 @@ static void TWD_RegisterOwnCb (TI_HANDLE hTWD, TI_UINT32 uCallBackID, void *fCb,
         cmdQueue_RegisterForErrorCb (pTWD->hCmdQueue, (void *)TWD_CheckMailboxCb, hTWD);
 
         /* Forward the Health-Moitor callback to the MAC-Services modules */
-        MacServices_registerFailureEventCB(pTWD->hMacServices, fCb, hCb);
-
+        MacServices_measurementSRV_registerFailureEventCB (pTWD->hMeasurementSRV, fCb, hCb);
+        
         /* Forward the Health-Moitor callback to the TwIf for bus errors */
         twIf_RegisterErrCb (pTWD->hTwIf, fCb, hCb);
 
@@ -1078,17 +1063,6 @@ TRACE0(pTWD->hReport, REPORT_SEVERITY_ERROR, "TWD_Register_CB: Invalid NULL Para
         TWD_RegisterOwnCb (hTWD, uCallbackId, fCb, pData);
         break;
  
-    case TWD_OWNER_MAC_SERVICES:
-        switch (uCallbackId)
-        {
-        case TWD_OWN_EVENT_SCAN_CMPLT:
-            MacServices_scanSRV_registerScanCompleteCB (pTWD->hMacServices, (TScanSrvCompleteCb)fCb, pData);
-            break;
-        default:
-            TRACE0(pTWD->hReport, REPORT_SEVERITY_ERROR, "TWD_Register_CB: TWD_OWNER_MAC_SERVICES - Illegal value\n");
-        }
-        break;
-
     case TWD_OWNER_SELF_CONFIG:    
         TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION, "TWD_Register_CB: TWD_OWNER_SELF_CONFIG\n");
         pTWD->fConfigFwCb  = (TTwdCallback)fCb;
@@ -1233,8 +1207,8 @@ TI_STATUS TWD_Stop (TI_HANDLE hTWD)
     cmdQueue_Restart (pTWD->hCmdQueue);
     cmdQueue_DisableMbox (pTWD->hCmdQueue);
     eventMbox_Stop (pTWD->hEventMbox);
-    MacServices_restart (pTWD->hMacServices); 
-
+    MacServices_measurementSRV_restart (pTWD->hMeasurementSRV);
+    
     status = twIf_Restart(pTWD->hTwIf);
     
     /* Call user stop callback */
@@ -1252,13 +1226,14 @@ void TWD_EnableExternalEvents (TI_HANDLE hTWD)
 
     TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_EnableExternalEvents: called\n");
 
+    /* unmasking the interrupt before going to sleep */
+    fwEvent_EnableExternalEvents (pTWD->hFwEvent);
+
     /* 
      * Enable sleep after all firmware initializations completed 
      * The awake was in the TWD_initHw phase
      */
     twIf_Sleep (pTWD->hTwIf);
-
-    fwEvent_EnableExternalEvents (pTWD->hFwEvent);
 }
 
 TI_BOOL TWD_RecoveryEnabled (TI_HANDLE hTWD)
@@ -1279,53 +1254,39 @@ TI_UINT32 TWD_GetMaxNumberOfCommandsInQueue (TI_HANDLE hTWD)
     return cmdQueue_GetMaxNumberOfCommands (pTWD->hCmdQueue);
 }
 
-TI_STATUS TWD_SetPsMode (TI_HANDLE                   hTWD,
-						 E80211PsMode ePsMode, 
-						 TI_BOOL bSendNullDataOnExit, 
-                         TI_HANDLE                   hPowerSaveCompleteCb,
-                         TPowerSaveCompleteCb        fPowerSaveCompleteCb,
-                         TPowerSaveResponseCb        fPowerSaveResponseCb)
+TI_STATUS TWD_SetPsMode (TI_HANDLE hTWD, E80211PsMode ePsMode,
+						 TI_HANDLE hPowerSaveResponseCb, TPowerSaveResponseCb fPowerSaveResponseCb)
 {
     TTwd *pTWD = (TTwd *)hTWD;
+    TI_BOOL psEnable = TI_FALSE;
 
     TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_SetPsMode: called\n");
 
-    return MacServices_powerSrv_SetPsMode (pTWD->hMacServices,
-                                           ePsMode,
-                                           bSendNullDataOnExit,
-                                           hPowerSaveCompleteCb,
-                                           fPowerSaveCompleteCb,
-                                           fPowerSaveResponseCb);
-}
+	switch (ePsMode)
+	{
+		case POWER_SAVE_OFF:
+			psEnable = TI_FALSE;
+			break;
+		case POWER_SAVE_ON:
+			psEnable = TI_TRUE;
+			break;
+		case POWER_SAVE_KEEP_CURRENT:
+			return TI_OK;
+		default:
+			TRACE0(pTWD->hReport, REPORT_SEVERITY_ERROR, "Wrong PS value configuration!\n");
+			return TI_NOK;
+	}
 
-TI_BOOL TWD_GetPsStatus (TI_HANDLE hTWD)
-{
-    TTwd *pTWD = (TTwd *)hTWD;
 
-    TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_GetPsStatus: called\n");
-
-    return MacServices_powerSrv_getPsStatus (pTWD->hMacServices);
-}
-
-TI_STATUS TWD_SetNullRateModulation (TI_HANDLE hTWD, TI_UINT16 rate)
-{
-    TTwd *pTWD = (TTwd *)hTWD;
-
-    TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_SetRateModulation: called\n");
-
-    MacServices_powerSrv_SetRateModulation (pTWD->hMacServices, rate); 
+	if (cmdBld_CmdSetPsMode (pTWD->hCmdBld, psEnable, fPowerSaveResponseCb, hPowerSaveResponseCb) != TI_OK)
+    {
+        TRACE0(pTWD->hReport, REPORT_SEVERITY_ERROR, "Error in configuring Power Save paramters!\n");
+		return TI_NOK;
+    }
 
     return TI_OK;
 }
 
-void TWD_UpdateDtimTbtt (TI_HANDLE hTWD, TI_UINT8 uDtimPeriod, TI_UINT16 uBeaconInterval)
-{
-    TTwd *pTWD = (TTwd *)hTWD;
-
-    TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_UpdateDtimTbtt: called\n");
-
-    MacServices_scanSrv_UpdateDtimTbtt (pTWD->hMacServices, uDtimPeriod, uBeaconInterval); 
-}
 
 TI_STATUS TWD_StartMeasurement (TI_HANDLE                   hTWD, 
                                 TMeasurementRequest        *pMsrRequest,
@@ -1337,9 +1298,9 @@ TI_STATUS TWD_StartMeasurement (TI_HANDLE                   hTWD,
 {
     TTwd *pTWD = (TTwd *)hTWD;
 
-    TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_StartMeasurement: called\n");
-
-    return MacServices_measurementSRV_startMeasurement (pTWD->hMacServices, 
+    TRACE1(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_StartMeasurement: called. uTimeToRequestExpiryMs=%d \n", uTimeToRequestExpiryMs);
+    
+    return MacServices_measurementSRV_startMeasurement (pTWD->hMeasurementSRV, 
                                                         pMsrRequest,
                                                         uTimeToRequestExpiryMs,
                                                         fResponseCb,
@@ -1357,48 +1318,18 @@ TI_STATUS TWD_StopMeasurement (TI_HANDLE       	hTWD,
 
     TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_StopMeasurement: called\n");
 
-    return MacServices_measurementSRV_stopMeasurement (pTWD->hMacServices,
+    return MacServices_measurementSRV_stopMeasurement (pTWD->hMeasurementSRV,
                                                        bSendNullData,
                                                        fResponseCb,
                                                        hResponseCb);
 }
 
-TI_STATUS TWD_RegisterScanCompleteCb (TI_HANDLE            hTWD, 
-                                      TScanSrvCompleteCb   fScanCompleteCb, 
-                                      TI_HANDLE            hScanCompleteCb)
-{
-    TTwd *pTWD = (TTwd *)hTWD;
-
-    TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_RegisterScanCompleteCb: called\n");
-
-    MacServices_scanSRV_registerScanCompleteCB (pTWD->hMacServices, 
-                                                fScanCompleteCb, 
-                                                hScanCompleteCb);
-
-    return TI_OK;
-}
-
-#ifdef TI_DBG
-TI_STATUS TWD_PrintMacServDebugStatus (TI_HANDLE hTWD)
-{
-    TTwd *pTWD = (TTwd *)hTWD;
-
-    TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_PrintMacServDebugStatus: called\n");
-
-    MacServices_scanSrv_printDebugStatus (pTWD->hMacServices);
-
-    return TI_OK;
-}
-#endif
 
 TI_STATUS TWD_Scan (TI_HANDLE       hTWD, 
                     TScanParams    	*pScanParams,
                     EScanResultTag 	eScanTag, 
                     TI_BOOL        	bHighPriority,
-                    TI_BOOL        	bDriverMode, 
-                    TI_BOOL        	bScanOnDriverModeError, 
-                    E80211PsMode   	ePsRequest, 
-                    TI_BOOL        	bSendNullData,
+                    TI_BOOL        	bForceScan, 
                     TCmdResponseCb 	fResponseCb, 
                     TI_HANDLE      	hResponseCb)
 {
@@ -1406,42 +1337,36 @@ TI_STATUS TWD_Scan (TI_HANDLE       hTWD,
 
     TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_Scan: called\n");
 
-    return MacServices_scanSRV_scan (pTWD->hMacServices,
-                                     pScanParams,
-                                     eScanTag,
-                                     bHighPriority,
-                                     bDriverMode, 
-                                     bScanOnDriverModeError, 
-                                     ePsRequest, 
-                                     bSendNullData,
-                                     fResponseCb, 
-                                     hResponseCb);
+    if ( SCAN_TYPE_SPS == pScanParams->scanType )
+    {
+		return cmdBld_CmdStartSPSScan (pTWD->hCmdBld, pScanParams, eScanTag, fResponseCb, hResponseCb);
+	}
+    else
+    {
+		return cmdBld_CmdStartScan (pTWD->hCmdBld, pScanParams, eScanTag, bHighPriority,
+									bForceScan, fResponseCb, hResponseCb);
+    }
 }
 
 TI_STATUS TWD_StopScan (TI_HANDLE       hTWD, 
                         EScanResultTag  eScanTag,
-                        TI_BOOL         bSendNullData, 
+                        EScanType 		eScanType,
                         TCmdResponseCb  fScanCommandResponseCb, 
                         TI_HANDLE       hCb)
 {
     TTwd *pTWD = (TTwd *)hTWD;
+	
 
     TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_StopScan: called\n");
 
-    return MacServices_scanSRV_stopScan (pTWD->hMacServices,
-                                         eScanTag,
-                                         bSendNullData, 
-                                         fScanCommandResponseCb, 
-                                         hCb);
-}
-
-TI_STATUS TWD_StopScanOnFWReset (TI_HANDLE hTWD)
-{
-    TTwd *pTWD = (TTwd *)hTWD;
-
-    TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_StopScanOnFWReset: called\n");
-
-    return MacServices_scanSRV_stopOnFWReset (pTWD->hMacServices);
+    if ( SCAN_TYPE_SPS == eScanType )
+    {
+        return cmdBld_CmdStopSPSScan (pTWD->hCmdBld, eScanTag, (void *)fScanCommandResponseCb, hCb);
+    }
+    else
+    {
+        return cmdBld_CmdStopScan (pTWD->hCmdBld, eScanTag, (void *)fScanCommandResponseCb, hCb);
+    }
 }
 
 TI_STATUS TWD_StartConnectionScan (TI_HANDLE              hTWD,
@@ -1569,7 +1494,6 @@ static TI_STATUS TWD_WriteMibTemplateFrame (TI_HANDLE hTWD, TMib* pMib)
         
     case TEMPLATE_TYPE_NULL_FRAME:
         tSetTemplate.type = NULL_DATA_TEMPLATE;
-        MacServices_powerSrv_SetRateModulation (pTWD->hMacServices, (TI_UINT16)uRateMask);
         break;
         
     case TEMPLATE_TYPE_PROBE_RESPONSE:

@@ -89,9 +89,19 @@ typedef enum
     SITE_MGR_GET_SELECTED_BSSID_INFO_EX             =           GET_BIT | SITE_MGR_MODULE_PARAM | 0x37,    
     SITE_MGR_RADIO_BAND_PARAM                       =           GET_BIT | SITE_MGR_MODULE_PARAM | 0x39,
 	SITE_MGR_GET_STATS		                        =           GET_BIT | SITE_MGR_MODULE_PARAM | 0x43,
+	SITE_MGR_GET_RRM_ENABLED_CAPABILITIES		    =           GET_BIT | SITE_MGR_MODULE_PARAM | 0x44,
 
     /* MLME section */
     MLME_BEACON_RECV                                =           GET_BIT | MLME_SM_MODULE_PARAM  | 0x01,
+      /* Auth section */
+    MLME_AUTH_RESPONSE_TIMEOUT_PARAM                = SET_BIT | GET_BIT | MLME_SM_MODULE_PARAM | 0x02,
+    MLME_AUTH_COUNTERS_PARAM                        =           GET_BIT | MLME_SM_MODULE_PARAM | 0x03,
+      /* Assoc section */
+    MLME_ASSOC_RESPONSE_TIMEOUT_PARAM               = SET_BIT | GET_BIT | MLME_SM_MODULE_PARAM | 0x04,
+    MLME_ASSOC_COUNTERS_PARAM                       =           GET_BIT | MLME_SM_MODULE_PARAM | 0x05,
+    MLME_ASSOCIATION_INFORMATION_PARAM              =           GET_BIT | MLME_SM_MODULE_PARAM | 0x06,
+    MLME_ASSOCIATION_REQ_PARAM                      =           GET_BIT | MLME_SM_MODULE_PARAM | 0x07,
+    MLME_ASSOCIATION_RESP_PARAM                     =           GET_BIT | MLME_SM_MODULE_PARAM | 0x08,
 
     /* SME SM section */
     SME_DESIRED_BSSID_PARAM                         = SET_BIT | GET_BIT | SME_MODULE_PARAM   | 0x02,
@@ -105,17 +115,6 @@ typedef enum
     
     /* Connection section */
     CONN_SELF_TIMEOUT_PARAM                         = SET_BIT | GET_BIT | CONN_MODULE_PARAM | 0x01,
-
-    /* Auth section */
-    AUTH_RESPONSE_TIMEOUT_PARAM                     = SET_BIT | GET_BIT | AUTH_MODULE_PARAM | 0x01,
-    AUTH_COUNTERS_PARAM                             =           GET_BIT | AUTH_MODULE_PARAM | 0x02,
-
-    /* Assoc section */
-    ASSOC_RESPONSE_TIMEOUT_PARAM                        = SET_BIT | GET_BIT | ASSOC_MODULE_PARAM | 0x01,
-    ASSOC_COUNTERS_PARAM                                =           GET_BIT | ASSOC_MODULE_PARAM | 0x02,
-    ASSOC_ASSOCIATION_INFORMATION_PARAM             =           GET_BIT | ASSOC_MODULE_PARAM | 0x03,
-    ASSOC_ASSOCIATION_REQ_PARAM                        	=           GET_BIT | ASSOC_MODULE_PARAM | 0x04,
-    ASSOC_ASSOCIATION_RESP_PARAM                        =           GET_BIT | ASSOC_MODULE_PARAM | 0x05,
 
     /* RSN section */
     RSN_PRIVACY_OPTION_IMPLEMENTED_PARAM            =           GET_BIT | RSN_MODULE_PARAM | 0x01,
@@ -170,6 +169,11 @@ typedef enum
     REGULATORY_DOMAIN_GET_SCAN_CAPABILITIES             =           GET_BIT | REGULATORY_DOMAIN_MODULE_PARAM | 0x1C,
     REGULATORY_DOMAIN_IS_COUNTRY_FOUND                  =           GET_BIT | REGULATORY_DOMAIN_MODULE_PARAM | 0x1D,
     REGULATORY_DOMAIN_TIME_TO_COUNTRY_EXPIRY            =           GET_BIT | REGULATORY_DOMAIN_MODULE_PARAM | 0x1E,
+    REGULATORY_DOMAIN_COUNTRY_ZONE_PARAM                = SET_BIT | GET_BIT | REGULATORY_DOMAIN_MODULE_PARAM | 0x1F,
+    REGULATORY_DOMAIN_GET_BAND_BY_REG_CLASS_PARAM       =           GET_BIT | REGULATORY_DOMAIN_MODULE_PARAM | 0x20,
+    REGULATORY_DOMAIN_GET_CHANNELS_BY_REG_CLASS_PARAM   =           GET_BIT | REGULATORY_DOMAIN_MODULE_PARAM | 0x21,
+    REGULATORY_DOMAIN_GET_REG_CLASS_BY_BAND_AND_CHANNEL =           GET_BIT | REGULATORY_DOMAIN_MODULE_PARAM | 0x22,
+        
     /* measurement section */
      
 #ifdef XCC_MODULE_INCLUDED
@@ -194,6 +198,8 @@ typedef enum
     ROAMING_MNGR_PRINT_CURRENT_STATUS               =           GET_BIT | ROAMING_MANAGER_MODULE_PARAM | 0x07,
     ROAMING_MNGR_PRINT_CANDIDATE_TABLE              =           GET_BIT | ROAMING_MANAGER_MODULE_PARAM | 0x08,
 #endif
+    ROAMING_MNGR_CURRENT_CANDIDATE_BUFFER_LEN       =           GET_BIT | ROAMING_MANAGER_MODULE_PARAM | 0x09,
+    ROAMING_MNGR_CURRENT_CANDIDATE_BUFFER           =           GET_BIT | ROAMING_MANAGER_MODULE_PARAM | 0x0A,
 
     /* Soft Gemini params */
      

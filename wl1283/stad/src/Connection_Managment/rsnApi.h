@@ -60,6 +60,12 @@
 #define MAX_NUM_OF_PRE_AUTH_BSSIDS  16
 #define MAX_KEYS_NUM                4
 
+/* Flags for Any-WPA (WPA Mixed) mode) - set by the Supplicant  */
+#define ADMCTRL_WPA_OPTION_NONE  							0x00000000
+#define ADMCTRL_WPA_OPTION_ENABLE_PROMOTE_AUTH_MODE  	0x00000001
+#define ADMCTRL_WPA_OPTION_ENABLE_PROMOTE_CIPHER     	0x00000002
+
+#define ADMCTRL_WPA_OPTION_MAXVALUE                  	0x00000003
 
 /* Enumerations */
 
@@ -257,8 +263,6 @@ TI_STATUS rsn_reportMicFailure(TI_HANDLE hRsn, TI_UINT8 *pType, TI_UINT32 Length
 
 TI_STATUS rsn_resetPMKIDList(TI_HANDLE hRsn);
 
-TI_STATUS rsn_removedDefKeys(TI_HANDLE hRsn);
-
 TI_STATUS rsn_startPreAuth(TI_HANDLE hRsn, TBssidList4PreAuth *pBssidList);
 
 ERsnSiteBanLevel rsn_banSite(TI_HANDLE hRsn, TMacAddr siteBssid, ERsnSiteBanLevel banLevel, TI_UINT32 durationMs);
@@ -270,5 +274,7 @@ void rsn_MboxFlushFinishCb(TI_HANDLE handle, TI_UINT16 MboxStatus, char *Interro
 TI_STATUS rsn_setPortStatus(TI_HANDLE hRsn, TI_BOOL state);
 
 void rsn_reAuth(TI_HANDLE hRsn);
+
+void rsn_clearGenInfoElement(TI_HANDLE hRsn);
 
 #endif /* __RSN_API_H__*/

@@ -283,17 +283,24 @@ void context_RequestSchedule (TI_HANDLE hContext, TI_UINT32 uClientId)
     /* Set client's Pending flag */
     pContext->aClientPending[uClientId] = TI_TRUE;
 
+    /* Disable system suspend (enabled again after task completion) */
+    os_wake_lock(pContext->hOs);
+
     /* 
      * If configured to switch context, request driver task scheduling.
      * Else (context switch not required) call the driver task directly. 
      */
     if (pContext->bContextSwitchRequired)
     {
-        os_RequestSchedule (pContext->hOs);
+        if (os_RequestSchedule (pContext->hOs) != TI_OK)
+        {
+            os_wake_unlock(pContext->hOs);
+        }
     }
     else 
     {
         context_DriverTask (hContext);
+        os_wake_unlock(pContext->hOs);
     }
 }
 
@@ -378,17 +385,24 @@ void context_EnableClient (TI_HANDLE hContext, TI_UINT32 uClientId)
     /* If client is pending, schedule driver task */
     if (pContext->aClientPending[uClientId])
     {
+        /* Disable system suspend (enabled again after task completion) */
+        os_wake_lock(pContext->hOs);
+
         /* 
          * If configured to switch context, request driver task scheduling.
          * Else (context switch not required) call the driver task directly. 
          */
         if (pContext->bContextSwitchRequired)
         {
-            os_RequestSchedule (pContext->hOs);
+            if (os_RequestSchedule (pContext->hOs) != TI_OK)
+            {
+                os_wake_unlock(pContext->hOs);
+            }
         }
         else 
         {
             context_DriverTask (hContext);
+            os_wake_unlock(pContext->hOs);
         }
     }
 }
@@ -460,6 +474,7 @@ void context_LeaveCriticalSection (TI_HANDLE hContext)
 
 void context_Print(TI_HANDLE hContext)
 {
+#ifdef REPORT_LOG
 	TContext *pContext = (TContext *)hContext;
     TI_UINT32 i;
 
@@ -479,6 +494,7 @@ void context_Print(TI_HANDLE hContext)
                         pContext->aRequestCount[i],
                         pContext->aInvokeCount[i] ));
 	}
+#endif
 }
 
 #endif /* TI_DBG */

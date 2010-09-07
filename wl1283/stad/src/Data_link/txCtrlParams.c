@@ -49,9 +49,6 @@
 #include "txCtrl.h"
 
 
-
-
-
 /***********************************************************************
  *                        calcCreditFromTimer
  ***********************************************************************
@@ -171,7 +168,6 @@ TRACE1(pTxCtrl->hReport, REPORT_SEVERITY_INFORMATION, ": ac = %d mediumTime = 0 
 	}
 }
 
-
 /****************************************************************************
  *                      updateDataPktPrototype()
  ****************************************************************************
@@ -268,6 +264,12 @@ TI_STATUS txCtrlParams_setAdmissionCtrlParams(TI_HANDLE hTxCtrl, TI_UINT8 acId, 
 
 	if(admFlag == TI_TRUE) 
 	{
+		pTxCtrl->tokenCalcParams[acId].allocatedMediumTime = mediumTime;
+		pTxCtrl->tokenCalcParams[acId].tokens = mediumTime;
+		pTxCtrl->tokenCalcParams[acId].unusedTokensReminder = 0;
+		pTxCtrl->tokenCalcParams[acId].usedTokensReminder = 0;
+		pTxCtrl->tokenCalcParams[acId].lastCalcTimeStamp = os_timeStampUs(pTxCtrl->hOs);
+		pTxCtrl->tokenCalcParams[acId].timeDiffMinThreshold = (1000000/mediumTime);
 		/* tspec added */
 		pTxCtrl->mediumTime[acId] = mediumTime;
         pTxCtrl->admissionState[acId] = AC_ADMITTED;
@@ -277,6 +279,11 @@ TI_STATUS txCtrlParams_setAdmissionCtrlParams(TI_HANDLE hTxCtrl, TI_UINT8 acId, 
 	}
 	else
 	{
+		pTxCtrl->tokenCalcParams[acId].allocatedMediumTime = 0;
+		pTxCtrl->tokenCalcParams[acId].tokens = 0;
+		pTxCtrl->tokenCalcParams[acId].unusedTokensReminder = 0;
+		pTxCtrl->tokenCalcParams[acId].usedTokensReminder = 0;
+		pTxCtrl->tokenCalcParams[acId].timeDiffMinThreshold = 0;
 		/* tspaec deleted */
 		pTxCtrl->mediumTime[acId] = 0;
         pTxCtrl->admissionState[acId] = AC_NOT_ADMITTED;
@@ -600,7 +607,20 @@ void txCtrlParams_setAcAdmissionStatus (TI_HANDLE hTxCtrl,
 	txCtrl_UpdateQueuesMapping (hTxCtrl);
 }
 
+/***********************************************************************
+ *                        txCtrlParams_setDowngradeStatuse
+ ***********************************************************************
+DESCRIPTION:    Update the AC downgrade status - called by QosMngr when 
+				the ac is upgraded
+************************************************************************/
+void txCtrlParams_setDowngradeStatus(TI_HANDLE hTxCtrl,
+                                     TI_UINT32 ac,
+                                     TI_BOOL bDowngraded)
+{
+    txCtrl_t *pTxCtrl = (txCtrl_t *)hTxCtrl;
 
+    pTxCtrl->acDowngraded[ac] = bDowngraded;
+}
 /***********************************************************************
  *                        txCtrlParams_setAcMsduLifeTime
  ***********************************************************************
@@ -685,6 +705,7 @@ DESCRIPTION:    Print module internal information.
 ************************************************************************/
 void txCtrlParams_printInfo(TI_HANDLE hTxCtrl)
 {
+#ifdef REPORT_LOG
 	txCtrl_t *pTxCtrl = (txCtrl_t *)hTxCtrl;
 
     WLAN_OS_REPORT(("-------------- Tx-Ctrl Module Information --------------\n"));
@@ -727,6 +748,7 @@ void txCtrlParams_printInfo(TI_HANDLE hTxCtrl)
     WLAN_OS_REPORT(("encryptionFieldSize          = %d\n", pTxCtrl->encryptionFieldSize));
     WLAN_OS_REPORT(("currBssType                  = %d\n", pTxCtrl->currBssType));
     WLAN_OS_REPORT(("========================================================\n\n"));
+#endif
 }
 
 
@@ -737,6 +759,7 @@ DESCRIPTION:    Print Tx statistics debug counters.
 ************************************************************************/
 void txCtrlParams_printDebugCounters(TI_HANDLE hTxCtrl)
 {
+#ifdef REPORT_LOG
 	txCtrl_t *pTxCtrl = (txCtrl_t *)hTxCtrl;
     TI_UINT32 ac;
 
@@ -793,6 +816,7 @@ void txCtrlParams_printDebugCounters(TI_HANDLE hTxCtrl)
 		pTxCtrl->dbgCounters.dbgNumPktsPending[0] +	pTxCtrl->dbgCounters.dbgNumPktsPending[1] +
 		pTxCtrl->dbgCounters.dbgNumPktsPending[2] +	pTxCtrl->dbgCounters.dbgNumPktsPending[3]));
     WLAN_OS_REPORT(("========================================================\n\n"));
+#endif
 }
 
 

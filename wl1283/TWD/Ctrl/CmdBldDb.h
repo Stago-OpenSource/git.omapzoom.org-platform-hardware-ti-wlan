@@ -114,6 +114,7 @@ typedef struct
     TI_UINT32                  PsPollTemplateSize;
     TI_UINT32                  qosNullDataTemplateSize;
     TI_UINT32                  ArpRspTemplateSize;
+    TI_UINT32                  LinkMeasTemplateSize;
     TI_BOOL                    ch14TelecCca;
     TI_UINT8                   PacketDetectionThreshold;
     TI_UINT8                   FcsErrThrsh;
@@ -156,10 +157,12 @@ typedef struct
 
     /* CoexActivity Table */
     THalCoexActivityTable      tWlanParamsCoexActivityTable;
+
     /* DCO Itrim params */
     TI_BOOL                    dcoItrimEnabled;
     TI_UINT32                  dcoItrimModerationTimeoutUsec;
-    
+    /* RRM capability enabled */
+    TI_BOOL                     bIsLinkMeasRequestEnabled;
 #ifdef TNETW1283
     /* TCXO parameters */
     TI_UINT8                   TcxoRefClk;
@@ -189,6 +192,7 @@ typedef struct
     /* Policy for recovery */  
     TTxRatePolicy              TxRateClassParams; 
     TI_UINT32                  BasicRateSet;   
+	TI_UINT32                  SupportedRateSet;   
     /* The ctrl field in the Join-Command (see StartJoinRequest_t) */
     TI_UINT8                   Ctrl;                                 
     /* ATIM window of IBSS*/
@@ -279,6 +283,7 @@ typedef struct
     TTemplateParams            KeepAlive[ KLV_MAX_TMPL_NUM ];
     TTemplateParams            Disconn;
     TTemplateParams            ArpRsp;
+    TTemplateParams            LinkMeasReport;
 
 } TTemplateListParams;
 
@@ -321,14 +326,6 @@ typedef struct
 } TRxDataFiltersTable;
 
 typedef struct
-{
- ACXSmartReflexConfigParams_t     tSmartReflexParams;       
- ACXSmartReflexDebugParams_t      tSmartReflexDebugParams;  
- ACXSmartReflexState_t            tSmartReflexState;        
-
-}TSmartReflexParams ;
-
-typedef struct
 {  
 	RateMangeParams_t rateMngParams;
 
@@ -360,8 +357,8 @@ typedef struct
 #ifndef TNETW1283
     IniFileExtendedRadioParam  tExtRadioIniParams;  /* Extended Radio ini params from public_radio.h     */
 #endif
-    TSmartReflexParams         tSmartReflex;
-	TRateMngParams		       tRateMngParams;      /* rate management params */
+    TRateMngParams		       tRateMngParams;      /* rate management params */
+	TPsParams		   		   tPsParams;			/* general PS params */
 } TCmdBldDb;
 
 #endif

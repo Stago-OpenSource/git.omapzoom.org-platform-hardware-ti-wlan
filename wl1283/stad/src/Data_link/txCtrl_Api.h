@@ -44,6 +44,92 @@
 #include "GeneralUtilApi.h"
 #include "DrvMainModules.h"
 
+
+
+#define TSM_REPORT_NUM_OF_BINS_MAX  	                        6
+#define TSM_REPORT_NUM_OF_TID_MAX  	                            8
+#define TSM_REPORT_NUM_OF_MEASUREMENT_IN_PARALLEL_MAX  	        3
+
+
+#define TSM_REQUEST_TRIGGER_CONDITION_AVERAGE  	                BIT_0
+#define TSM_REQUEST_TRIGGER_CONDITION_CONSECUTIVE               BIT_1
+#define TSM_REQUEST_TRIGGER_CONDITION_DELAY  	                BIT_2
+
+
+typedef struct
+{
+    TI_UINT32   binDelayThreshold[TSM_REPORT_NUM_OF_BINS_MAX];/* The thresholds for the delay histogram to be reported in the TSM  */
+    TI_UINT32   binsDelayCounter[TSM_REPORT_NUM_OF_BINS_MAX]; /* Every packet delay will increase the corresponding bin counter */
+    TI_UINT8    uMaxConsecutiveDelayedPktsThr;     /* The number of consecutive delayed packets threshold which will cause triggering TSM report */
+    TI_UINT8    uMaxConsecutiveDelayedPktsCounter; /* The number of consecutive delayed packets counter  */
+
+    
+    /* bit field : bit0: average, bit1: consecutive, bit2: delay */
+    TI_UINT8    uDelayThreshold; /* in TUs (1024 useconds)  */
+    TI_UINT8    uAverageErrorThreshold; 
+    TI_UINT8    uConsecutiveErrorThreshold;
+
+    TI_UINT8    uConsecutiveDiscardedMsduCounter;
+    TI_UINT8    uAverageDiscardedMsduCredit;
+    
+    TI_UINT8    uPktCrossedDelayThrCounter;        /* The actual number of consecutive MSDUs crossed the Delay Threshold */
+    TI_UINT32   uMsduTotalCounter;                 /* the number of MSDU that were successfully or not transmitted */
+    TI_UINT32   uMsduTransmittedOKCounter;         /* the number of MSDU that were successfully transmitted */
+    TI_UINT32   uMsduRetryExceededCounter;         /* the number of transmit attempts exceeding short/long retry limit */ 
+    TI_UINT32   uMsduMultipleRetryCounter;         /* more than one retransmission attempt */
+    TI_UINT32   uMsduLifeTimeExpiredCounter;       /* the number of transmit attempts with lifetime expired */
+    TI_BOOL     bTSMInProgress;                    /* flag which specifies that the measurement for this TID has started */
+    TI_BOOL     bIsTriggeredReport;
+    TI_UINT8    measurementToken;
+    TI_UINT8    measurementCount;
+    TI_UINT16   measurementDuration;
+    
+    TI_UINT8    actualMeasurementTSF[8];
+    TI_UINT8    frameToken;
+    TI_UINT16   frameNumOfRepetitions;
+    TMacAddr    peerSTA;
+    TI_UINT8    uTID;
+    TI_UINT8    reportingReason;
+    TI_UINT8    bin0Range;
+    TI_UINT8    triggerCondition;
+   
+
+    
+} TSMReportData_t;
+
+
+/* Callback function definition for triggering the TSM report towards the RRM module */
+typedef void (* tTriggerTSMReport)(TI_HANDLE hMeasurementMgr, TSMReportData_t *pTSMReport);
+
+typedef struct
+{
+    TI_UINT8           triggerCondition;
+    TI_UINT8           averageErrorThreshold;
+    TI_UINT8           consecutiveErrorThreshold;
+    TI_UINT8           delayThreshold;
+    TI_UINT8           measuCount;
+    TI_UINT8           triggerTimeout;
+
+} TSMTriggeredReportField_t;
+
+typedef struct
+{
+    TI_BOOL                         bIsTriggeredReport;
+    TI_UINT8                        frameToken;
+    TI_UINT16                       frameNumOfRepetitions;
+    TI_UINT8                        measurementToken;
+    TI_UINT16                       randomInterval;
+    TI_UINT16                       uDuration;
+    TI_UINT8                        uTID;
+    TI_UINT8                        uBin0Range; 
+    TI_UINT8                        uDelayedMsduRange; 
+    TI_UINT8                        uDelayedMsduCount;
+    TMacAddr                        peerSTA;
+    TSMTriggeredReportField_t       tTriggerReporting;
+    tTriggerTSMReport               fCB;
+} TSMParams_t;
+
+
 /* TxCtrl Xmit results */
 typedef enum
 {
@@ -81,7 +167,7 @@ TI_HANDLE txCtrl_Create (TI_HANDLE hOs);
 void      txCtrl_Init (TStadHandlesList *pStadHandles);
 TI_STATUS txCtrl_SetDefaults (TI_HANDLE hTxCtrl, txDataInitParams_t *txDataInitParams);
 TI_STATUS txCtrl_Unload (TI_HANDLE hTxCtrl);
-TI_STATUS txCtrl_XmitData (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk);
+EStatusXmit txCtrl_XmitData (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk);
 TI_STATUS txCtrl_XmitMgmt (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk);
 void      txCtrl_UpdateQueuesMapping (TI_HANDLE hTxCtrl);
 void *    txCtrl_AllocPacketBuffer (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk, TI_UINT32 uPacketLen);
@@ -89,6 +175,11 @@ void      txCtrl_FreePacket (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk, TI_STAT
 TI_STATUS txCtrl_NotifyFwReset(TI_HANDLE hTxCtrl);
 TI_STATUS txCtrl_CheckForTxStuck(TI_HANDLE hTxCtrl);
 TI_UINT32 txCtrl_BuildDataPktHdr (TI_HANDLE hTxCtrl, TTxCtrlBlk *pPktCtrlBlk, AckPolicy_e ackPolicy);
+
+/* TSM (802.11k measurements) */
+TI_STATUS txCtrl_UpdateTSMParameters(TI_HANDLE          hTxCtrl,
+                                     TSMParams_t        *pTSMParams,
+                                     tTriggerTSMReport  fCB);
 
 
 /* 
@@ -124,6 +215,9 @@ void txCtrlParams_setAcAdmissionStatus (TI_HANDLE hTxCtrl,
                                         TI_UINT8 ac, 
                                         EAdmissionState admissionRequired,
                                         ETrafficAdmState admissionState);
+void txCtrlParams_setDowngradeStatus(TI_HANDLE hTxCtrl,
+                                     TI_UINT32 ac,
+                                     TI_BOOL bDowngraded);
 void txCtrlParams_setAcMsduLifeTime (TI_HANDLE hTxCtrl, TI_UINT8 ac, TI_UINT32 msduLifeTime);
 void txCtrlParams_setAcAckPolicy (TI_HANDLE hTxCtrl, TI_UINT8 ac, AckPolicy_e ackPolicy);
 void txCtrlParams_updateMgmtRateAttributes(TI_HANDLE hTxCtrl, TI_UINT8 ratePolicyId, TI_UINT8 ac);

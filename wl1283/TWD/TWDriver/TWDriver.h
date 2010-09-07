@@ -223,11 +223,7 @@
 
 #define SMART_REFLEX_STATE_MIN        TI_FALSE
 #define SMART_REFLEX_STATE_MAX        TI_TRUE
-#define SMART_REFLEX_STATE_DEF        TI_TRUE
-
-#define SMART_REFLEX_DEBUG_MIN        0
-#define SMART_REFLEX_DEBUG_MAX        0xFFFF
-#define SMART_REFLEX_DEBUG_DEF        0
+#define SMART_REFLEX_STATE_DEF        TI_FALSE
 
 #define SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE  "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
 #define SMART_REFLEX_CONFIG_PARAMS_DEF_TABLE_SRF1  "07,03,18,10,05,fb,f0,e8, 0,0,0,0,0,0,0f,3f"
@@ -296,9 +292,9 @@
 #define TWD_RX_INTR_TIMEOUT_MAX         50000
 
 /* Rx aggregation packets number limit (max packets in one aggregation) */
-#define TWD_RX_AGGREG_PKTS_LIMIT_DEF    4
+#define TWD_RX_AGGREG_PKTS_LIMIT_DEF    5
 #define TWD_RX_AGGREG_PKTS_LIMIT_MIN    0 
-#define TWD_RX_AGGREG_PKTS_LIMIT_MAX    4
+#define TWD_RX_AGGREG_PKTS_LIMIT_MAX    5
 
 /* Tx aggregation packets number limit (max packets in one aggregation) */
 #define TWD_TX_AGGREG_PKTS_LIMIT_DEF    0
@@ -403,6 +399,7 @@
 
 #define RSSI_DEFAULT_THRESHOLD          -80 
 #define SNR_DEFAULT_THRESHOLD           0 
+#define RSSI_BG_SCAN_HIGH_THRESHOLD     -45
 
 /* 
  * 'No beacon' roaming trigger configuration
@@ -639,9 +636,10 @@ typedef enum
 /*	0x26	*/	TWD_COEX_ACTIVITY_PARAM_ID,	    				/**< */
 /*	0x27	*/	TWD_FM_COEX_PARAM_ID,	    				    /**< */
 /*	0x28	*/	TWD_DCO_ITRIM_PARAMS_ID,    				    /**< */
+/*	0x29	*/	TWD_SDIO_VALIDATION_PARAMS_ID,    				/**< */
 
 				/* must be last!!! */
-/*	0x29    */	TWD_LAST_PARAM_ID								/**< */
+/*	0x30    */	TWD_LAST_PARAM_ID								/**< */
 } ETwdParam;
 
 /** \enum ETwdCallbackOwner
@@ -677,7 +675,8 @@ typedef enum
 {
     TWD_INT_SEND_PACKET_TRANSFER        =  0x00 ,	/**< 	Tx Data Path Send Callback  	*/    
     TWD_INT_SEND_PACKET_COMPLETE                , 	/**< 	Tx Data Path Complete Callback 	*/   
-    TWD_INT_UPDATE_BUSY_MAP                     , 	/**< 	Tx Data Path Update-Busy-Map Callback 	*/   
+    TWD_INT_UPDATE_BUSY_MAP                     , 	/**< 	Tx Data Path Update-Busy-Map Callback 	*/
+    TWD_INT_UPDATE_PRIORITY_QUEUE_MAP               ,   /**< 	Tx Data Path Update-Full-Queue-Map Callback 	*/
 
     /* Rx Data Path Callbacks */
     TWD_INT_RECEIVE_PACKET              =  0x10 ,	/**< 	Rx Data Path Receive Packet Callback 	   	*/    
@@ -760,6 +759,7 @@ typedef enum
     TWD_EVENT_TX_XFER_SEND_PKT_TRANSFER 	=  TWD_OWNER_DRIVER_TX_XFER | TWD_INT_SEND_PACKET_TRANSFER,	/**< 	TX Data Path Send Packet Event ID 			*/
     TWD_EVENT_TX_RESULT_SEND_PKT_COMPLETE	=  TWD_OWNER_TX_RESULT | TWD_INT_SEND_PACKET_COMPLETE,      /**< 	TX Data Path Send Packet Complete Event ID 	*/
     TWD_EVENT_TX_HW_QUEUE_UPDATE_BUSY_MAP   =  TWD_OWNER_TX_HW_QUEUE | TWD_INT_UPDATE_BUSY_MAP,         /**< 	TX Data Path Update-Busy-Map Event ID 	*/
+    TWD_EVENT_TX_HW_QUEUE_UPDATE_FULL_QUEUE_MAP   =  TWD_OWNER_TX_HW_QUEUE | TWD_INT_UPDATE_PRIORITY_QUEUE_MAP,
 
     /* Rx Data Path Callbacks */
     TWD_EVENT_RX_REQUEST_FOR_BUFFER     	=  TWD_OWNER_RX_XFER | TWD_INT_REQUEST_FOR_BUFFER,         	/**< 	RX Data Path Request for Buffer Internal Event ID 	*/
@@ -898,15 +898,16 @@ typedef enum
  */
 typedef enum
 {
-/*	0	*/	NULL_DATA_TEMPLATE = 0,		/**< NULL Data Template						*/
-/*	1	*/	BEACON_TEMPLATE,        	/**< Beacon Template						*/
-/*	2	*/	PROBE_REQUEST_TEMPLATE,     /**< PROBE Request Template					*/
-/*	3	*/	PROBE_RESPONSE_TEMPLATE,	/**< PROBE Response Template				*/
-/*	4	*/	QOS_NULL_DATA_TEMPLATE,		/**< Quality Of Service NULL Data Template	*/
-/*	5	*/	PS_POLL_TEMPLATE,			/**< Power Save Poll Template				*/
-/*	6	*/	KEEP_ALIVE_TEMPLATE,		/**< Keep Alive Template 					*/
-/*	7	*/	DISCONN_TEMPLATE,			/**< Disconn (Deauth/Disassoc) Template		*/
-/*	8	*/	ARP_RSP_TEMPLATE			/**< ARP Ressponse Template		            */
+/*	0	*/	NULL_DATA_TEMPLATE = 0,		        /**< NULL Data Template						*/
+/*	1	*/	BEACON_TEMPLATE,        	        /**< Beacon Template						*/
+/*	2	*/	PROBE_REQUEST_TEMPLATE,             /**< PROBE Request Template					*/
+/*	3	*/	PROBE_RESPONSE_TEMPLATE,	        /**< PROBE Response Template				*/
+/*	4	*/	QOS_NULL_DATA_TEMPLATE,		        /**< Quality Of Service NULL Data Template	*/
+/*	5	*/	PS_POLL_TEMPLATE,			        /**< Power Save Poll Template				*/
+/*	6	*/	KEEP_ALIVE_TEMPLATE,		        /**< Keep Alive Template 					*/
+/*	7	*/	DISCONN_TEMPLATE,			        /**< Disconn (Deauth/Disassoc) Template		*/
+/*	8	*/	ARP_RSP_TEMPLATE,			        /**< ARP Ressponse Template		            */
+/*	9	*/	LINK_MEAUSREMENT_REPORT_TEMPLATE	/**< Link Measurement Report  Template	    */
 } ETemplateType;
 
 
@@ -1237,8 +1238,8 @@ typedef enum
             MAX_MPDU_MIN_VALUE = 0,
 
 /*	0	*/	MAX_MPDU_8191_OCTETS = MAX_MPDU_MIN_VALUE,	/**< Maximum MPDU Octets Number: 8191	*/
-/*	1	*/  MAX_MPDU_16383_OCTETS,		/**< Maximum MPDU Octets Number: 16383	*/
-/*	2	*/  MAX_MPDU_32767_OCTETS,		/**< Maximum MPDU Octets Number: 32767	*/
+/*	1	*/  MAX_MPDU_16383_OCTETS,		                /**< Maximum MPDU Octets Number: 16383	*/
+/*	2	*/  MAX_MPDU_32767_OCTETS,		                /**< Maximum MPDU Octets Number: 32767	*/
 /*	3	*/  MAX_MPDU_65535_OCTETS,		                /**< Maximum MPDU Octets Number: 65535	*/
 
             MAX_MPDU_MAX_VALUE = MAX_MPDU_65535_OCTETS
@@ -1563,6 +1564,13 @@ typedef struct
 
 } TPsRxStreaming;
 
+typedef struct
+{
+    TI_UINT32               uTid;           /**< The configured TID (0-7) */
+    TI_UINT32               uBaPlociy;  	/**< Ba policy */
+
+} TBaPolicy;
+
 /** \struct TDmaParams
  * \brief DMA Parameters
  * 
@@ -1582,6 +1590,10 @@ typedef struct
 	void                                *fwRxControlPtr;			/**< Pointer to FW TX Control 				*/
 	void                                *fwTxControlPtr;			/**< Pointer to FW RX Control 				*/
     TI_UINT32                           PacketMemoryPoolStart;      /**< RX Memory block offset 				*/  
+    TI_UINT8                            uDynMemEnable;	            /**< 0 Disable */
+	TI_UINT8                            uTxFreeReq;                 /**< number of mem blks for optimize tx use*/
+	TI_UINT8                            uRxFreeReq;                	/**< number of mem blks for optimize tx use */
+    TI_UINT8                            uTxMin;                     /**< minimal number  of mem blks for tx use*/
 } TDmaParams;
 
 /** \struct TSecurityKeys
@@ -1699,6 +1711,7 @@ typedef struct
     TI_UINT8*                           pSSID;				/**< */
     TI_UINT8                            ssidLength;			/**< */
     TI_UINT32                           basicRateSet;      	/**< */ 
+	TI_UINT32               			supportedRateSet;	/**< */ 
     ERadioBand                          radioBand;			/**< */
     /* Current Tx-Session index as configured to FW in last Join command */
     TI_UINT16                           txSessionCount;    	/**< */     
@@ -1887,17 +1900,8 @@ typedef struct
     TI_BOOL                             beaconMissInterruptEnable;	/**< Enable/Disable Beacon Miss Interrupt   							*/
     TI_BOOL                             rxBroadcast;				/**< Enable/Disable receive of broadcast packets in Power-Save mode   	*/
     TI_BOOL                             hwPsPoll;					/**< Enable/Disable Power-Save Polling								   	*/    
-    /* Power Management Configuration IE */
-    TI_BOOL                             ps802_11Enable;				/**< Enable/Disable 802.11 Power-Save 									*/
-    TI_UINT8                            needToSendNullData;  		/**< Indicates if need to send NULL data								*/
-    TI_UINT8                            numNullPktRetries; 			/**< Number of NULL Packets allowed retries 							*/
-    TI_UINT8                            hangOverPeriod;				/**< HangOver period:
-																	* Indicates what is the time in TUs during which the WiLink remains awake 
-																	* after sending an MPDU with the Power Save bit set (indicating that the 
-																	* station is to go into Power Save mode). Setting bit 0 does not affect 
-																	* the hangover period 
-																	*/
-    TI_UINT16                           NullPktRateModulation; 		/**< Null Packet Rate Modulation										*/
+
+
     /* PMConfigStruct */
     TI_BOOL                             ELPEnable;					/**< Enable/Disable ELP				 									*/
     TI_UINT32                           BBWakeUpTime;				/**< Base Band Wakeup Time				 								*/
@@ -1911,29 +1915,6 @@ typedef struct
     TI_UINT8  							ConsecutivePsPollDeliveryFailureThreshold;	/**< Power-Save Polling Delivery Failure Threshold		*/
 
 } TPowerMgmtConfig;
-
-/** \struct TPowerSaveParams
- * \brief Power Save Parameters 
- * 
- * \par Description 
- * 
- * \sa	
- */ 
-typedef struct
-{
-    /* powerMgmtConfig IE */
-    TI_BOOL                             ps802_11Enable;			/**< Enable/Disable 802.11 Power-Save 									*/
-    TI_UINT8                            needToSendNullData;  	/**< Indicates if need to send NULL data								*/
-    TI_UINT8                            numNullPktRetries; 		/**< Number of NULL Packets allowed retries 							*/
-    TI_UINT8                            hangOverPeriod;			/**< HangOver period:
-																* Indicates what is the time in TUs during which the WiLink remains awake 
-																* after sending an MPDU with the Power Save bit set (indicating that the 
-																* station is to go into Power Save mode). Setting bit 0 does not affect 
-																* the hangover period 
-																*/
-    EHwRateBitFiled                     NullPktRateModulation;	/**< Null Packet Rate Modulation										*/
-
-} TPowerSaveParams;
 
 /** \struct TAcQosParams
  * \brief AC QoS Parameters 
@@ -1972,8 +1953,20 @@ typedef struct
     Channel_e                           channel;		/**< Channel number on which the measurement is performed								*/
     RadioBand_e                         band;			/**< Specifies the band to which the channel belongs									*/
     EScanResultTag                      eTag;			/**< Scan Result Tag																	*/
+	TI_BOOL								enterPS;    	/**< Protecting the serving channel is required by entering PS						    */
 
 } TMeasurementParams;
+
+
+
+/* This structure extends the single channel measurement */
+typedef struct
+{
+    TI_UINT8    channelList[SCAN_MAX_NUM_OF_CHANNELS];
+    TI_UINT8    txPowerDbm[SCAN_MAX_NUM_OF_CHANNELS];
+    TI_UINT8    uActualNumOfChannels;
+} channelListEx_t;
+
 
 /** \struct TApDiscoveryParams
  * \brief AP Discovery Parameters
@@ -1985,22 +1978,23 @@ typedef struct
  */ 
 typedef struct 
 {
-    TI_UINT32                           ConfigOptions;	/**< RX Configuration Options for measurement														*/
-    TI_UINT32                           FilterOptions;	/**< RX Filter Configuration Options for measurement												*/
-    TI_UINT32                           scanDuration;	/**< This field specifies the amount of time, in time units (TUs), to perform the AP discovery		*/
-    TI_UINT16                           scanOptions;	/**< This field specifies whether the AP discovery is performed by an active scan or a passive scan 
+    TI_UINT32              ConfigOptions;	/**< RX Configuration Options for measurement														*/
+    TI_UINT32              FilterOptions;	/**< RX Filter Configuration Options for measurement												*/
+    TI_UINT32              scanDuration;	/**< This field specifies the amount of time, in time units (TUs), to perform the AP discovery (total duraion for all channels) 	*/
+    TI_UINT16              scanOptions;	    /**< This field specifies whether the AP discovery is performed by an active scan or a passive scan 
 														* 0 - ACTIVE, 1 - PASSIVE
 														*/
-    TI_UINT8                            numOfProbRqst;	/**< This field indicates the number of probe requests to send per channel, when active scan is specified 
+    TI_UINT8               numOfProbRqst;	/**< This field indicates the number of probe requests to send per channel, when active scan is specified 
 														* Note: for XCC measurement this value should be set to 1
 														*/
-    TI_UINT8                            txPowerDbm;    	/**< TX power level to be used for sending probe requests when active scan is specified.
-														* If 0, leave normal TX power level for this channel
-														*/
-    EHwRateBitFiled                     txdRateSet;		/**< This EHwBitRate format field specifies the rate and modulation to transmit the probe request when 
-														* an active scan is specifie
-														*/
-    ERadioBand                          eBand;			/**< Specifies the band to which the channel belongs												*/
+    EHwRateBitFiled        txdRateSetBandA;		/**< This EHwBitRate format field specifies the rate and modulation to transmit the probe request when 
+														* an active scan is specifie */
+    EHwRateBitFiled        txdRateSetBandBG;		/**< This EHwBitRate format field specifies the rate and modulation to transmit the probe request when 
+                                                    * an active scan is specifie */
+    channelListEx_t        channelListBandBG;
+    channelListEx_t        channelListBandA;
+
+    TSsid                  ssid;
 } TApDiscoveryParams;
 
 /** \struct TRroamingTriggerParams
@@ -2379,6 +2373,50 @@ typedef struct
     uint32 moderationTimeoutUsec;
 }DcoItrimParams_t;
 
+
+/** \struct TPsParams
+ * \brief General PS params structure
+ * 
+ * \par Description
+ * 
+ * \sa
+ */ 
+typedef struct
+{
+    /* General PS params*/
+    TI_UINT8 	numOfExitPsRetries;
+    TI_UINT8	numOfEnterPsRetries;
+	TI_UINT32	nullPktRateModulation;
+
+    /* Hang Over params*/
+	TI_UINT8	hangOverPeriod;
+	TI_BOOL		bDynamicHangoverMode;
+	TI_BOOL		bEarlyTerminationMode;
+	TI_UINT32	recoverTime;
+	TI_UINT8	maxHangOverPeriod;
+	TI_UINT8	minHangOverPeriod;
+	TI_UINT8	increaseDelatTimeFromHangover;
+	TI_UINT8	decreaseDelatTimeFromHangover;
+	TI_UINT8	quietTimeForEarlyTermination;
+	TI_UINT8	increaseHangoverTime;
+	TI_UINT8	slidingWindowSize;
+}TPsParams;
+
+/** \struct SdioValidationTestParams_t
+ * \brief SDIO Validation Test params structure
+ * 
+ * \par Description
+ * 
+ * \sa
+ */ 
+typedef struct
+{
+    TI_UINT32 uTxnSize;     /* In Bytes */
+    TI_UINT32 uNumOfLoops;
+
+} SdioValidationTestParams_t;
+
+
 /** \union TMibData
  * \brief MIB Data
  * 
@@ -2497,6 +2535,9 @@ typedef union
     /* DCO Itrim */
     DcoItrimParams_t                    tDcoItrimParams;                /**< */
 
+    /* SDIO Validation Test */
+    SdioValidationTestParams_t          tSdioValidationTestParams;      /**< */
+
 } TTwdParamContents;
 
 /** \struct TTwdParamInfo
@@ -2609,6 +2650,8 @@ typedef struct
     TI_UINT32                           PsPollTemplateSize;				   	/**< */ 	
     TI_UINT32                           qosNullDataTemplateSize;			/**< */
     TI_UINT32                           ArpRspTemplateSize;                 /**< */
+    TI_UINT32                           LinkMeasReportTemplateSize;         /**< */
+    TI_BOOL                             bIsLinkMeasRequestEnabled;
     TI_UINT32                           tddRadioCalTimout;					/**< */
     TI_UINT32                           CrtRadioCalTimout;					/**< */
     TI_UINT32                           UseMboxInterrupt;					/**< */
@@ -2620,6 +2663,10 @@ typedef struct
 	TI_UINT8       						ConsecutivePsPollDeliveryFailureThreshold;	/**< */
     TI_UINT8                            TxBlocksThresholdPerAc[MAX_NUM_OF_AC];/**< */
     TI_UINT8                            uRxMemBlksNum;                      /**< */
+    TI_UINT8                            uDynMemEnable;	                    /**< */
+	TI_UINT8                            uTxFreeReq;               	        /**< */
+	TI_UINT8                            uRxFreeReq;                	        /**< */
+    TI_UINT8                            uTxMin;                     	    /**< */
     TI_UINT16                           BeaconRxTimeout;					/**< */
     TI_UINT16                           BroadcastRxTimeout;					/**< */
 
@@ -2634,6 +2681,8 @@ typedef struct
     TFmCoexParams                       tFmCoexParams;                      /**< */
     TI_UINT8                            uMaxAMPDU;                          /**< */
 
+	TI_UINT32       					uSplitScanTimeOut;					/**< */
+
 #ifdef TNETW1283
     /* TCXO parameters */
     TI_UINT8                            TcxoRefClk;                         /**< */
@@ -2641,40 +2690,8 @@ typedef struct
     TI_UINT8                            TcxoValidOnWakeup;                  /**< */
     TI_UINT8                            TcxoLdoVoltage;                     /**< */
     TI_UINT8                            NewPllAlgo;
-    TI_UINT8                            PlatformConfiguration;
 #endif
 } TGeneralInitParams;
-
-/** \struct TPowerSrvInitParams
- * \brief Power Service Init Parameters
- * 
- * \par Description
- * 
- * \sa
- */ 
-typedef struct 
-{
-    TI_UINT8                            numNullPktRetries; 			/**< */
-    TI_UINT8                            hangOverPeriod;				/**< */
-    TI_UINT16                           reserve;					/**< */
-
-} TPowerSrvInitParams;
-
-/** \struct TScanSrvInitParams
- * \brief Scan Service Init Parameters
- * 
- * \par Description
- * 
- * \sa
- */ 
-typedef struct
-{
-    TI_UINT32                           numberOfNoScanCompleteToRecovery;	/**< The number of consecutive no scan complete that will trigger a recovery notification 	*/
-    TI_UINT32                      		uTriggeredScanTimeOut; 				/**< i.e. split scan. Time out for starting triggered scan between 2 channels 				*/
-
-} TScanSrvInitParams;
-
-
 
 
 /** \struct TArpIpFilterInitParams
@@ -2752,8 +2769,6 @@ typedef struct
 typedef struct
 {
     TGeneralInitParams                  tGeneral;			 /**< General Initialization Parameters			*/
-    TPowerSrvInitParams                 tPowerSrv;			 /**< Power Service Initialization Parameters	*/
-    TScanSrvInitParams                  tScanSrv;			 /**< Scan Service Initialization Parameters    */
     TArpIpFilterInitParams              tArpIpFilter;		 /**< ARP IP filter Initialization Parameters	*/
     TMacAddrFilterInitParams            tMacAddrFilter;		 /**< MAC Address Initialization Parameters		*/
     IniFileRadioParam                   tIniFileRadioParams; /**< Radio Initialization Parameters   		*/
@@ -2761,12 +2776,9 @@ typedef struct
     IniFileExtendedRadioParam			tIniFileExtRadioParams; /**< Radio Initialization Parameters   		*/
 #endif
     IniFileGeneralParam                 tPlatformGenParams; /**< Radio Initialization Parameters   	        */
-    ACXSmartReflexConfigParams_t        tSmartReflexParams;       /**< Smart Refelx Parameters   	        */
-    ACXSmartReflexDebugParams_t         tSmartReflexDebugParams;  /**< Smart Refelx Debug Parameters   	    */
-    ACXSmartReflexState_t               tSmartReflexState;        /**< Smart Refelx state   	            */
 	RateMangeParams_t					tRateMngParams;			  
-    DcoItrimParams_t                    tDcoItrimParams;          /**< Dco Itrim Parameters   	            */
-   
+    DcoItrimParams_t                    tDcoItrimParams;     /**< Dco Itrim Parameters                      */
+	TPsParams                           tIniFilePsParams;		/**< General PS Parameters					*/
 } TTwdInitParams;
 
 /** \struct TTwdHtCapabilities
@@ -2899,31 +2911,6 @@ typedef union
 }TTwdCB;
 
 
-/** @ingroup Control
- * \brief Scan Service complete CB
- * 
- * \param  hCb        	- handle to the scan object
- * \param  eTag  		- the scan results type tag
- * \param  uResultCount - number of results received during this scan
- * \param  SPSStatus  	- bitmap indicating which channels were attempted (if this is an SPS scan)
- * \param  TSFError  	- whether a TSF error occurred (if this is an SPS scan)
- * \param  ScanStatus  	- scan SRV status (OK / NOK)
- * \param  PSMode		- Power Save Mode
- * \return void
- * 
- * \par Description
- * This function CB will be called when Scan Service is complete
- * User registers the Scan Service Complete CB
- * 
- * \sa	TWD_RegisterScanCompleteCb
- */ 
-typedef void (*TScanSrvCompleteCb) (TI_HANDLE 		hCb, 
-									EScanResultTag 	eTag, 
-									TI_UINT32 		uResultCount,
-                                    TI_UINT16 		SPSStatus, 
-									TI_BOOL 		TSFError, 
-									TI_STATUS 		ScanStatus,
-                                    TI_STATUS 		PSMode);
 /** @ingroup Control
  * \brief TWD Callback
  * 
@@ -3289,47 +3276,46 @@ TI_STATUS TWD_StopMeasurement (TI_HANDLE hTWD,
 							   TI_BOOL bSendNullData, 
 							   TCmdResponseCb fResponseCb, 
 							   TI_HANDLE hResponseCb);
-/** @ingroup Measurement
- * \brief Start scan
+/*\brief Start scan
  * 
- * \param hTWD                		- TWD module object handle
- * \param pScanParams            	- Pointer to Input Scan specific parameters
- * \param eScanTag               	- Scan tag, used for result and scan complete tracking
- * \param bHighPriority          	- Indicates whether to perform a high priority (overlaps DTIM) scan
- * \param bDriverMode            	- Indicates whether to try to enter driver mode (with PS on) before issuing the scan command
- * \param bScanOnDriverModeError 	- Indicates whether to proceed with the scan if requested to enter driver mode and failed 
- * \param ePsRequest             	- Parameter sent to PowerSaveServer. 
- * 										Should indicates PS ON or "keep current" only when driver mode is requested, 
- * 										Otherwise should indicate OFF
- * \param bSendNullData          	- Indicates whether to send Null data when exiting driver mode on scan complete
- * \param fResponseCb            	- The Response CB Function which called after downloading the command
- * \param hResponseCb            	- Handle to the Response CB Function Obj (Notice : last 2 params are NULL in Legacy run)
- * \return TI_OK on success or TI_NOK on failure 
+ * \param hTWD			    - TWD module object handle
+ * \param pScanParams		- Pointer to Input Scan specific parameters
+ * \param eScanTag		    - Scan tag, used for result and scan complete tracking
+ * \param bHighPriority		- Indicates whether to perform a high priority (overlaps DTIM) scan
+ * \param bForceScan		- proceed with the scan if requested to enter driver mode and failed
+ * \param fResponseCb		- The Response CB Function which called after downloading the command
+ * \param hResponseCb		- Handle to the Response CB Function Obj (Notice : last 2 params are NULL
+				  in Legacy run)
+ * \return TI_OK on success or TI_NOK on failure
  * 
  * \par Description
  * Start scan. enter driver mode (PS) only if station is connected
  *
  * \sa
  */ 
-TI_STATUS TWD_Scan (TI_HANDLE hTWD, 
-					TScanParams *pScanParams, 
-					EScanResultTag eScanTag, 
-					TI_BOOL bHighPriority, 
-					TI_BOOL bDriverMode, 
-					TI_BOOL bScanOnDriverModeError, 
-					E80211PsMode ePsRequest, 
-					TI_BOOL bSendNullData, 
-					TCmdResponseCb fResponseCb, 
-					TI_HANDLE hResponseCb);
-/** @ingroup Measurement
- * \brief Stop scan
+TI_STATUS TWD_Scan (TI_HANDLE       hTWD, 
+                    TScanParams    	*pScanParams,
+                    EScanResultTag 	eScanTag, 
+                    TI_BOOL        	bHighPriority,
+                    TI_BOOL        	bForceScan, 
+                    TCmdResponseCb 	fResponseCb, 
+                    TI_HANDLE      	hResponseCb);
+
+/* \brief Stop scan
  * 
  * \param hTWD                		- TWD module object handle
  * \param eScanTag               	- Scan tag, used to track scan complete and result
- * \param bSendNullData          	- Indicates whether to send Null data when exiting driver mode
- * \param fScanCommandResponseCb 	- The Response CB Function which called after downloading the command
- * \param hCb                    	- Handle to the Response CB Function Obj (Notice : last 2 params are NULL in Legacy run)
- * \return TI_OK on success or TI_NOK on failure 
+ * \param eScanType                 - Scan type, to notice SPS
+ *                                    scan
+ * \param fScanCommandResponseCb    - The Response CB Function
+ *                                    which called after
+ *                                    downloading the
+ *                                    command
+ * \param hCb                       - Handle to the Response CB
+ *                                    Function Obj (Notice :
+ *                                    last 2 params are NULL in
+ *                                    Legacy run)
+ * \return TI_OK on success or TI_NOK on failure
  * 
  * \par Description
  * Sends a Stop Scan command to FW, no matter if we are in scan progress or not
@@ -3338,22 +3324,11 @@ TI_STATUS TWD_Scan (TI_HANDLE hTWD,
  */ 
 TI_STATUS TWD_StopScan (TI_HANDLE hTWD, 
 						EScanResultTag eScanTag, 
-						TI_BOOL bSendNullData, 
+						EScanType eScanType,
 						TCmdResponseCb fScanCommandResponseCb, 
 						TI_HANDLE hCb);
-/** @ingroup Measurement
- * \brief Stop Scan on FW Reset
- * 
- * \param hTWD		- TWD module object handle
- * \return TI_OK on success or TI_NOK on failure 
- * 
- * \par Description
- * Stop scan operation when a FW reset (recovery) situation is detected (by all processes 
- * other than scan)
- *
- * \sa
- */ 
-TI_STATUS TWD_StopScanOnFWReset (TI_HANDLE hTWD);
+
+
 /** @ingroup Measurement
  * \brief Start Connection Periodic Scan operation
  * 
@@ -3394,22 +3369,6 @@ TI_STATUS TWD_StopPeriodicScan (TI_HANDLE hTWD,
 								EScanResultTag eScanTag, 
 								TCmdResponseCb fResponseCb, 
 								TI_HANDLE hResponseCb);
-/** @ingroup Measurement
- * \brief Register CB for Scan Complete
- * 
- * \param  hTWD         		- TWD module object handle
- * \param  fScanCompleteCb     	- The Complete CB Function
- * \param  hScanCompleteCb   	- Handle to the Complete CB Function Obj
- * \return TI_OK on success or TI_NOK on failure 
- * 
- * \par Description
- * Registers a Complete CB Function for Scan Complete notifications
- *
- * \sa
- */ 
-TI_STATUS TWD_RegisterScanCompleteCb (TI_HANDLE hTWD, 
-									  TScanSrvCompleteCb fScanCompleteCb, 
-									  TI_HANDLE hScanCompleteCb); 
 /** @ingroup Misc
  * \brief  Set Parameters in FW
  * 
@@ -3611,17 +3570,6 @@ TI_UINT32 TWD_TranslateToFwTime (TI_HANDLE hTWD, TI_UINT32 uHostTime);
  */ 
 void TWD_GetTwdHtCapabilities (TI_HANDLE hTWD, TTwdHtCapabilities **pTwdHtCapabilities);
 #ifdef TI_DBG
-/** @ingroup Measurement
- * \brief Prints Scan Server Debug status
- * 
- * \param  hTWD         - TWD module object handle
- * \return TI_OK on success or TI_NOK on failure 
- * 
- * \par Description
- *
- * \sa
- */ 
-TI_STATUS TWD_PrintMacServDebugStatus (TI_HANDLE hTWD);
 
 /** @ingroup Test
  * \brief Prints Tx Info
@@ -3653,17 +3601,6 @@ TI_STATUS TWD_PrintTxInfo (TI_HANDLE hTWD, ETwdPrintInfoType ePrintInfo);
  * \sa
  */ 
 TI_UINT32 TWD_GetMaxNumberOfCommandsInQueue (TI_HANDLE hTWD);
-/** @ingroup Power_Management
- * \brief Get Power Save Status 
- * 
- * \param  hTWD         		- TWD module object handle
- * \return TI_OK on success or TI_NOK on failure 
- * 
- * \par Description
- *
- * \sa
- */ 
-TI_BOOL TWD_GetPsStatus (TI_HANDLE hTWD);
 
 
 /** @ingroup Control
@@ -3756,34 +3693,20 @@ TI_BOOL TWD_isValidRegAddr (TI_HANDLE hTWD, TFwDebugParams* pMemDebug);
  * 
  * \param  hTWD         		- TWD module object handle
  * \param  ePsMode       		- Power Save Mode
- * \param  bSendNullDataOnExit  - Indicates whether to send NULL data when exiting driver mode
- * \param  hPowerSaveCompleteCb - Handle to PS Complete CB Parameters Obj 
- * \param  fPowerSaveCompleteCb - The PS Complete CB function
- * \param  fPowerSaveResponseCb - The PS Response CB function
- * \return TI_OK on success or TI_NOK on failure 
+ * \param  hPowerSaveResponseCb - Handle to PS Complete CB
+ * Parameters Obj
+ * \param  fPowerSaveResponseCb - The PS Complete CB function
+ * \return TI_OK on success or TI_NOK on failure
  * 
  * \par Description
  *
  * \sa
  */ 
-TI_STATUS TWD_SetPsMode (TI_HANDLE hTWD, 
-						 E80211PsMode ePsMode, 
-						 TI_BOOL bSendNullDataOnExit, 
-						 TI_HANDLE hPowerSaveCompleteCb, 
-						 TPowerSaveCompleteCb fPowerSaveCompleteCb, 
+TI_STATUS TWD_SetPsMode (TI_HANDLE hTWD,
+						 E80211PsMode ePsMode,
+						 TI_HANDLE hPowerSaveResponseCb,
 						 TPowerSaveResponseCb fPowerSaveResponseCb);
-/** @ingroup Radio
- * \brief Set Rate Modulation 
- * 
- * \param  hTWD         - TWD module object handle
- * \param  rate         - Rate Modulation Value
- * \return TRUE if Power Service State is Pwer Save, FALSE otherwise 
- * 
- * \par Description
- *
- * \sa
- */ 
-TI_STATUS TWD_SetNullRateModulation (TI_HANDLE hTWD, TI_UINT16 rate);
+
 /** @ingroup Radio
  * \brief	Set Radio Band
  * 
@@ -3811,20 +3734,6 @@ TI_STATUS TWD_SetRadioBand (TI_HANDLE hTWD, ERadioBand eRadioBand);
  * \sa
  */
 TI_STATUS TWD_SetSecuritySeqNum (TI_HANDLE hTWD, TI_UINT8 securitySeqNumLsByte);
-/** @ingroup BSS
- * \brief Update DTIM & TBTT 
- * 
- * \param  hTWD         	- TWD module object handle
- * \param  uDtimPeriod     	- DTIM period in number of beacons
- * \param  uBeaconInterval 	- Beacon perios in TUs (1024 msec)
- * \return void 
- * 
- * \par Description
- * Update DTIM and Beacon periods for scan timeout calculations
- *
- * \sa
- */ 
-void TWD_UpdateDtimTbtt (TI_HANDLE hTWD, TI_UINT8 uDtimPeriod, TI_UINT16 uBeaconInterval);
 
 /*---------*/
 /* Command */

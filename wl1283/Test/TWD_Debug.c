@@ -212,7 +212,7 @@ static void TWD_PrintMemRegs (TI_HANDLE hTWD, TI_UINT32 address, TI_UINT32 len, 
 
 static TI_STATUS TWD_PrintMemoryMapCb (TI_HANDLE hTWD, TI_STATUS status, void *pData)
 {
-#ifdef TI_DBG
+#ifdef REPORT_LOG
     TTwd        *pTWD = (TTwd *)hTWD;    
     MemoryMap_t  *pMemMap = &pTWD->MemMap;
 
@@ -627,8 +627,9 @@ TI_STATUS TWD_Debug (TI_HANDLE hTWD, TI_UINT32 funcType, void *pParam)
 	TFwDebugParams* pMemDebug	= (TFwDebugParams*)pParam;
 
     static TI_UINT32 GenericAddr;
+#ifdef REPORT_LOG
     static int    iStart[100];
-
+#endif
 	/* check paramemters validity */
 	if (pMemDebug == NULL)
 	{

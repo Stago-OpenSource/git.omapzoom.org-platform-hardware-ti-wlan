@@ -45,7 +45,9 @@
 #include <linux/netdevice.h>
 #include <linux/workqueue.h>
 #include <mach/gpio.h>
-
+#ifdef CONFIG_HAS_WAKELOCK
+#include <linux/wakelock.h>
+#endif
 #include "tidef.h"
 #include "WlanDrvCommon.h"
 #include "paramOut.h"
@@ -53,8 +55,8 @@
 #include "windows_types.h"
 
 #define TIWLAN_DRV_NAME    "tiwlan"
+#define DRIVERWQ_NAME      "tiwlan_wq"
 #define TIWLAN_DRV_IF_NAME TIWLAN_DRV_NAME"%d"
-
 
 #ifdef TI_DBG
 #define ti_dprintf(log, fmt, args...) do { \
@@ -69,6 +71,7 @@
 
 #define ti_nodprintf(log, fmt, args...)
 
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29)
 #define NETDEV_SET_PRIVATE(dev, drv)    dev->priv = drv
 #define NETDEV_GET_PRIVATE(dev)         dev->priv
@@ -78,7 +81,7 @@
 #endif
 
 
-typedef enum 
+typedef enum
 {
    TIWLAN_LOG_ERROR,
    TIWLAN_LOG_INFO,
@@ -95,13 +98,15 @@ typedef struct
 {
 } TCmdRespUnion;
 
+
 /* Driver object */
-typedef struct 
+typedef struct
 {
     TWlanDrvIfCommon         tCommon;   /* The driver object common part */
+
     int                      irq;       /* The OS IRQ handle */
-	unsigned long            irq_flags; /* The IRQ flags */
-    struct workqueue_struct *pWorkQueue;/* The OS work queue */
+	unsigned long 			 irq_flags; /* The IRQ flags */
+    struct workqueue_struct *tiwlan_wq; /* Work Queue */
     struct work_struct       tWork;     /* The OS work handle. */
     spinlock_t               lock;      /* The OS spinlock handle. */
     unsigned long            flags;     /* For saving the cpu flags during spinlock */
@@ -109,7 +114,12 @@ typedef struct
     struct net_device_stats  stats;     /* The driver's statistics for OS reports. */
     struct sock             *wl_sock;   /* The OS socket used for sending it the driver events */
     struct net_device       *netdev;    /* The OS handle for the driver interface. */
-
+    int                      wl_packet; /* Remember to stay awake */
+    int                      wl_count;  /* Wifi wakelock counter */
+#ifdef CONFIG_HAS_WAKELOCK
+    struct wake_lock         wl_wifi;   /* Wifi wakelock */
+    struct wake_lock         wl_rxwake; /* Wifi rx wakelock */
+#endif
     NDIS_HANDLE		         ConfigHandle;/* Temp - For Windows compatibility */
 
 } TWlanDrvIfObj, *TWlanDrvIfObjPtr;

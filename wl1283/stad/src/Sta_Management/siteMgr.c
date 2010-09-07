@@ -45,6 +45,8 @@
 /***************************************************************************/
 
 #define __FILE_ID__  FILE_ID_85
+
+
 #include "tidef.h"
 #include "report.h"
 #include "osApi.h"
@@ -68,7 +70,6 @@
 #include "currBss.h"
 #include "PowerMgr.h"
 #include "TWDriver.h"
-#include "admCtrl.h"
 #include "DrvMainModules.h"
 #include "StaCap.h"
 #include "freq.h"
@@ -189,8 +190,14 @@ extern TI_STATUS wlanDrvIf_getNetwIpByDevName(TIpAddr devIp, char *devName);
 #define UPDATE_BEACON_TIMESTAMP(pSiteMgr, pSite, pFrameInfo)    os_memoryCopy(pSiteMgr->hOs, pSite->tsfTimeStamp, (void *)pFrameInfo->content.iePacket.timestamp, TIME_STAMP_LEN)
 
 
+#define UPDATE_RRM_ENABLED_CAPABILITIES(pSite, pFrameInfo)  if (pFrameInfo->content.iePacket.pRRMCapabilities != NULL) { \
+                                                        pSite->RRMEnabledCapabilities[0] = pFrameInfo->content.iePacket.pRRMCapabilities->capabilities[0];\
+                                                        pSite->RRMEnabledCapabilities[1] = pFrameInfo->content.iePacket.pRRMCapabilities->capabilities[1];\
+                                                        pSite->RRMEnabledCapabilities[2] = pFrameInfo->content.iePacket.pRRMCapabilities->capabilities[2];\
+                                                        pSite->RRMEnabledCapabilities[3] = pFrameInfo->content.iePacket.pRRMCapabilities->capabilities[3];\
+                                                        pSite->RRMEnabledCapabilities[4] = pFrameInfo->content.iePacket.pRRMCapabilities->capabilities[4];}
 
-
+                                                            
 /* Local  functions definitions*/
 
 static void update_apsd(siteEntry_t *pSite, mlmeFrameInfo_t *pFrameInfo);
@@ -227,6 +234,9 @@ static TI_UINT16 incrementTxSessionCount(siteMgr_t *pSiteMgr);
 static void siteMgr_TxPowerAdaptation(TI_HANDLE hSiteMgr, RssiEventDir_e highLowEdge);
 static void siteMgr_TxPowerLowThreshold(TI_HANDLE hSiteMgr, TI_UINT8 *data, TI_UINT8 dataLength);
 static void siteMgr_TxPowerHighThreshold(TI_HANDLE hSiteMgr, TI_UINT8 *data, TI_UINT8 dataLength);
+#ifdef SUPPL_WPS_SUPPORT
+static TI_STATUS DetermineWpsMode(TI_HANDLE hSiteMg, TI_BOOL bWpsEnabled, TIWLN_SIMPLE_CONFIG_MODE *pWpsMode);
+#endif
 
 /************************************************************************
 *                        siteMgr_setTemporaryTxPower                    *
@@ -350,14 +360,11 @@ void siteMgr_init (TStadHandlesList *pStadHandles)
     pSiteMgr->hRxData               = pStadHandles->hRxData;
     pSiteMgr->hTxCtrl               = pStadHandles->hTxCtrl;
     pSiteMgr->hRsn                  = pStadHandles->hRsn;
-    pSiteMgr->hAuth                 = pStadHandles->hAuth;
-    pSiteMgr->hAssoc                = pStadHandles->hAssoc;
     pSiteMgr->hRegulatoryDomain     = pStadHandles->hRegulatoryDomain;
     pSiteMgr->hMeasurementMgr       = pStadHandles->hMeasurementMgr;
     pSiteMgr->hReport               = pStadHandles->hReport;
     pSiteMgr->hOs                   = pStadHandles->hOs;
-    pSiteMgr->hMlmeSm               = pStadHandles->hMlmeSm;
-    pSiteMgr->hAssoc                = pStadHandles->hAssoc;
+    pSiteMgr->hMlme                 = pStadHandles->hMlme;
     pSiteMgr->hReport               = pStadHandles->hReport;
     pSiteMgr->hXCCMngr              = pStadHandles->hXCCMngr;
     pSiteMgr->hApConn               = pStadHandles->hAPConnection;
@@ -406,7 +413,7 @@ TI_STATUS siteMgr_SetDefaults (TI_HANDLE                hSiteMgr,
     os_memoryCopy(pSiteMgr->hOs, (void *)&(pSiteMgr->ibssBssid[2]), &timestamp, sizeof(TI_UINT32));
 
     /* Get the Source MAC address in order to use it for AD-Hoc BSSID, solving Conexant ST issue for WiFi test */
-    status = ctrlData_getParamBssid(pSiteMgr->hCtrlData, CTRL_DATA_MAC_ADDRESS, saBssid);
+    status = ctrlData_getParamMacAddr(pSiteMgr->hCtrlData, saBssid);
     if (status != TI_OK)
     {
         TRACE0(pSiteMgr->hReport, REPORT_SEVERITY_CONSOLE ,"\n ERROR !!! : siteMgr_config - Error in getting MAC address\n" );
@@ -665,10 +672,6 @@ TI_STATUS siteMgr_setParam(TI_HANDLE        hSiteMgr,
         /* increase the random IBSS BSSID calculated during init */
 		pSiteMgr->ibssBssid[MAC_ADDR_LEN - 1] ++;
 
-        if (OS_802_11_SSID_JUNK (pSiteMgr->pDesiredParams->siteMgrDesiredSSID.str, pSiteMgr->pDesiredParams->siteMgrDesiredSSID.len))
-        {
-            rsn_removedDefKeys(pSiteMgr->hRsn);
-        }
 
         /* due to the fact we call to SME_DESIRED_SSID_ACT_PARAM also we not need to call sme_Restart */
         return TI_OK;
@@ -710,8 +713,41 @@ TI_STATUS siteMgr_setParam(TI_HANDLE        hSiteMgr,
         return TI_OK;
 
     case SITE_MGR_SIMPLE_CONFIG_MODE: /* Setting the WiFiSimpleConfig mode */
+
+#ifdef SUPPL_WPS_SUPPORT
+		{
+			TIWLN_SIMPLE_CONFIG_MODE wpsMode;
+
+			if (DetermineWpsMode(hSiteMgr, pParam->content.siteMgrWpsEnabled, &wpsMode) != TI_OK) 
+			{
+				TRACE0(pSiteMgr->hReport, REPORT_SEVERITY_WARNING, "Failed to determine WPS mode\n");
+				return TI_NOK;
+			}
+
+			if (pSiteMgr->siteMgrWSCCurrMode != wpsMode) 
+			{
+				TRACE1(pSiteMgr->hReport, REPORT_SEVERITY_INFORMATION, "Setting current WPS mode to %d", wpsMode);
+
+				pSiteMgr->siteMgrWSCCurrMode = wpsMode;
+
+				/*update other modules on the change*/
+				param.paramType = RSN_WPA_PROMOTE_OPTIONS;	
+				/* In case the WSC is on ,the ProbeReq WSC IE need to be updated */
+				if(pSiteMgr->siteMgrWSCCurrMode != TIWLN_SIMPLE_CONFIG_OFF)
+					param.content.rsnWPAPromoteFlags = ADMCTRL_WPA_OPTION_ENABLE_PROMOTE_AUTH_MODE;
+				else
+					param.content.rsnWPAPromoteFlags = ADMCTRL_WPA_OPTION_NONE;
+				rsn_setParam(pSiteMgr->hRsn, &param);
 		
-        /* Modify the current mode and IE size */
+				/* update the SME on the WPS mode */
+				param.paramType = SME_WSC_PB_MODE_PARAM;
+				sme_SetParam (pSiteMgr->hSmeSm, &param);
+			}
+	
+			return TI_OK;
+		}
+#else
+		       /* Modify the current mode and IE size */
 		pSiteMgr->siteMgrWSCCurrMode = pParam->content.siteMgrWSCMode.WSCMode;
 		pSiteMgr->uWscIeSize = pParam->content.siteMgrWSCMode.uWscIeSize;
 
@@ -721,27 +757,35 @@ TI_STATUS siteMgr_setParam(TI_HANDLE        hSiteMgr,
         if(pSiteMgr->siteMgrWSCCurrMode != TIWLN_SIMPLE_CONFIG_OFF)
 		{
 			os_memoryCopy(pSiteMgr->hOs, &pSiteMgr->siteMgrWSCProbeReqParams, &pParam->content.siteMgrWSCMode.probeReqWSCIE, pSiteMgr->uWscIeSize);
-
-			param.paramType = RSN_WPA_PROMOTE_OPTIONS;	
-           	param.content.rsnWPAPromoteFlags = ADMCTRL_WPA_OPTION_ENABLE_PROMOTE_AUTH_MODE;
-           	rsn_setParam(pSiteMgr->hRsn, &param);
-        }
-		else
-		{
-			param.paramType = RSN_WPA_PROMOTE_OPTIONS;	
-           	param.content.rsnWPAPromoteFlags = ADMCTRL_WPA_OPTION_NONE;
-           	rsn_setParam(pSiteMgr->hRsn, &param);
 		}
 
         /* Update the FW prob request templates to reflect the new WSC state */
         setDefaultProbeReqTemplate (hSiteMgr);
 
         /* update the SME on the WPS mode */
-            param.paramType = SME_WSC_PB_MODE_PARAM;
-            sme_SetParam (pSiteMgr->hSmeSm, &param);
+        param.paramType = SME_WSC_PB_MODE_PARAM;
+        sme_SetParam (pSiteMgr->hSmeSm, &param);
 
         return TI_OK;
 
+#endif
+
+    case SITE_MGR_PROBE_REQ_EXTRA_IES: 
+
+		if (pParam->paramLength > MAX_BEACON_BODY_LENGTH)
+		{
+			 TRACE2(pSiteMgr->hReport, REPORT_SEVERITY_ERROR, 
+					"Set SITE_MGR_PROBE_REQ_EXTRA_IES: Extra IEs length provided (%d) is larger than maximum Probe Request length(%d) \n",
+					pParam->paramLength, MAX_BEACON_BODY_LENGTH);
+
+			 return TI_NOK;
+		}
+		pSiteMgr->uProbeReqExtraIesLen = pParam->paramLength;
+		os_memoryCopy(pSiteMgr->hOs, pSiteMgr->probeReqExtraIes, pParam->content.pProbeReqExtraIes, pSiteMgr->uProbeReqExtraIesLen);
+
+		setDefaultProbeReqTemplate (hSiteMgr);
+
+		return TI_OK;
     case SITE_MGR_DESIRED_MODULATION_TYPE_PARAM:
         if ((pParam->content.siteMgrDesiredModulationType < DRV_MODULATION_CCK) ||
             (pParam->content.siteMgrDesiredModulationType > DRV_MODULATION_OFDM))
@@ -975,7 +1019,7 @@ TI_STATUS siteMgr_setParam(TI_HANDLE        hSiteMgr,
         break;
 
     default:
-        TRACE1(pSiteMgr->hReport, REPORT_SEVERITY_ERROR, "Set param, Params is not supported, %d\n", pParam->paramType);
+        TRACE1(pSiteMgr->hReport, REPORT_SEVERITY_ERROR, "Set param, Params is not supported, 0x%x\n", pParam->paramType);
         return PARAM_NOT_SUPPORTED;
     }
 
@@ -1191,6 +1235,14 @@ TI_STATUS siteMgr_getParam (TI_HANDLE        hSiteMgr,
         pParam->content.siteMgrSlotTime = pSiteMgr->pDesiredParams->siteMgrDesiredSlotTime;
         break;
 
+    case SITE_MGR_GET_RRM_ENABLED_CAPABILITIES:
+        pParam->content.RRMEnabledCapabilities[0] = pSiteMgr->pSitesMgmtParams->pPrimarySite->RRMEnabledCapabilities[0];
+        pParam->content.RRMEnabledCapabilities[1] = pSiteMgr->pSitesMgmtParams->pPrimarySite->RRMEnabledCapabilities[1];
+        pParam->content.RRMEnabledCapabilities[2] = pSiteMgr->pSitesMgmtParams->pPrimarySite->RRMEnabledCapabilities[2];
+        pParam->content.RRMEnabledCapabilities[3] = pSiteMgr->pSitesMgmtParams->pPrimarySite->RRMEnabledCapabilities[3];
+        pParam->content.RRMEnabledCapabilities[4] = pSiteMgr->pSitesMgmtParams->pPrimarySite->RRMEnabledCapabilities[4];
+        break;
+        
     case SITE_MGR_CURRENT_SLOT_TIME_PARAM:
 
         if(pSiteMgr->siteMgrOperationalMode == DOT11_G_MODE)
@@ -1263,14 +1315,14 @@ TI_STATUS siteMgr_getParam (TI_HANDLE        hSiteMgr,
         pParam->content.siteMgrTiWlanCounters.FcsErrors = tTwdParam.content.halCtrlCounters.FcsErrors;
         pParam->content.siteMgrTiWlanCounters.RecvError = tTwdParam.content.halCtrlCounters.RecvError;
 
-        pParam->paramType = AUTH_COUNTERS_PARAM;
-        auth_getParam(pSiteMgr->hAuth, pParam);
+        pParam->paramType = MLME_AUTH_COUNTERS_PARAM;
+        mlme_getParam(pSiteMgr->hMlme, pParam);
         
 		pParam->paramType = MLME_BEACON_RECV;
-        mlme_getParam(pSiteMgr->hMlmeSm, pParam);
+        mlme_getParam(pSiteMgr->hMlme, pParam);
         
-        pParam->paramType = ASSOC_COUNTERS_PARAM;
-        assoc_getParam(pSiteMgr->hAssoc, pParam);
+        pParam->paramType = MLME_ASSOC_COUNTERS_PARAM;
+        mlme_getParam(pSiteMgr->hMlme, pParam);
         pParam->content.siteMgrTiWlanCounters.BeaconsXmit = pSiteMgr->beaconSentCount;
         break;
     
@@ -1454,7 +1506,7 @@ TI_STATUS siteMgr_getParam (TI_HANDLE        hSiteMgr,
        }
        break;
 
-    case SITE_MGRT_GET_RATE_MANAGMENT:
+	case SITE_MGRT_GET_RATE_MANAGMENT:
          return cmdBld_ItrRateParams (pSiteMgr->hTWD,
                                       pParam->content.interogateCmdCBParams.fCb, 
                                       pParam->content.interogateCmdCBParams.hCb,
@@ -1540,6 +1592,7 @@ TI_STATUS siteMgr_join(TI_HANDLE    hSiteMgr)
     else /* != SPECIAL_BG_CHANNEL */
     {
         joinParams.basicRateSet = (TI_UINT16)pSiteMgr->pDesiredParams->siteMgrMatchedBasicRateMask;
+		joinParams.supportedRateSet = pSiteMgr->pDesiredParams->siteMgrMatchedSuppRateMask;
     }
 
     ctrlData_getParamPreamble(pSiteMgr->hCtrlData, &curPreamble); /* CTRL_DATA_CURRENT_PREAMBLE_TYPE_PARAM */
@@ -2071,6 +2124,7 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
     paramInfo_t param;
     TI_BOOL        ssidUpdated = TI_FALSE;
 
+        
     switch (pFrameInfo->subType)
     {
     case BEACON:
@@ -2154,8 +2208,9 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
 
         /* Updating QoS params */
         updateBeaconQosParams(pSiteMgr, pSite, pFrameInfo);
-
-
+        
+        UPDATE_RRM_ENABLED_CAPABILITIES(pSite, pFrameInfo);
+        
         /* updating CountryIE  */
         if ((pFrameInfo->content.iePacket.country  != NULL) && 
 			(pFrameInfo->content.iePacket.country->hdr[1] != 0))
@@ -2258,10 +2313,6 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
         
         UPDATE_BEACON_TIMESTAMP(pSiteMgr, pSite, pFrameInfo);
 
-        
-        
-        TWD_UpdateDtimTbtt (pSiteMgr->hTWD, pSite->dtimPeriod, pSite->beaconInterval);
-       
         break;
 
 
@@ -2313,6 +2364,8 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
         /* Updating HT params */
         siteMgr_UpdatHtParams ((TI_HANDLE)pSiteMgr, pSite, pFrameInfo);
 
+        UPDATE_RRM_ENABLED_CAPABILITIES(pSite, pFrameInfo);
+        
         updateRates(pSiteMgr, pSite, pFrameInfo);
 
         if ((pFrameInfo->content.iePacket.pDSParamsSet != NULL)  &&
@@ -2321,8 +2374,9 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
             TRACE2(pSiteMgr->hReport, REPORT_SEVERITY_ERROR, "updateSiteInfo, wrong CHANNELS:rxChannel=%d,currChannel=%d\n", rxChannel, pFrameInfo->content.iePacket.pDSParamsSet->currChannel);
         }
         else
+        {
             UPDATE_CHANNEL(pSite, pFrameInfo, rxChannel);
-
+        }
 
         UPDATE_BSS_TYPE(pSite, pFrameInfo);
 
@@ -2333,6 +2387,7 @@ static void updateSiteInfo(siteMgr_t *pSiteMgr, mlmeFrameInfo_t *pFrameInfo, sit
         /* Updating WME params */
         updateProbeQosParams(pSiteMgr, pSite, pFrameInfo);
 
+        
 
         /* updating CountryIE  */
         if ((pFrameInfo->content.iePacket.country  != NULL) && 
@@ -2659,14 +2714,14 @@ static void updateRates(siteMgr_t *pSiteMgr, siteEntry_t *pSite, mlmeFrameInfo_t
         return;
     }
 
-    /* Update the rate elements */
-    maxBasicRate = rate_GetMaxBasicFromStr ((TI_UINT8 *)pFrameInfo->content.iePacket.pRates->rates,pFrameInfo->content.iePacket.pRates->hdr[1], maxBasicRate);
-    maxActiveRate = rate_GetMaxActiveFromStr ((TI_UINT8 *)pFrameInfo->content.iePacket.pRates->rates,pFrameInfo->content.iePacket.pRates->hdr[1], maxActiveRate);
+	    /* Update the rate elements */
+    maxBasicRate = (TI_UINT8)rate_GetMaxBasicFromStr ((TI_UINT8 *)pFrameInfo->content.iePacket.pRates->rates,pFrameInfo->content.iePacket.pRates->hdr[1], (ENetRate)maxBasicRate);
+    maxActiveRate = (TI_UINT8)rate_GetMaxActiveFromStr ((TI_UINT8 *)pFrameInfo->content.iePacket.pRates->rates,pFrameInfo->content.iePacket.pRates->hdr[1], (ENetRate)maxActiveRate);
 
     if(pFrameInfo->content.iePacket.pExtRates)
     {
-        maxBasicRate = rate_GetMaxBasicFromStr ((TI_UINT8 *)pFrameInfo->content.iePacket.pExtRates->rates,pFrameInfo->content.iePacket.pExtRates->hdr[1], maxBasicRate);
-        maxActiveRate = rate_GetMaxActiveFromStr ((TI_UINT8 *)pFrameInfo->content.iePacket.pExtRates->rates,pFrameInfo->content.iePacket.pExtRates->hdr[1], maxActiveRate);
+        maxBasicRate = (TI_UINT8)rate_GetMaxBasicFromStr ((TI_UINT8 *)pFrameInfo->content.iePacket.pExtRates->rates,pFrameInfo->content.iePacket.pExtRates->hdr[1], (ENetRate)maxBasicRate);
+        maxActiveRate = (TI_UINT8)rate_GetMaxActiveFromStr ((TI_UINT8 *)pFrameInfo->content.iePacket.pExtRates->rates,pFrameInfo->content.iePacket.pExtRates->hdr[1], (ENetRate)maxActiveRate);
     }
 
 
@@ -2929,13 +2984,13 @@ void siteMgr_printPrimarySiteDesc(TI_HANDLE hSiteMgr )
     /* the driver logger can't print %s
      * TRACE1(pSiteMgr->hReport, REPORT_SEVERITY_CONSOLE, "-- SSID  = %s \n",pPrimarySite->ssid.str); 
      */
-    TRACE6(pSiteMgr->hReport, REPORT_SEVERITY_CONSOLE,"-- BSSID = %x-%x-%x-%x-%x-%x\n",
+    TRACE6(pSiteMgr->hReport, REPORT_SEVERITY_CONSOLE,"-- BSSID = %02x-%02x-%02x-%02x-%02x-%02x\n",
                     pPrimarySite->bssid[0], pPrimarySite->bssid[1], pPrimarySite->bssid[2], pPrimarySite->bssid[3], 
                     pPrimarySite->bssid[4], pPrimarySite->bssid[5]);
 
 
 	WLAN_OS_REPORT(("-- SSID  = %s \n",pPrimarySite->ssid.str));
-	WLAN_OS_REPORT(("-- BSSID = %x-%x-%x-%x-%x-%x\n",
+	WLAN_OS_REPORT(("-- BSSID = %02x-%02x-%02x-%02x-%02x-%02x\n",
 					pPrimarySite->bssid[0], pPrimarySite->bssid[1], pPrimarySite->bssid[2], pPrimarySite->bssid[3], 
 					pPrimarySite->bssid[4], pPrimarySite->bssid[5]));
 }
@@ -3589,7 +3644,6 @@ TI_BOOL siteMgr_SelectRateMatch (TI_HANDLE hSiteMgr, TSiteEntry *pCurrentSite)
 {
     siteMgr_t *pSiteMgr = (siteMgr_t *)hSiteMgr;
 	TI_UINT32 StaTotalRates;
-	TI_UINT32 SiteTotalRates;
 
 	/* If the basic or active rate are invalid (0), return NO_MATCH. */
 	if ((pCurrentSite->maxBasicRate == DRV_RATE_INVALID) || (pCurrentSite->maxActiveRate == DRV_RATE_INVALID)) 
@@ -3612,8 +3666,6 @@ TI_BOOL siteMgr_SelectRateMatch (TI_HANDLE hSiteMgr, TSiteEntry *pCurrentSite)
 	StaTotalRates = pSiteMgr->pDesiredParams->siteMgrCurrentDesiredRateMask.basicRateMask |
 				    pSiteMgr->pDesiredParams->siteMgrCurrentDesiredRateMask.supportedRateMask;
 
-	SiteTotalRates = pCurrentSite->rateMask.basicRateMask | pCurrentSite->rateMask.supportedRateMask;
-    
     if ((StaTotalRates & pCurrentSite->rateMask.basicRateMask) != pCurrentSite->rateMask.basicRateMask)
     {
         TRACE0(pSiteMgr->hReport, REPORT_SEVERITY_INFORMATION, "siteMgr_SelectRateMatch: Basic or Supported Rates Doesn't Match \n");
@@ -3660,7 +3712,7 @@ void siteMgr_bandParamsConfig(TI_HANDLE hSiteMgr,  TI_BOOL updateToOS)
 void siteMgr_ConfigRate(TI_HANDLE hSiteMgr)
 {
     siteMgr_t   *pSiteMgr = (siteMgr_t *)hSiteMgr;
-    TI_BOOL      dot11a, b11nEnable;
+    TI_BOOL      dot11a;
     EDot11Mode   OperationMode;
 
     OperationMode = pSiteMgr->siteMgrOperationalMode;
@@ -3697,20 +3749,16 @@ void siteMgr_ConfigRate(TI_HANDLE hSiteMgr)
     /* use HT MCS rates */
     if (pSiteMgr->pDesiredParams->siteMgrDesiredBSSType == BSS_INFRASTRUCTURE)
 	{
-		b11nEnable = TI_TRUE;
-        OperationMode = DOT11_N_MODE;
-    }
-	else
-	{
-		b11nEnable = TI_FALSE;
+		OperationMode = DOT11_N_MODE;
 	}
+	
     
 
     pSiteMgr->pDesiredParams->siteMgrRegstryBasicRateMask =
         rate_BasicToDrvBitmap ((EBasicRateSet)(pSiteMgr->pDesiredParams->siteMgrRegstryBasicRate[OperationMode]), dot11a);
 
     pSiteMgr->pDesiredParams->siteMgrRegstrySuppRateMask =
-        rate_SupportedToDrvBitmap ((EBasicRateSet)(pSiteMgr->pDesiredParams->siteMgrRegstrySuppRate[OperationMode]), dot11a);
+        rate_SupportedToDrvBitmap ((ESupportedRateSet)(pSiteMgr->pDesiredParams->siteMgrRegstrySuppRate[OperationMode]), dot11a);
 
     siteMgr_updateRates(pSiteMgr, dot11a, TI_TRUE);
 
@@ -4006,7 +4054,7 @@ TI_STATUS siteMgr_overwritePrimarySite(TI_HANDLE hSiteMgr, bssEntry_t *newAP, TI
 {
     siteMgr_t   *pSiteMgr = (siteMgr_t *)hSiteMgr;
     siteEntry_t *newApEntry;
-    mlmeIEParsingParams_t *ieListParseParams = mlmeParser_getParseIEsBuffer(pSiteMgr->hMlmeSm);
+    mlmeIEParsingParams_t *ieListParseParams = mlmeParser_getParseIEsBuffer(pSiteMgr->hMlme);
 
     TRACE6(pSiteMgr->hReport, REPORT_SEVERITY_INFORMATION, "siteMgr_overwritePrimarySite: new site bssid= 0x%x-0x%x-0x%x-0x%x-0x%x-0x%x\n\n", newAP->BSSID[0], newAP->BSSID[1], newAP->BSSID[2], newAP->BSSID[3], newAP->BSSID[4], newAP->BSSID[5]);
 
@@ -4077,7 +4125,7 @@ TI_STATUS siteMgr_overwritePrimarySite(TI_HANDLE hSiteMgr, bssEntry_t *newAP, TI
         ieListParseParams->frame.content.iePacket.beaconInerval     = newAP->beaconInterval;
         ieListParseParams->frame.content.iePacket.capabilities  = newAP->capabilities;
 
-        if (mlmeParser_parseIEs(pSiteMgr->hMlmeSm, newAP->pBuffer, newAP->bufferLength, ieListParseParams) != TI_OK)
+        if (mlmeParser_parseIEs(pSiteMgr->hMlme, newAP->pBuffer, newAP->bufferLength, ieListParseParams) != TI_OK)
         {
             /* Error in parsing Probe response packet - exit */
             return TI_NOK;
@@ -4247,3 +4295,41 @@ static void siteMgr_TxPowerAdaptation(TI_HANDLE hSiteMgr, RssiEventDir_e highLow
     }
 }
 
+#ifdef SUPPL_WPS_SUPPORT
+static TI_STATUS DetermineWpsMode(TI_HANDLE hSiteMgr, TI_BOOL bWpsEnabled, TIWLN_SIMPLE_CONFIG_MODE *pWpsMode)
+{
+	siteMgr_t    *pSiteMgr = (siteMgr_t *)hSiteMgr;
+	/*If WPS is enabled parse the config method from probe request WPS IE if present*/
+	if (bWpsEnabled && pSiteMgr->uProbeReqExtraIesLen)
+	{
+		mlmeIEParsingParams_t *probeReqExtraIes = mlmeParser_getParseIEsBuffer(pSiteMgr->hMlme);;
+
+		os_memoryZero (pSiteMgr->hOs, probeReqExtraIes, sizeof(mlmeIEParsingParams_t));
+
+		if (mlmeParser_parseIEs(pSiteMgr->hMlme, pSiteMgr->probeReqExtraIes, pSiteMgr->uProbeReqExtraIesLen, probeReqExtraIes) != TI_OK)
+		{
+			TRACE0(pSiteMgr->hReport, REPORT_SEVERITY_WARNING, "Failed to parse probe request extra IEs");
+			return TI_NOK;
+		}
+		if (probeReqExtraIes->WSCParams.hdr[1])/*If WPS IE has non-zero length*/
+		{
+			if (parseWscMethodFromIE (pSiteMgr, &probeReqExtraIes->WSCParams, pWpsMode) != TI_OK)
+			{
+				TRACE0(pSiteMgr->hReport, REPORT_SEVERITY_WARNING, "Failed to parse WPS config method from WPS IE");
+				return TI_NOK;
+			}
+		}
+		else
+		{
+			TRACE0(pSiteMgr->hReport, REPORT_SEVERITY_INFORMATION, "WPS IE is not present in probe request - couldn't parse WPS mode");
+		}
+
+	}
+	else
+	{
+		*pWpsMode = TIWLN_SIMPLE_CONFIG_OFF;
+	}
+
+	return TI_OK;
+}
+#endif /*SUPPL_WPS_SUPPORT*/

@@ -76,6 +76,7 @@
 #include "WlanDrvCommon.h"
 #include "DrvMainModules.h"
 #include "CmdDispatcher.h"
+#include "queue.h"
 
 
 #define SM_WATCHDOG_TIME_MS     20000  /* SM processes timeout is 20 sec. */
@@ -84,6 +85,8 @@
 
 /* This is used to prevent endless recovery loops */
 #define MAX_NUM_OF_RECOVERY_TRIGGERS 5
+
+#define ACTIONS_QUE_SIZE   QUE_UNLIMITED_SIZE   
 
 /* Handle failure status from the SM callbacks by triggering the SM with FAILURE event */
 #define HANDLE_CALLBACKS_FAILURE_STATUS(hDrvMain, eStatus)      \
@@ -127,6 +130,15 @@ typedef enum
 
 } ESmEvent;
 
+/* Action structure */
+typedef struct 
+{
+    TQueNodeHdr     tQueNodeHdr;    /* The header used for queueing the action */
+    void *          pSignalObject;  /* use to save handle to complete mechanism per OS */
+    EActionType     eAction;        /* The requested action (start/stop) inserted to the driver */
+
+} TActionObject;
+
 /* The module's object */
 typedef struct
 {
@@ -138,11 +150,12 @@ typedef struct
     TI_UINT32         uPendingEventsCount; /* Counts the number of events pending for SM execution */
     TFileInfo         tFileInfo;    /* Information of last file retrieved by os_GetFile() */
     TI_UINT32         uContextId;   /* ID allocated to this module on registration to context module */
-    EActionType       eAction;      /* The last action (start/stop) inserted to the driver */
-    void             *hSignalObj;   /* The signal object used for waiting for action completion */
     TBusDrvCfg        tBusDrvCfg;   /* A union (struc per each supported bus type) for the bus driver configuration */
     TI_UINT32         uRxDmaBufLen; /* The bus driver Rx DMA buffer length (needed as a limit for Rx aggregation length) */
     TI_UINT32         uTxDmaBufLen; /* The bus driver Tx DMA buffer length (needed as a limit for Tx aggregation length) */
+    TI_HANDLE         hActionQueue; /* Handle to the start/stop actions queue */
+    TActionObject    *pCurrAction;  /* The action that is being processed */
+    EActionType       eLastAction;  /* The last action (start/stop) handled by the driver */
 
 } TDrvMain;
 
@@ -154,10 +167,10 @@ static void drvMain_ConfigFwCb (TI_HANDLE hDrvMain, TI_STATUS eStatus);
 static void drvMain_TwdStopCb (TI_HANDLE hDrvMain, TI_STATUS eStatus);
 static void drvMain_InitFailCb (TI_HANDLE hDrvMain, TI_STATUS eStatus);
 static void drvMain_InitLocals (TDrvMain *pDrvMain);
-/* static void drvMain_SmWatchdogTimeout (TI_HANDLE hDrvMain); */
+static void drvMain_ClearActionQueue (TDrvMain *pDrvMain);
 static void drvMain_SmEvent (TI_HANDLE hDrvMain, ESmEvent eEvent);
 static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent);
-
+static void drvMain_ClearQueuedEvents (TDrvMain *pDrvMain);
 /* External functions prototypes */
 
 /** \brief WLAN Driver I/F Get file
@@ -335,22 +348,8 @@ TI_STATUS drvMain_Create (TI_HANDLE  hOs,
         return TI_NOK;
     }
 
-    pDrvMain->tStadHandles.hMlmeSm = mlme_create (hOs);
-    if (pDrvMain->tStadHandles.hMlmeSm == NULL)
-    {
-        drvMain_Destroy (pDrvMain);
-        return TI_NOK;
-    }
-
-    pDrvMain->tStadHandles.hAuth = auth_create (hOs);
-    if (pDrvMain->tStadHandles.hAuth == NULL)
-    {
-        drvMain_Destroy (pDrvMain);
-        return TI_NOK;
-    }
-
-    pDrvMain->tStadHandles.hAssoc = assoc_create (hOs);
-    if (pDrvMain->tStadHandles.hAssoc == NULL)
+    pDrvMain->tStadHandles.hMlme = mlme_create (hOs);
+    if (pDrvMain->tStadHandles.hMlme == NULL)
     {
         drvMain_Destroy (pDrvMain);
         return TI_NOK;
@@ -572,6 +571,14 @@ TI_STATUS drvMain_Destroy (TI_HANDLE  hDrvMain)
         return TI_NOK;
     }
 
+    /* Clear event queues */
+	drvMain_ClearQueuedEvents (pDrvMain);
+	drvMain_ClearActionQueue (pDrvMain);
+	if (pDrvMain->hActionQueue)
+	{
+		que_Destroy (pDrvMain->hActionQueue);
+	}
+
     if (pDrvMain->tStadHandles.hScanMngr != NULL)
     {
         scanMngr_unload (pDrvMain->tStadHandles.hScanMngr);
@@ -637,19 +644,9 @@ TI_STATUS drvMain_Destroy (TI_HANDLE  hDrvMain)
         rxData_unLoad (pDrvMain->tStadHandles.hRxData);
     }
 
-    if (pDrvMain->tStadHandles.hAssoc != NULL)
+    if (pDrvMain->tStadHandles.hMlme != NULL)
     {
-        assoc_unload (pDrvMain->tStadHandles.hAssoc);
-    }
-
-    if (pDrvMain->tStadHandles.hAuth != NULL)
-    {
-        auth_unload (pDrvMain->tStadHandles.hAuth);
-    }
-
-    if (pDrvMain->tStadHandles.hMlmeSm != NULL)
-    {
-        mlme_unload (pDrvMain->tStadHandles.hMlmeSm);
+        mlme_destroy (pDrvMain->tStadHandles.hMlme);
     }
 
     if (pDrvMain->tStadHandles.hSCR != NULL)
@@ -812,9 +809,7 @@ static void drvMain_Init (TI_HANDLE hDrvMain)
     siteMgr_init (pModules);
     regulatoryDomain_init (pModules);
     scanCncn_Init (pModules);
-    auth_init (pModules);
     mlme_init (pModules);    
-    assoc_init (pModules);
     rxData_init (pModules);
     txCtrl_Init (pModules);
     txDataQ_Init (pModules);
@@ -880,6 +875,13 @@ static TI_STATUS drvMain_SetDefaults (TI_HANDLE hDrvMain, TI_UINT8 *pBuf, TI_UIN
 
     pInitTable = os_memoryAlloc (pDrvMain->tStadHandles.hOs, sizeof(TInitTable));
 
+    if(NULL == pInitTable)
+    {
+        TRACE0(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_FATAL_ERROR, "drvMain_SetDefaults(): Allocation for pInitTable has failed!\n");
+
+        return TI_NOK;
+    }
+
     /* Parse defaults */
     eStatus = osInitTable_IniFile (pDrvMain->tStadHandles.hOs, pInitTable, (char*)pBuf, (int)uLength);
 
@@ -893,8 +895,6 @@ static TI_STATUS drvMain_SetDefaults (TI_HANDLE hDrvMain, TI_UINT8 *pBuf, TI_UIN
     ctrlData_SetDefaults (pDrvMain->tStadHandles.hCtrlData, &pInitTable->ctrlDataInitParams);
     regulatoryDomain_SetDefaults (pDrvMain->tStadHandles.hRegulatoryDomain, &pInitTable->regulatoryDomainInitParams);
     scanCncn_SetDefaults (pDrvMain->tStadHandles.hScanCncn, &pInitTable->tScanCncnInitParams);
-    auth_SetDefaults (pDrvMain->tStadHandles.hAuth, &pInitTable->authInitParams);
-    assoc_SetDefaults (pDrvMain->tStadHandles.hAssoc, &pInitTable->assocInitParams);
     rxData_SetDefaults (pDrvMain->tStadHandles.hRxData, &pInitTable->rxDataInitParams);
     sme_SetDefaults (pDrvMain->tStadHandles.hSme, &pInitTable->tSmeModifiedInitParams, &pInitTable->tSmeInitParams);
     rsn_SetDefaults (pDrvMain->tStadHandles.hRsn, &pInitTable->rsnInitParams);
@@ -911,7 +911,7 @@ static TI_STATUS drvMain_SetDefaults (TI_HANDLE hDrvMain, TI_UINT8 *pBuf, TI_UIN
     txDataQ_SetDefaults (pDrvMain->tStadHandles.hTxDataQ, &pInitTable->txDataInitParams);
     txCtrl_SetDefaults (pDrvMain->tStadHandles.hTxCtrl, &pInitTable->txDataInitParams);
     currBSS_SetDefaults (pDrvMain->tStadHandles.hCurrBss, &pInitTable->tCurrBssInitParams);
-    mlme_SetDefaults (pDrvMain->tStadHandles.hMlmeSm, &pInitTable->tMlmeInitParams);
+    mlme_SetDefaults (pDrvMain->tStadHandles.hMlme, &pInitTable->tMlmeInitParams);
 
     scanMngr_SetDefaults(pDrvMain->tStadHandles.hScanMngr, &pInitTable->tRoamScanMngrInitParams);
     roamingMngr_setDefaults(pDrvMain->tStadHandles.hRoamingMngr, &pInitTable->tRoamScanMngrInitParams);
@@ -919,6 +919,8 @@ static TI_STATUS drvMain_SetDefaults (TI_HANDLE hDrvMain, TI_UINT8 *pBuf, TI_UIN
     /* Note: The siteMgr_SetDefaults includes many settings that relate to other modules so keep it last!! */ 
     siteMgr_SetDefaults (pDrvMain->tStadHandles.hSiteMgr, &pInitTable->siteMgrInitParams);
 
+    StaCap_SetDefaults(pDrvMain->tStadHandles.hStaCap,&pInitTable->tStaCapabilityParams);
+        
     /* Set DrvMain local defaults */
     pDrvMain->tBusDrvCfg.tSdioCfg.uBlkSizeShift         = pInitTable->tDrvMainParams.uSdioBlkSizeShift;
     pDrvMain->tBusDrvCfg.tSdioCfg.uBusDrvThreadPriority = pInitTable->tDrvMainParams.uBusDrvThreadPriority;
@@ -976,8 +978,17 @@ static void drvMain_ConfigFwCb (TI_HANDLE hDrvMain, TI_STATUS eStatus)
 
 static void drvMain_TwdStopCb (TI_HANDLE hDrvMain, TI_STATUS eStatus)
 {
+    TDrvMain *pDrvMain = (TDrvMain *)hDrvMain;
+
     HANDLE_CALLBACKS_FAILURE_STATUS(hDrvMain, eStatus);
-    drvMain_SmEvent (hDrvMain, SM_EVENT_STOP_COMPLETE);
+    if (pDrvMain->eSmState == SM_STATE_STOPPING) 
+    {
+        drvMain_SmEvent (hDrvMain, SM_EVENT_STOP_COMPLETE);
+    }
+    else 
+    {
+        TRACE1(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_WARNING , "drvMain_TwdStopCb(): STOP_COMPLETE event ignored - arrived in state %d\n", pDrvMain->eSmState);
+    }
 }
 
 static void drvMain_InitFailCb (TI_HANDLE hDrvMain, TI_STATUS eStatus)
@@ -991,9 +1002,36 @@ static void drvMain_InitFailCb (TI_HANDLE hDrvMain, TI_STATUS eStatus)
 
 static void drvMain_InvokeAction (TI_HANDLE hDrvMain)
 {
-    TDrvMain *pDrvMain = (TDrvMain *)hDrvMain;
+    TDrvMain      *pDrvMain = (TDrvMain *)hDrvMain;
+    TActionObject *pNewAction;
 
-    switch (pDrvMain->eAction)
+    TRACE0(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_INFORMATION , "drvMain_InvokeAction(): called\n");
+
+    /* Dequeue action under critical section */
+    context_EnterCriticalSection (pDrvMain->tStadHandles.hContext);
+    pNewAction = (TActionObject *)que_Dequeue(pDrvMain->hActionQueue);
+    context_LeaveCriticalSection (pDrvMain->tStadHandles.hContext);
+
+    /* If there is no action, exit (queue is empty) */
+    if (pNewAction == NULL) 
+    {
+        TRACE0(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_WARNING , "drvMain_InvokeAction(): action queue is empty\n");
+        return;
+    }
+
+    /* If new action equals previous one, just release the semaphore and exit (freed in drvMain_InsertAction). */
+    if (pNewAction->eAction == pDrvMain->eLastAction)
+    {
+        TRACE1(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_WARNING , "drvMain_InvokeAction(): new action (%d) equals previous one - ignored\n", pNewAction->eAction);
+        os_SignalObjectSet (pDrvMain->tStadHandles.hOs, pNewAction->pSignalObject);
+        return;
+    }
+    pDrvMain->eLastAction = pNewAction->eAction;
+    pDrvMain->pCurrAction = pNewAction;  /* save for releasing the signal when finished */
+
+    /* Send related event to the SM to start processing */
+    TRACE1(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_INFORMATION , "drvMain_InvokeAction(): Handle action = %d\n", pNewAction->eAction);
+    switch (pNewAction->eAction)
     {
     case ACTION_TYPE_START:    
         drvMain_SmEvent (hDrvMain, SM_EVENT_START);   
@@ -1002,7 +1040,7 @@ static void drvMain_InvokeAction (TI_HANDLE hDrvMain)
         drvMain_SmEvent (hDrvMain, SM_EVENT_STOP);
         break;
         default:    
-            TRACE1(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_ERROR , "drvMain_InvokeAction(): Action=%d\n", pDrvMain->eAction);
+            TRACE1(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_ERROR , "drvMain_InvokeAction(): Action=%d\n", pNewAction->eAction);
     }
 }
 
@@ -1038,6 +1076,9 @@ static void drvMain_GetFileCb (TI_HANDLE hDrvMain)
  */ 
 static void drvMain_InitLocals (TDrvMain *pDrvMain)
 {
+    /* The offset of the queue-node-header from the actions structure entry is needed by the queue */
+    TI_UINT32 uNodeHeaderOffset = TI_FIELD_OFFSET(TActionObject, tQueNodeHdr); 
+
     /* Initialize the module's local varniables to default values */
     pDrvMain->tFileInfo.eFileType   = FILE_TYPE_INI;
     pDrvMain->tFileInfo.fCbFunc     = drvMain_GetFileCb;
@@ -1046,7 +1087,13 @@ static void drvMain_InitLocals (TDrvMain *pDrvMain)
     pDrvMain->uPendingEventsCount   = 0;
 	pDrvMain->bRecovery             = TI_FALSE; 
 	pDrvMain->uNumOfRecoveryAttempts = 0;
-	pDrvMain->eAction               = ACTION_TYPE_NONE; 
+    pDrvMain->eLastAction           = ACTION_TYPE_NONE;
+
+    /* Create and initialize the actions queue */
+    pDrvMain->hActionQueue = que_Create (pDrvMain->tStadHandles.hOs, 
+                                         pDrvMain->tStadHandles.hReport, 
+                                         ACTIONS_QUE_SIZE, 
+                                         uNodeHeaderOffset);
 
     /* Register the Action callback to the context engine and get the client ID */
     pDrvMain->uContextId = context_RegisterClient (pDrvMain->tStadHandles.hContext,
@@ -1057,7 +1104,8 @@ static void drvMain_InitLocals (TDrvMain *pDrvMain)
                                                    sizeof("ACTION"));
 
     /* Platform specific HW preparations */
-    hPlatform_Wlan_Hardware_Init (pDrvMain->tStadHandles.hOs);
+    hPlatform_Wlan_Hardware_Init(pDrvMain->tStadHandles.hOs);
+
 
     /* Insure that device power is off (expected to be) */
     hPlatform_DevicePowerOff ();
@@ -1158,6 +1206,8 @@ static TI_STATUS drvMain_ConfigFw (TI_HANDLE hDrvMain)
 static TI_STATUS drvMain_StopActivities (TDrvMain *pDrvMain)
 {
     txPort_suspendTx (pDrvMain->tStadHandles.hTxPort);
+	PowerMgr_recover (pDrvMain->tStadHandles.hPowerMgr);
+	scanCncn_Recover (pDrvMain->tStadHandles.hScanCncn);
 
     /* Disable External Inputs (IRQs and commands) */
     TWD_DisableInterrupts(pDrvMain->tStadHandles.hTWD);
@@ -1188,8 +1238,6 @@ static void drvMain_EnableActivities (TDrvMain *pDrvMain)
 
     /* Enable external events from FW */
     TWD_EnableExternalEvents (pDrvMain->tStadHandles.hTWD);
-
-    
 }
 
 
@@ -1213,11 +1261,42 @@ static void drvMain_ClearQueuedEvents (TDrvMain *pDrvMain)
 }
 
 
+/** 
+ * \fn     drvMain_ClearActionQueue
+ * \brief  Clear actions queue
+ * 
+ * Dequeue and free all queued actions.
+ * 
+ * \note   
+ * \param  pDrvMain - The object                                          
+ * \return void 
+ * \sa     
+ */ 
+static void drvMain_ClearActionQueue (TDrvMain *pDrvMain)
+{
+    TActionObject *pAction;
+
+    /* Dequeue and free all queued actions under critical section */
+    while (1) 
+    {
+        context_EnterCriticalSection (pDrvMain->tStadHandles.hContext);
+        pAction = (TActionObject *)que_Dequeue(pDrvMain->hActionQueue);
+        context_LeaveCriticalSection (pDrvMain->tStadHandles.hContext);
+        if (pAction == NULL) 
+        {
+            break;
+        }
+        /* Just release the semaphore. The action is freed subsequently. */
+        os_SignalObjectSet (pDrvMain->tStadHandles.hOs, pAction->pSignalObject);
+    }
+}
+
+
 /* 
  * \fn     drvMain_InsertAction
- * \brief  Get start/stop action and trigger handling
+ * \brief  Enqueue start/stop action and schedule its handling
  * 
- * Get start or stop action command from OAL, save it and trigger driver task
+ * Get start or stop action command from OAL, enqueue it and trigger driver task
  *     for handling it.
  * Wait on a signal object until the requested process is completed.
  * 
@@ -1229,45 +1308,53 @@ static void drvMain_ClearQueuedEvents (TDrvMain *pDrvMain)
  */ 
 TI_STATUS drvMain_InsertAction (TI_HANDLE hDrvMain, EActionType eAction)
 {
-    TDrvMain *pDrvMain = (TDrvMain *) hDrvMain;
+    TDrvMain      *pDrvMain = (TDrvMain *)hDrvMain;
+	TActionObject *pNewAction;
 
-    if (pDrvMain->eAction == eAction)
-    {            
-        TRACE0(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_CONSOLE, "Action is identical to last action!\n");
-        WLAN_OS_REPORT(("Action is identical to last action!\n"));
-        return TI_NOK;
-    }
+    TRACE0(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_INFORMATION , "drvMain_InsertAction(): Called\n");
 
-    /* Save the requested action */
-    pDrvMain->eAction = eAction;
+    /* Allocate action structure */
+	pNewAction = os_memoryAlloc (pDrvMain->tStadHandles.hOs, sizeof(TActionObject));
+	if (pNewAction == NULL)
+	{
+        TRACE0(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_ERROR , "drvMain_InsertAction(): Couldn't allocate action object!\n");
+		return TI_NOK;
+	}
+    os_memoryZero (pDrvMain->tStadHandles.hOs, (void *)pNewAction, sizeof(TActionObject));
 
-    /* Create signal object */
-    /* 
-     * Notice that we must create the signal object before asking for ReSchedule,
-     * because we might receive it immidiatly, and then we will be in a different context 
-     * with null signal object.
-     */
-    pDrvMain->hSignalObj = os_SignalObjectCreate (pDrvMain->tStadHandles.hOs);
-    if (pDrvMain->hSignalObj == NULL) 
-    {
+	/* Copy user request and signal object into the action structure structure */
+	pNewAction->eAction = eAction;
+	pNewAction->pSignalObject = os_SignalObjectCreate (pDrvMain->tStadHandles.hOs);
+
+	/* If creating the signal object failed, free action and exit */
+	if (pNewAction->pSignalObject == NULL)
+	{
         TRACE0(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_ERROR , "drvMain_InsertAction(): Couldn't allocate signal object!\n");
-        return TI_NOK;
-    }
+		os_memoryFree (pDrvMain->tStadHandles.hOs, pNewAction, sizeof(TActionObject));
+		return TI_NOK;
+	}
+
+	/* Enqueue the action under critical section (can't fail because queue size is unlimited) */
+    context_EnterCriticalSection (pDrvMain->tStadHandles.hContext);
+    que_Enqueue (pDrvMain->hActionQueue, (TI_HANDLE)pNewAction);
+    context_LeaveCriticalSection (pDrvMain->tStadHandles.hContext);
 
     /* Request driver task schedule for action handling */
     context_RequestSchedule (pDrvMain->tStadHandles.hContext, pDrvMain->uContextId);
 
-    /* Wait for the action processing completion */
-    os_SignalObjectWait (pDrvMain->tStadHandles.hOs, pDrvMain->hSignalObj);
+	/* Wait until the action is executed */
+	os_SignalObjectWait (pDrvMain->tStadHandles.hOs, pNewAction->pSignalObject);
 
     /* After "wait" - the action has already been processed in the driver's context */
 
-    /* Free signalling object */
-    os_SignalObjectFree (pDrvMain->tStadHandles.hOs, pDrvMain->hSignalObj);
+	/* Free signalling object and action structure */
+	os_SignalObjectFree (pDrvMain->tStadHandles.hOs, pNewAction->pSignalObject);
+    os_memoryFree (pDrvMain->tStadHandles.hOs, pNewAction, sizeof(TActionObject));
 
     if (pDrvMain->eSmState == SM_STATE_FAILED)
-    return TI_NOK;
-
+    {
+        return TI_NOK;
+    }
     return TI_OK;
 }
 
@@ -1509,10 +1596,7 @@ static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent)
 		{
 			WLAN_OS_REPORT(("SDBus Connect Failed, Set Object Event !!\r\n"));
 			TRACE0(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_ERROR , "SDBus Connect Failed, Set Object Event !!\r\n");
-            if (!pDrvMain->bRecovery) 
-			{
-				os_SignalObjectSet (hOs, pDrvMain->hSignalObj);
-			}
+            
 		}
 		else /* SDBus Connect success */
         {
@@ -1580,7 +1664,9 @@ static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent)
             pDrvMain->eSmState = SM_STATE_FW_CONFIG;
             if (!pDrvMain->bRecovery) 
             {
-				os_SignalObjectSet (hOs, pDrvMain->hSignalObj);
+                /*update the state before unblocking the application so command will not be rejected*/
+                wlanDrvIf_UpdateDriverState (hOs, DRV_STATE_RUNNING);
+				os_SignalObjectSet (hOs, pDrvMain->pCurrAction->pSignalObject);
             }
             TWD_EnableInterrupts(pDrvMain->tStadHandles.hTWD);
           #ifdef PRIODIC_INTERRUPT
@@ -1614,7 +1700,6 @@ static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent)
             else 
             {
                 sme_Start (pDrvMain->tStadHandles.hSme); 
-                wlanDrvIf_UpdateDriverState (hOs, DRV_STATE_RUNNING);
             }
             tmr_UpdateDriverState (pDrvMain->tStadHandles.hTimer, TI_TRUE);
             drvMain_EnableActivities (pDrvMain);
@@ -1625,7 +1710,7 @@ static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent)
         break;
     case SM_STATE_OPERATIONAL:
         /* 
-         * Disable start/stop commands and start watchdog timer.
+         * Disable start/stop commands.
          * Update timer and OAL about exiting OPERATIONAL state (OAL ignores recovery).
          * For STOP, stop SME (handle disconnection) and move to DISCONNECTING state.
          * For recovery, stop driver activities and move to STOPPING state.
@@ -1688,20 +1773,20 @@ static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent)
                 pDrvMain->eSmState = SM_STATE_STOPPED;
                 drvMain_ClearQueuedEvents (pDrvMain);
                 scr_notifyFWReset(pDrvMain->tStadHandles.hSCR);
-                os_SignalObjectSet (hOs, pDrvMain->hSignalObj);
-                context_EnableClient (pDrvMain->tStadHandles.hContext, pDrvMain->uContextId);
                 wlanDrvIf_UpdateDriverState (hOs, DRV_STATE_STOPPED);
+                context_EnableClient (pDrvMain->tStadHandles.hContext, pDrvMain->uContextId);
                 eStatus = TI_OK;
+                os_SignalObjectSet (hOs, pDrvMain->pCurrAction->pSignalObject);
             }
         }
         
         break;
     case SM_STATE_STOPPED:
         /* 
+         * Disable start/stop commands.
          * A START action command was inserted, so we go through the init process.
-         * Disable further actions, start watchdog timer, turn on device and request NVS file.
+         * Turn on device and request NVS file.
          */
-        
         context_DisableClient (pDrvMain->tStadHandles.hContext, pDrvMain->uContextId);
         if (eEvent == SM_EVENT_START) 
         {
@@ -1723,7 +1808,7 @@ static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent)
 
         if (!pDrvMain->bRecovery) 
 		{
-            os_SignalObjectSet (hOs, pDrvMain->hSignalObj);
+            os_SignalObjectSet (hOs, pDrvMain->pCurrAction->pSignalObject);
 		}
 		else if (pDrvMain->uNumOfRecoveryAttempts < MAX_NUM_OF_RECOVERY_TRIGGERS) 
 		{

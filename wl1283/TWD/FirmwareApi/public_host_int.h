@@ -136,7 +136,10 @@ typedef struct
     uint32      rxPktsDesc[NUM_RX_PKT_DESC];   /* Array of Rx packets short descriptors (see RX_DESC_SET/GET...) */
 	uint32      txReleasedBlks[NUM_TX_QUEUES]; /* Per queue released blocks count since FW-reset */
     uint32      fwLocalTime;    /* FW time in usec, used for clock synchronization with the host */
-    uint32      spare[2];       /* Total structure size is 68 bytes */
+	uint8		txTotal;
+	uint8		Reserved1;
+	uint16		Reserved2;
+    uint32      spare;       /* Total structure size is 68 bytes */
 } FwStatus_t;
 
 #endif

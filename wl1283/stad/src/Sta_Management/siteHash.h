@@ -97,12 +97,10 @@ typedef struct
     TI_HANDLE           hRxData;
     TI_HANDLE           hTxCtrl;
     TI_HANDLE           hRsn;
-    TI_HANDLE           hAuth;
-    TI_HANDLE           hAssoc;
     TI_HANDLE           hRegulatoryDomain;
     TI_HANDLE           hMeasurementMgr;
     TI_HANDLE           hTWD;
-    TI_HANDLE           hMlmeSm;
+    TI_HANDLE           hMlme;
     TI_HANDLE           hReport;
     TI_HANDLE           hOs;
     TI_HANDLE           hXCCMngr;
@@ -144,6 +142,9 @@ typedef struct
     TI_UINT32           uWscIeSize; 			  /* Simple Config IE actual size (the part after the OUI) */
     char                siteMgrWSCProbeReqParams[DOT11_WSC_PROBE_REQ_MAX_LENGTH]; /* Contains the params to be used in the ProbeReq - WSC IE */ 
 
+	TI_UINT32           uProbeReqExtraIesLen; 			  
+	TI_UINT8            probeReqExtraIes[MAX_BEACON_BODY_LENGTH];
+
     TI_UINT8            includeWSCinProbeReq;
 } siteMgr_t;
 
@@ -174,6 +175,8 @@ TI_STATUS buildDisconnTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate);
 TI_STATUS buildPsPollTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate);
 
 TI_STATUS buildQosNullDataTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate, TI_UINT8 userPriority);
+
+TI_STATUS buildLinkMeasurementReportTemplate(siteMgr_t *pSiteMgr, TSetTemplate *pTemplate);
 
 void setDefaultProbeReqTemplate (TI_HANDLE	hSiteMgr);
 

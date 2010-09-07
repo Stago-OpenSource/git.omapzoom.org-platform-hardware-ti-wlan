@@ -58,6 +58,7 @@ void      txDataQ_ClearQueues (TI_HANDLE hTxDataQ);
 TI_STATUS txDataQ_InsertPacket (TI_HANDLE hTxDataQ, TTxCtrlBlk *pPktCtrlBlk, TI_UINT8 uPacketDtag);
 void      txDataQ_StopQueue (TI_HANDLE hTxDataQ, TI_UINT32 tidBitMap);
 void      txDataQ_UpdateBusyMap (TI_HANDLE hTxDataQ, TI_UINT32 tidBitMap);
+void      txDataQ_UpdatePriorityMap (TI_HANDLE hTxDataQ, TI_UINT32 tidBitMap);
 void      txDataQ_StopAll (TI_HANDLE hTxDataQ);
 void      txDataQ_WakeAll (TI_HANDLE hTxDataQ);
 

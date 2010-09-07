@@ -57,6 +57,7 @@ TI_STATUS	txHwQueue_Config (TI_HANDLE hTxHwQueue, TTwdInitParams *pInitParams);
 TI_STATUS	txHwQueue_SetHwInfo (TI_HANDLE hTxHwQueue, TDmaParams *pDmaParams);
 TI_STATUS	txHwQueue_Restart (TI_HANDLE hTxHwQueue);
 ETxHwQueStatus txHwQueue_AllocResources (TI_HANDLE hTxHwQueue, TTxCtrlBlk *pTxCtrlBlk);
+void        txHwQueue_SetSecureMode (TI_HANDLE hTxHwQueue, ECipherSuite eSecurityMode);
 ETxnStatus         txHwQueue_UpdateFreeResources (TI_HANDLE hTxHwQueue, FwStatus_t *pFwStatus);
 void        txHwQueue_RegisterCb (TI_HANDLE hTxHwQueue, TI_UINT32 uCallBackId, void *fCbFunc, TI_HANDLE hCbHndl);
 #ifdef TI_DBG

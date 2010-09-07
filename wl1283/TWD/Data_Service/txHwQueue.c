@@ -64,13 +64,17 @@ const EAcTrfcType WMEQosTagToACTable[MAX_NUM_OF_802_1d_TAGS] =
  */
 
 /* Spare blocks written in extraMemBlks field in TxDescriptor for HW use */
-#define BLKS_HW_ALLOC_SPARE             2 
-
+#define BLKS_HW_ALLOC_SPARE             1 
+#define TXHWQUEUE_QUOTA                 30
 /* Set queue's backpressure bit (indicates queue state changed from ready to busy or inversely). */
-#define SET_QUEUE_BACKPRESSURE(pBackpressure, uQueueId)   (*pBackpressure |= (1 << uQueueId)) 
-
+#define SET_QUEUE_BACKPRESSURE(pBackpressure, uQueueId)   (*pBackpressure |= (1 << uQueueId))
+/* Set low scheduler priority indication */ 
+#define SET_QUEUE_LOW_PRIORITY(priorityBitMap, uQueueId)   (priorityBitMap |= (1 << uQueueId))
+/* Set high scheduler priority indication */
+#define SET_QUEUE_HIGH_PRIORITY(priorityBitMap,uQueueId)   (priorityBitMap &= ~(1 << uQueueId))
 /* Callback function definition for UpdateBusyMap */
 typedef void (* tUpdateBusyMapCb)(TI_HANDLE hCbHndl, TI_UINT32 uBackpressure);
+typedef void (* tUpdatePriorityMapCb)(TI_HANDLE hCbHndl, TI_UINT32 uPriorityMap);
 
 /* Per Queue HW blocks accounting data: */
 typedef struct
@@ -84,6 +88,8 @@ typedef struct
     TI_BOOL    bQueueBusy;              /* If TI_TRUE, this queue is currently stopped. */
     TI_UINT16  uPercentOfBlkLowThresh;  /* Configured percentage of blocks to use as the queue's low allocation threshold */
     TI_UINT16  uPercentOfBlkHighThresh; /* Configured percentage of blocks to use as the queue's high allocation threshold */
+    TI_UINT32  uNumBlksQuota;
+    TI_UINT32  uPriorityBitMap;
 
 } TTxHwQueueInfo; 
 
@@ -95,6 +101,9 @@ typedef struct
     tUpdateBusyMapCb fUpdateBusyMapCb;  /* The upper layers UpdateBusyMap callback */
     TI_HANDLE        hUpdateBusyMapHndl;/* The handle for the fUpdateBusyMapCb */
 
+    tUpdatePriorityMapCb fUpdatePriorityMapCb;  /* The upper layers UpdateBusyMap callback */
+    TI_HANDLE        hUpdatePriorityMapHndl;/* The handle for the fUpdateBusyMapCb */
+
     TI_UINT32  uNumTotalBlks;           /* The total number of Tx blocks        */
     TI_UINT32  uNumTotalBlksFree;       /* Total number of free HW blocks       */    
     TI_UINT32  uNumTotalBlksReserved;   /* Total number of free but reserved HW blocks */
@@ -103,7 +112,9 @@ typedef struct
     TI_UINT8   uDrvTxPacketsCntr;       /* Accumulated allocated descriptors in driver. */
     
     TTxHwQueueInfo  aTxHwQueueInfo[MAX_NUM_OF_AC]; /* The per queue variables */
-
+    ECipherSuite    eSecurityMode;      /* Current security mode default TWD_CIPHER_NONE - 0*/
+    TI_UINT32       uExtraHwBlocks;     /* Default value BLKS_HW_ALLOC_SPARE*/
+	TI_INT32    iTxTotaldiff;           /* Indicates How much Memory blocks should be moved to RX poll */
 } TTxHwQueue;
 
 
@@ -177,6 +188,7 @@ TI_STATUS txHwQueue_Init (TI_HANDLE hTxHwQueue, TI_HANDLE hReport)
     TTxHwQueue *pTxHwQueue = (TTxHwQueue *)hTxHwQueue;
     
     pTxHwQueue->hReport = hReport;
+    pTxHwQueue->uExtraHwBlocks = BLKS_HW_ALLOC_SPARE;
 
     return TI_OK;
 }
@@ -234,8 +246,8 @@ TI_STATUS txHwQueue_SetHwInfo (TI_HANDLE hTxHwQueue, TDmaParams *pDmaParams)
 {
     TTxHwQueue *pTxHwQueue = (TTxHwQueue *)hTxHwQueue;
     
-    pTxHwQueue->uNumTotalBlks = pDmaParams->NumTxBlocks - 1; /* One block must be always free for FW use. */
-    
+    pTxHwQueue->uNumTotalBlks = pDmaParams->NumTxBlocks; 
+    TRACE1(pTxHwQueue->hReport, REPORT_SEVERITY_INFORMATION,"pTxHwQueue->uNumTotalBlks = %d \n",pTxHwQueue->uNumTotalBlks);
     /* Restart the module variables. */
     txHwQueue_Restart (hTxHwQueue);
 
@@ -280,6 +292,8 @@ TI_STATUS txHwQueue_Restart (TI_HANDLE hTxHwQueue)
         pQueueInfo->uFwFreedBlksCntr = 0;
         pQueueInfo->uNumBlksCausedBusy = 0;
         pQueueInfo->bQueueBusy = TI_FALSE;
+        pQueueInfo->uNumBlksQuota = TXHWQUEUE_QUOTA;
+        pQueueInfo->uPriorityBitMap = 0;
 
         /* Since no blocks are used yet, reserved blocks number equals to the low threshold. */
         pQueueInfo->uNumBlksReserved = pQueueInfo->uNumBlksThresh;
@@ -333,7 +347,7 @@ ETxHwQueStatus txHwQueue_AllocResources (TI_HANDLE hTxHwQueue, TTxCtrlBlk *pTxCt
     uNumBlksToAlloc += (uExcludedLength > 252) ? 2 : 1;
 
     /* Add extra blocks needed in case of fragmentation */
-    uNumBlksToAlloc += BLKS_HW_ALLOC_SPARE;
+    uNumBlksToAlloc += pTxHwQueue->uExtraHwBlocks;
 
     /***********************************************************************/
     /*            Check if the required resources are available            */
@@ -363,9 +377,9 @@ ETxHwQueStatus txHwQueue_AllocResources (TI_HANDLE hTxHwQueue, TTxCtrlBlk *pTxCt
 
     /* !!!!!!!!!!!!!just for test - swap fields - OK for HW, fw will have the value on other field */
     pTxCtrlBlk->tTxDescriptor.extraMemBlks = uNumBlksToAlloc;
-    pTxCtrlBlk->tTxDescriptor.totalMemBlks = BLKS_HW_ALLOC_SPARE;
+    pTxCtrlBlk->tTxDescriptor.totalMemBlks = pTxHwQueue->uExtraHwBlocks;
 #else
-    pTxCtrlBlk->tTxDescriptor.extraMemBlks = BLKS_HW_ALLOC_SPARE;
+    pTxCtrlBlk->tTxDescriptor.extraMemBlks = pTxHwQueue->uExtraHwBlocks;
     pTxCtrlBlk->tTxDescriptor.totalMemBlks = uNumBlksToAlloc;
 #endif
 
@@ -436,6 +450,37 @@ ETxHwQueStatus txHwQueue_AllocResources (TI_HANDLE hTxHwQueue, TTxCtrlBlk *pTxCt
     /* Return SUCCESS (resources are available). */
     return TX_HW_QUE_STATUS_SUCCESS;
 }
+/****************************************************************************
+ *                  txHwQueue_SetSecureMode()
+ ****************************************************************************
+ * DESCRIPTION: 
+   ============
+    1.  Set cipher mode for connection.
+    2.  Calculate number of Extra HW block depending on security mode
+ ****************************************************************************/
+void txHwQueue_SetSecureMode (TI_HANDLE hTxHwQueue, ECipherSuite eSecurityMode)
+{
+    TTxHwQueue *pTxHwQueue = (TTxHwQueue *)hTxHwQueue;
+    if(eSecurityMode < TWD_CIPHER_MAX)
+    {
+        pTxHwQueue->eSecurityMode = eSecurityMode;
+#ifdef GEM_SUPPORTED
+        if(TWD_CIPHER_GEM == eSecurityMode)
+        {
+            pTxHwQueue->uExtraHwBlocks = BLKS_HW_ALLOC_SPARE + 1;
+        }
+        else
+#endif
+        {
+            pTxHwQueue->uExtraHwBlocks = BLKS_HW_ALLOC_SPARE;
+        }
+    }
+    else
+    {
+        pTxHwQueue->eSecurityMode = TWD_CIPHER_NONE;
+        pTxHwQueue->uExtraHwBlocks = BLKS_HW_ALLOC_SPARE;
+    }
+}
 
 
 /****************************************************************************
@@ -481,7 +526,27 @@ static void txHwQueue_UpdateFreeBlocks (TTxHwQueue *pTxHwQueue, TI_UINT32 uQueue
 #endif
 
     /* Update total free blocks and Queue used blocks with the freed blocks number. */
-    pTxHwQueue->uNumTotalBlksFree += numBlksToFree;
+    if(pTxHwQueue->iTxTotaldiff >= 0)
+    {
+        /* In case we don't need to transfer blocks to RX poll add the freed blocks to the TX poll*/
+        pTxHwQueue->uNumTotalBlksFree += numBlksToFree;
+    }
+    else
+    {
+        /* By adding the freed blocks to txTotalDiff we are actually moving them to RX poll */
+        pTxHwQueue->iTxTotaldiff += numBlksToFree;
+        if(pTxHwQueue->iTxTotaldiff > 0)
+        {
+            /* If we still have blocks available add the to TX poll */
+            numBlksToFree = pTxHwQueue->iTxTotaldiff;
+            pTxHwQueue->uNumTotalBlksFree += numBlksToFree;
+        }
+        else
+        {
+            /* Otherwise no blocks are left to work with. */
+            numBlksToFree = 0;
+        }
+    }
     pQueueInfo->uNumBlksUsed = newUsedBlks;
 
     lowThreshold = pQueueInfo->uNumBlksThresh;
@@ -492,7 +557,15 @@ static void txHwQueue_UpdateFreeBlocks (TTxHwQueue *pTxHwQueue, TI_UINT32 uQueue
     */
     if (newUsedBlks < lowThreshold)
     {
+        /* Maximal number of blocks that can be reserved is the sum of the available blocks and the blocks already reserved */
+        int maxReservedBlks = pQueueInfo->uNumBlksReserved + numBlksToFree;
         newReserved = lowThreshold - newUsedBlks;
+
+        /* newReserved can't be larger than the maximum possible*/
+        if (maxReservedBlks < newReserved) 
+        {
+            newReserved = maxReservedBlks;
+        }
         pQueueInfo->uNumBlksReserved = newReserved;
 
         
@@ -546,9 +619,13 @@ ETxnStatus txHwQueue_UpdateFreeResources (TI_HANDLE hTxHwQueue, FwStatus_t *pFwS
     TI_UINT32 uAvailableBlks; /* Max blocks available for current queue. */
     TI_UINT32 uNewNumUsedDescriptors;
     TI_UINT32 uBackpressure = 0;
+    TI_UINT32 uPriorityQueueBitMap = 0;
     TI_UINT32 *pFreeBlocks = (TI_UINT32 *)pFwStatus->txReleasedBlks;
     TI_UINT32 uTempFwCounters;
     FwStatCntrs_t *pFwStatusCounters;
+    TI_UINT32 uNewTxTotal = (TI_UINT32)pFwStatus->txTotal;
+
+    pTxHwQueue->iTxTotaldiff += (uNewTxTotal - pTxHwQueue->uNumTotalBlks) ;
 
     /* 
      * If TxResults counter changed in FwStatus, update descriptors number according to  information 
@@ -580,6 +657,13 @@ ETxnStatus txHwQueue_UpdateFreeResources (TI_HANDLE hTxHwQueue, FwStatus_t *pFwS
         pTxHwQueue->uNumUsedDescriptors = uNewNumUsedDescriptors;
     }
 
+    /* Update Total blocks*/
+    pTxHwQueue->uNumTotalBlks = uNewTxTotal;
+    if(pTxHwQueue->iTxTotaldiff > 0)
+    {
+        /* In case we have possitive difference we can add the blocks to TX poll */
+        pTxHwQueue->uNumTotalBlksFree += pTxHwQueue->iTxTotaldiff;
+    }
     /* 
      * For all queues, update blocks numbers according to FwStatus information 
      */
@@ -588,9 +672,25 @@ ETxnStatus txHwQueue_UpdateFreeResources (TI_HANDLE hTxHwQueue, FwStatus_t *pFwS
         pQueueInfo = &(pTxHwQueue->aTxHwQueueInfo[uQueueId]);
 
         /* Update per queue number of used, free and reserved blocks. */
-        txHwQueue_UpdateFreeBlocks (pTxHwQueue, uQueueId, pFreeBlocks[uQueueId]);
+        txHwQueue_UpdateFreeBlocks (pTxHwQueue, uQueueId, pFreeBlocks[uQueueId]/*, &txTotalDiff*/);
+        if(pQueueInfo->uNumBlksUsed > pQueueInfo->uNumBlksQuota)
+        {
+            SET_QUEUE_LOW_PRIORITY(uPriorityQueueBitMap, uQueueId);
+        }
+        else
+        {
+            SET_QUEUE_HIGH_PRIORITY(uPriorityQueueBitMap, uQueueId); 
+        }
     }
-
+    if((pQueueInfo->uPriorityBitMap != uPriorityQueueBitMap) && (pTxHwQueue->fUpdatePriorityMapCb != NULL))
+    { 
+        pTxHwQueue->fUpdatePriorityMapCb(pTxHwQueue->hUpdatePriorityMapHndl, uPriorityQueueBitMap); 
+        pQueueInfo->uPriorityBitMap = uPriorityQueueBitMap;
+    }
+	if(pTxHwQueue->iTxTotaldiff > 0)
+    {
+        pTxHwQueue->iTxTotaldiff = 0;
+    }
     /* 
      * For each busy queue, if now available indicate it in the backpressure bitmap 
      */
@@ -666,6 +766,10 @@ void txHwQueue_RegisterCb (TI_HANDLE hTxHwQueue, TI_UINT32 uCallBackId, void *fC
             pTxHwQueue->fUpdateBusyMapCb   = (tUpdateBusyMapCb)fCbFunc;
             pTxHwQueue->hUpdateBusyMapHndl = hCbHndl;
             break;
+        case TWD_INT_UPDATE_PRIORITY_QUEUE_MAP:
+            pTxHwQueue->fUpdatePriorityMapCb   = (tUpdatePriorityMapCb)fCbFunc;
+            pTxHwQueue->hUpdatePriorityMapHndl = hCbHndl;
+            break;
 
         default:
             TRACE1(pTxHwQueue->hReport, REPORT_SEVERITY_ERROR, " - Illegal parameter = %d\n", uCallBackId);
@@ -682,6 +786,7 @@ void txHwQueue_RegisterCb (TI_HANDLE hTxHwQueue, TI_UINT32 uCallBackId, void *fC
 #ifdef TI_DBG
 void txHwQueue_PrintInfo (TI_HANDLE hTxHwQueue)
 {
+#ifdef REPORT_LOG
     TTxHwQueue *pTxHwQueue = (TTxHwQueue *)hTxHwQueue;
     TI_INT32 TxQid;
 
@@ -715,6 +820,7 @@ void txHwQueue_PrintInfo (TI_HANDLE hTxHwQueue)
             pTxHwQueue->aTxHwQueueInfo[TxQid].uNumBlksCausedBusy,
             pTxHwQueue->aTxHwQueueInfo[TxQid].bQueueBusy));
     }
+#endif
 }
 
 

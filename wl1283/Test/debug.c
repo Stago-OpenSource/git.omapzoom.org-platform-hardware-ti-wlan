@@ -56,7 +56,6 @@
 #include "qosMngrDbg.h"
 #include "PowerMgrDebug.h"
 #include "roamingMgrDebug.h"
-#include "scanCncnDbg.h"
 #include "ScanMngrDbg.h"
 #include "scrDbg.h"
 #include "SoftGeminiDbg.h"
@@ -85,7 +84,6 @@ typedef enum
     TEST_MEASUREMENT_MODULE_PARAM           = 11,
     TEST_POWER_MGR_MODULE_PARAM             = 12,
 	TEST_HAL_CTRL_BUFFER_PARAM	        = 13,
-    TEST_SCAN_CNCN_MODULE_PARAM             = 14,
     TEST_SCAN_MNGR_MODULE_PARAM             = 15,
 	TEST_ROAMING_MNGR_PARAM		        = 16,
     TEST_SCR_PARAM                          = 17,
@@ -210,10 +208,6 @@ TI_STATUS debugFunction(TStadHandlesList *pStadHandles, TI_UINT32 functionNumber
                               pParam);
         break;
 
-    case TEST_SCAN_CNCN_MODULE_PARAM:
-        scanConcentratorDebugFunction( pStadHandles->hScanCncn, pStadHandles->hTWD ,functionNumber % 100, pParam );
-        break;
-
     case TEST_SCAN_MNGR_MODULE_PARAM:
         scanMngrDebugFunction( pStadHandles->hScanMngr, functionNumber  % 100, pParam, pStadHandles->hSiteMgr, pStadHandles->hCtrlData );
         break;
@@ -246,7 +240,7 @@ TI_STATUS debugFunction(TStadHandlesList *pStadHandles, TI_UINT32 functionNumber
          FWDebugFunction(pStadHandles->hDrvMain, 
 						 pStadHandles->hOs, 
 						 pStadHandles->hTWD, 
-						 pStadHandles->hMlmeSm, 
+						 pStadHandles->hMlme, 
 						 pStadHandles->hTxMgmtQ,
 						 pStadHandles->hTxCtrl,
 						 functionNumber % 100, 
@@ -283,7 +277,6 @@ static void printMenue(void)
     WLAN_OS_REPORT(("Measurement            1100\n"));
     WLAN_OS_REPORT(("PowerMgr               1200\n"));
     WLAN_OS_REPORT(("HAL Ctrl Buffer        1300\n"));
-    WLAN_OS_REPORT(("Scan concentrator      1400\n"));
     WLAN_OS_REPORT(("Scan Manager           1500\n"));
     WLAN_OS_REPORT(("Roaming Manager        1600\n"));
     WLAN_OS_REPORT(("SCR                    1700\n"));

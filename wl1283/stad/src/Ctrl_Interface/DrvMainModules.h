@@ -49,9 +49,7 @@ typedef struct
     TI_HANDLE           hSme;
     TI_HANDLE           hSiteMgr;
     TI_HANDLE           hConn;
-    TI_HANDLE           hMlmeSm;
-    TI_HANDLE           hAuth;
-    TI_HANDLE           hAssoc;
+    TI_HANDLE           hMlme;
     TI_HANDLE           hRxData;
     TI_HANDLE           hTxCtrl;
     TI_HANDLE           hTxPort;

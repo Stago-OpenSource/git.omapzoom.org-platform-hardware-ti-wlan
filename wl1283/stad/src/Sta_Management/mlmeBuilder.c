@@ -88,6 +88,9 @@ TI_STATUS mlmeBuilder_sendFrame(TI_HANDLE hMlme,
 
 	/* Allocate a TxCtrlBlk and data buffer (large enough for the max management packet) */
     pPktCtrlBlk = TWD_txCtrlBlk_Alloc (pHandle->hTWD);
+	if (pPktCtrlBlk == NULL)
+		return TI_NOK;
+
     pPktBuffer  = txCtrl_AllocPacketBuffer (pHandle->hTxCtrl, 
                                             pPktCtrlBlk, 
                                             MAX_MANAGEMENT_FRAME_BODY_LEN + WLAN_HDR_LEN);
@@ -117,7 +120,7 @@ TI_STATUS mlmeBuilder_sendFrame(TI_HANDLE hMlme,
 	/* copy destination mac address */
 	MAC_COPY (pDot11Header->DA, daBssid);
 
-    status = ctrlData_getParamBssid(pHandle->hCtrlData, CTRL_DATA_MAC_ADDRESS, saBssid);
+    status = ctrlData_getParamMacAddr(pHandle->hCtrlData, saBssid);
 	if (status != TI_OK)
 	{
         txCtrl_FreePacket (pHandle->hTxCtrl, pPktCtrlBlk, TI_NOK);

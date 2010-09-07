@@ -56,14 +56,6 @@ typedef enum
 } trafficAdmCtrl_smState_t;
 
 /* State machine inputs */
-typedef enum 
-{
-	TRAFFIC_ADM_CTRL_SM_EVENT_START			= 0,
-	TRAFFIC_ADM_CTRL_SM_EVENT_STOP			= 1,
-	TRAFFIC_ADM_CTRL_SM_EVENT_ACCEPT    	= 2,
-    TRAFFIC_ADM_CTRL_SM_EVENT_REJECT		= 3,
-   	TRAFFIC_ADM_CTRL_SM_EVENT_TIMEOUT		= 4
-} trafficAdmCtrl_smEvents_t;
 
 
 typedef struct
@@ -92,7 +84,6 @@ typedef struct
 	TI_UINT8				    dialogTokenCounter;
 
 
-	fsm_stateMachine_t	        *pTrafficAdmCtrlSm;
 
 	TI_UINT32				     timeout;
     TI_BOOL                      useFixedMsduSize;
@@ -124,8 +115,6 @@ TI_STATUS trafficAdmCtrl_setParam(TI_HANDLE hTrafficAdmCtrl, paramInfo_t	*pParam
 TI_STATUS trafficAdmCtrl_getParam(TI_HANDLE hTrafficAdmCtrl, paramInfo_t	*pParam);
 
 TI_STATUS trafficAdmCtrl_startAdmRequest(TI_HANDLE	hTrafficAdmCtrl, tspecInfo_t *pTSpecInfo);
-
-TI_STATUS trafficAdmCtrl_stopAdmRequest(TI_HANDLE hTrafficAdmCtrl, TI_UINT8 tid);
 
 TI_STATUS trafficAdmCtrl_stop(TI_HANDLE hTrafficAdmCtrl);
 

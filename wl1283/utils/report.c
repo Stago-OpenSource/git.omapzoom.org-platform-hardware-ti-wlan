@@ -135,7 +135,7 @@ TI_HANDLE report_Create (TI_HANDLE hOs)
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_61 ]),  "txMgmtQueue             "  ,  sizeof("txMgmtQueue             "));
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_62 ]),  "txPort                  "  ,  sizeof("txPort                  "));
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_63 ]),  "assocSM                 "  ,  sizeof("assocSM                 "));
-    os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_64 ]),  "authSm                  "  ,  sizeof("authSm                  "));
+    os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_64 ]),  "mlme                    "  ,  sizeof("mlme                    "));
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_65 ]),  "currBss                 "  ,  sizeof("currBss                 "));
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_66 ]),  "healthMonitor           "  ,  sizeof("healthMonitor           "));
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_67 ]),  "mlmeBuilder             "  ,  sizeof("mlmeBuilder             "));
@@ -210,7 +210,7 @@ TI_HANDLE report_Create (TI_HANDLE hOs)
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_136]),  "roamingMngr_manualSM    "  ,  sizeof("roamingMngr_manualSM    "));
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_137]),  "cmdinterpretoid         "  ,  sizeof("cmdinterpretoid         "));
     os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_138]),  "WlanDrvIf               "  ,  sizeof("WlanDrvIf               "));
-
+    os_memoryCopy(hOs, (void *)(pReport->aFileName[FILE_ID_139]),  "rrmMgr                  "  ,  sizeof("rrmMgr                  "));
 #endif  /* PRINTF_ROLLBACK */
 
 	/* Severity table description */

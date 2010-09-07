@@ -125,19 +125,23 @@ OUTPUT:
 RETURN:     TI_OK on success, TI_NOK otherwise
 
 ************************************************************************/
-TI_STATUS RequestHandler_config(TI_HANDLE 	hRequestHandler,
-						TI_HANDLE		hReport,
-						TI_HANDLE		hOs)
+TI_STATUS RequestHandler_config(TI_HANDLE 	hMeasurementMgr,
+                                TI_HANDLE 	hRequestHandler,
+                                TI_HANDLE	hReport,
+                                TI_HANDLE	hOs)
 {
 	requestHandler_t *pRequestHandler = (requestHandler_t *)hRequestHandler;
 	
 
 	/* init variables */
-    pRequestHandler->parserRequestIEHdr = NULL;
-	pRequestHandler->numOfWaitingRequests = 0;	/*	indicating empty data base	*/
-	pRequestHandler->activeRequestID = -1;		/*			   					*/
-	pRequestHandler->hReport	= hReport;
-	pRequestHandler->hOs		= hOs;
+    pRequestHandler->parserRequest          = NULL;
+	pRequestHandler->numOfWaitingRequests   = 0;	/*	indicating empty data base	*/
+	pRequestHandler->activeRequestID        = -1;		/*			   					*/
+	pRequestHandler->hReport	            = hReport;
+	pRequestHandler->hOs		            = hOs;
+    pRequestHandler->hMeasurementMgr        = hMeasurementMgr;
+
+    
 
 	/* Clearing the Request Array , mostly due to parallel bit */
 	os_memoryZero(pRequestHandler->hOs, pRequestHandler->reqArr, MAX_NUM_REQ * sizeof(MeasurementRequest_t));
@@ -281,7 +285,11 @@ TI_STATUS requestHandler_insertRequests(TI_HANDLE hRequestHandler,
     TI_INT32               requestsLen = measurementFrameReq.requestsLen;
     TI_UINT8               singelRequestLen = 0;
     TI_UINT8               *requests = measurementFrameReq.requests;
-		    
+    TI_UINT16              frameToken = 0;
+
+    TRACE1(pRequestHandler->hReport, REPORT_SEVERITY_ERROR, 
+           "requestHandler_insertRequests: requestsLen = %d\n", requestsLen);
+
 	if (requestsLen < 2)
     {
         TRACE0(pRequestHandler->hReport, REPORT_SEVERITY_ERROR, ": Invalid length of the data.\n");
@@ -292,16 +300,21 @@ TI_STATUS requestHandler_insertRequests(TI_HANDLE hRequestHandler,
 	/* Inserting all measurement request into the queues */
 	while (requestsLen > 0)
 	{
+        frameToken = (TI_UINT16)measurementFrameReq.dialogToken;
+        
 		if(insertMeasurementIEToQueue(hRequestHandler, 
-                                       measurementFrameReq.hdr->dialogToken, 
+                                       frameToken, 
                                        measurementMode, 
                                        requests,
                                        &singelRequestLen) != TI_OK )
         {
+            TRACE0(pRequestHandler->hReport, REPORT_SEVERITY_ERROR, "requestHandler_insertRequests: Failed to insert element to Queue\n");
             requestHandler_clearRequests(hRequestHandler);
 			return TI_NOK;
         }
-  
+
+        TRACE2(pRequestHandler->hReport, REPORT_SEVERITY_INFORMATION, 
+               "requestHandler_insertRequests: requestsLen = %d, singelRequestLen = %d\n",requestsLen, singelRequestLen);
 		requestsLen -= singelRequestLen;
 		requests += singelRequestLen;
       
@@ -347,7 +360,8 @@ TI_STATUS requestHandler_getNextReq(TI_HANDLE hRequestHandler,
 	requestHandler_t	*pRequestHandler = (requestHandler_t *)hRequestHandler;
 	TI_UINT8				requestIndex = pRequestHandler->activeRequestID;
 	TI_UINT8				loopIndex = 0;
-	
+
+    
 TRACE2(pRequestHandler->hReport, REPORT_SEVERITY_INFORMATION, ": Looking for requests. activeRequestID = %d, numOfWaitingRequests = %d\n",					pRequestHandler->activeRequestID, pRequestHandler->numOfWaitingRequests);
 
 	if(pRequestHandler->numOfWaitingRequests <= 0)
@@ -359,10 +373,11 @@ TRACE2(pRequestHandler->hReport, REPORT_SEVERITY_INFORMATION, ": Looking for req
 		loopIndex++;
 	}
 	while ( (loopIndex < pRequestHandler->numOfWaitingRequests) && 
-            (pRequestHandler->reqArr[requestIndex].isParallel) );
+            (pRequestHandler->reqArr[requestIndex].bIsParallel) );
 
 	*numOfRequests = loopIndex;
 
+    
 TRACE1(pRequestHandler->hReport, REPORT_SEVERITY_INFORMATION, ": Found %d requests to execute in parallel.\n", loopIndex);
 
 	if(isForActivation == TI_TRUE)
@@ -479,12 +494,12 @@ OUTPUT:
 
 RETURN:     TI_OK on success, TI_NOK otherwise
 ************************************************************************/	
-TI_STATUS requestHandler_setRequestParserFunction(TI_HANDLE hRequestHandler, 
-                                                  parserRequestIEHdr_t parserRequestIEHdr)
+TI_STATUS requestHandler_setRequestParserFunction(TI_HANDLE hRequestHandler, parserReq_t parserRequest)
 {
 	requestHandler_t	*pRequestHandler = (requestHandler_t *)hRequestHandler;
 
-    pRequestHandler->parserRequestIEHdr = parserRequestIEHdr;
+    pRequestHandler->parserRequest = parserRequest;
+    
 
     return TI_OK;
 }
@@ -518,57 +533,23 @@ static TI_STATUS insertMeasurementIEToQueue(TI_HANDLE           hRequestHandler,
                                             TI_UINT8               *singelRequestLen)
 {
    	requestHandler_t	*pRequestHandler = (requestHandler_t *)hRequestHandler;
-
-	TI_UINT16		HeaderLen;
-	TI_UINT8		measurementMode;
-	TI_UINT8		parallelBit;
-	TI_UINT8		enableBit;
-    TI_UINT16       measurementToken;
+    TI_UINT16           measurementToken;
 	
 	MeasurementRequest_t	*pCurrRequest = &(pRequestHandler->reqArr[pRequestHandler->numOfWaitingRequests]);
-
-    if (pRequestHandler->parserRequestIEHdr(pData, &HeaderLen, &measurementToken) != TI_OK)
+    
+    if (pRequestHandler->parserRequest(pRequestHandler->hMeasurementMgr, pData, &measurementToken, singelRequestLen, pCurrRequest) != TI_OK)
     {
         return TI_NOK;
     }
 
+
 	pCurrRequest->frameToken = frameToken;	
 	pCurrRequest->measurementToken = measurementToken;
 
-    pData += HeaderLen;
+    pData += *singelRequestLen;
 
-    /*** Getting the Measurement Mode ***/
-	measurementMode		= *pData++;
-
-	/* getting parallel bit */
-	parallelBit = measurementMode & 0x1;
-	
-    /* getting Enable bit */
-	enableBit = (measurementMode & 0x2)>>1;
-	
-    /* checking enable bit, the current implementation does not support 
-		enable bit which set to one, so there is no need to check request/report bits	*/
-	if(enableBit == 1)
-		return TI_OK;
-    
-    pCurrRequest->isParallel = parallelBit;
-
-
-    /* Getting the Measurement Mode */
-   	pCurrRequest->Type = (EMeasurementType)(*pData++);
-
-	/* Inserting the request that is included in the current measurement request IE. */
-	pCurrRequest->channelNumber = *pData++;
-    
-	pCurrRequest->ScanMode = (EMeasurementScanMode)(*pData++); /* IN dot11h - Spare = 0 */
-
-    COPY_WLAN_WORD(&pCurrRequest->DurationTime, pData);
-	
-	*singelRequestLen = HeaderLen + 6;
-
-	pRequestHandler->numOfWaitingRequests ++;
-	
-	return TI_OK;
+    pRequestHandler->numOfWaitingRequests++;
+    return TI_OK;
 }
 
 

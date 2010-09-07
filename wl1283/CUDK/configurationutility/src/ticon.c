@@ -54,11 +54,7 @@
 #endif
 
 #define TIWLAN_DRV_NAME "tiwlan0"
-#ifdef GEM_SUPPORTED
 #define SUPPL_IF_FILE "/var/run/wpa_supplicant/tiwlan0"
-#else
-#define SUPPL_IF_FILE "/var/run/tiwlan0"
-#endif
  
 extern int consoleRunScript( char *script_file, THandle hConsole);
     
@@ -108,7 +104,7 @@ static S32 TiCon_Init_Console_Menu(TiCon_t* pTiCon)
 	Console_AddToken(pTiCon->hConsole,h, (PS8)"Full_bssid_list", (PS8)"Full_bssid_list", (FuncToken_t) CuCmd_FullBssidList, NULL );
 #endif
 	
-#ifdef CONFIG_EAP_WSC
+#ifdef CONFIG_WPS
 	CHK_NULL(h1 = (THandle) Console_AddDirExt(pTiCon->hConsole,  (THandle) h, (PS8)"wPs", (PS8)"WiFi Protected Setup" ) );
 	Console_AddToken(pTiCon->hConsole,h1, (PS8)"Pin", (PS8)"Acquire profile using PIN", (FuncToken_t) CuCmd_StartEnrolleePIN, NULL );
 	Console_AddToken(pTiCon->hConsole,h1, (PS8)"pBc", (PS8)"Acquire profile using Push Button", (FuncToken_t) CuCmd_StartEnrolleePBC, NULL );
@@ -121,7 +117,7 @@ static S32 TiCon_Init_Console_Menu(TiCon_t* pTiCon)
 		};	
 		Console_AddToken(pTiCon->hConsole,h1, (PS8)"set pIn", (PS8)"Set PIN code", (FuncToken_t) CuCmd_SetPin, aaa );
 	}
-#endif /* CONFIG_EAP_WSC */
+#endif /* CONFIG_WPS */
 
     /* -------------------------------------------- Management -------------------------------------------- */
 	
@@ -248,6 +244,7 @@ static S32 TiCon_Init_Console_Menu(TiCon_t* pTiCon)
         };
         Console_AddToken(pTiCon->hConsole, h2, (PS8)"Remove", (PS8)"Remove a keep-alive template", (FuncToken_t)CuCmd_RemoveKeepAliveMessage, aaa );
     }
+
     Console_AddToken(pTiCon->hConsole, h2, (PS8)"Show", (PS8)"Show all configured keep-alive templates", (FuncToken_t)CuCmd_ShowKeepAlive, NULL );
 
 	/* -------------------------------------------- Show -------------------------------------------- */	
@@ -696,14 +693,18 @@ static S32 TiCon_Init_Console_Menu(TiCon_t* pTiCon)
 
     CHK_NULL(h1 = (THandle) Console_AddDirExt(pTiCon->hConsole,  (THandle) h, (PS8)"Tspec", (PS8)"TSPEC Sub-menu" ) );
 	{       ConParm_t TspecParams[]  = {
+		{(PS8)"tid", CON_PARM_RANGE, 0, 7, 1  },
+		{(PS8)"PSB Mode (0 - Legacy, 1 - U-APSD)", CON_PARM_RANGE , 0, 1, 0 },
 		{(PS8)"UserPriority", CON_PARM_RANGE, 0, 7, 1  },
-		{(PS8)"NominalMSDUsize", CON_PARM_RANGE, 1, 2312, 1  },
-		{(PS8)"MeanDataRate (Bps units)", CON_PARM_RANGE, 0, 54000000, 0 },
+		{(PS8)"NominalMSDUsize", CON_PARM_RANGE, 1, 32767, 1  },
+		{(PS8)"Fixed (0 - no, 1 - yes)", CON_PARM_RANGE, 0, 1, 0},
+		{(PS8)"MeanDataRate (Bps units)", CON_PARM_RANGE, 0, 0xffffffff, 0 },
 		{(PS8)"MinimumPHYRate (Mbps units)", CON_PARM_RANGE , 0, 54, 0  },
-		{(PS8)"SurplusBandwidthAllowance", CON_PARM_RANGE , 0, 7, 0 },
-		{(PS8)"UPSD Mode (0 - Legacy, 1 - U-APSD)", CON_PARM_RANGE , 0, 1, 0 },
-		{(PS8)"MinimumServiceInterval (usec)", CON_PARM_RANGE , 0, 1000000000, 0 },
-		{(PS8)"MaximumServiceInterval (usec)", CON_PARM_RANGE , 0, 1000000000, 0 },
+		{(PS8)"SurplusBandwidthAllowance (range 0x2001 to 0xffff)", CON_PARM_RANGE , 0x2001 , 0xffff, 0 },
+		{(PS8)"Maximum MSDU Size (optional)", CON_PARM_OPTIONAL , 1, 32767, 1 },
+		{(PS8)"Maximum Burst Size (optional)", CON_PARM_OPTIONAL, 1, 32767, 1 },
+		{(PS8)"Minimum Data Rate (optional)", CON_PARM_OPTIONAL,  0, 0xffffffff, 0 },
+		{(PS8)"Peak Data Rate (optional)", CON_PARM_OPTIONAL,  0, 0xffffffff, 0 },
 		CON_LAST_PARM };
 		Console_AddToken(pTiCon->hConsole,h1, (PS8)"Add", (PS8)"Add TSPEC", (FuncToken_t) CuCmd_AddTspec, TspecParams );
 	}
@@ -725,7 +726,26 @@ static S32 TiCon_Init_Console_Menu(TiCon_t* pTiCon)
 			CON_LAST_PARM };
 			Console_AddToken(pTiCon->hConsole,h1, (PS8)"Medium usage", (PS8)"Medium usage threshold", (FuncToken_t) CuCmd_ModifyMediumUsageTh, MediumUsageParams );
 	}
-	
+
+    CHK_NULL(h2 = (THandle) Console_AddDirExt(pTiCon->hConsole,  (THandle) h, (PS8)"Ba policy", (PS8)"BA Policy Sub-menu" ) );
+	{
+		ConParm_t aaa[]  = {
+							{(PS8)"TID", CON_PARM_RANGE | CON_PARM_OPTIONAL, 0, 7, 0  },
+							{(PS8)"BA Policy (0-None, 1-Tx Only, 2-Rx Only, 3 -Both)", CON_PARM_RANGE | CON_PARM_OPTIONAL, 0, 3, 0  },
+							CON_LAST_PARM };
+		Console_AddToken(pTiCon->hConsole,h2, (PS8)"set Ba policy", (PS8)"Set BA policy", (FuncToken_t) CuCmd_SetBaPolicy, aaa );
+	}
+	{
+		Console_AddToken(pTiCon->hConsole,h2, (PS8)"Clear ba policy", (PS8)"Clear BA policy", (FuncToken_t) CuCmd_ClearBaPolicy, NULL );
+	}
+
+	{
+		
+        ConParm_t aaa[]  = {
+            {(PS8)"ps traffic period (0 - disable)", CON_PARM_RANGE | CON_PARM_OPTIONAL, 0, 50, 30 },
+            CON_LAST_PARM };
+            Console_AddToken(pTiCon->hConsole,h, (PS8)"ps traffix periOd", (PS8)"set ps traffic period", (FuncToken_t) CuCmd_PsTrafficPeriod, aaa );
+	}
     
 	/* -------------------------------------------- Power Management -------------------------------------------- */
 	
@@ -946,6 +966,16 @@ static S32 TiCon_Init_Console_Menu(TiCon_t* pTiCon)
                               CON_LAST_PARM };
 
           Console_AddToken(pTiCon->hConsole, h1, (PS8)"set Arp ip filter",  (PS8)"arp ip filter", (FuncToken_t) CuCmd_SetArpIPFilter, aaa );
+      }
+
+      /* SDIO Validation Test */
+      {
+          ConParm_t aaa[] = { {(PS8)"Number of loops", CON_PARM_OPTIONAL, 1, 100, 1},
+                              {(PS8)"Buffer Size", CON_PARM_OPTIONAL, 4, 8192, 8000},
+                              CON_LAST_PARM
+                            };
+          
+          Console_AddToken(pTiCon->hConsole, h1, (PS8)"sdIo validation test", (PS8)"Test SDIO", (FuncToken_t) CuCmd_SdioValidation, aaa );
       }
 
      }

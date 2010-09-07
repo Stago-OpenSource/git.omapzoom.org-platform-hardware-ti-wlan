@@ -66,8 +66,7 @@ typedef struct
     TI_BOOL                 bScanCompletePending; /* TRUE if scan complete event is received
                                                     before all results, for periodic scan */
     TI_BOOL                 bInRequest;
-    TI_BOOL                 bSendNullDataOnStop;  /* indicates whether NULL data frame is to be sent wehn
-                                                     stopping scan to return to previous PS mode */
+    
     TScanPrivateSMFunction  fScrRequest;
     TScanPrivateSMFunction  fScrRelease;
     TScanPrivateSMFunction  fStartScan;
@@ -120,27 +119,22 @@ void        scanCncnSmApp1Shot_ScrRequest      (TI_HANDLE hScanCncnClient);
 void        scanCncnSmApp1Shot_ScrRelease      (TI_HANDLE hScanCncnClient);
 void        scanCncnSmApp1Shot_StartScan       (TI_HANDLE hScanCncnClient);
 void        scanCncnSmApp1Shot_StopScan        (TI_HANDLE hScanCncnClient);
-void        scanCncnSmApp1Shot_Recovery        (TI_HANDLE hScanCncnClient);
 void        scanCncnSmAppP_ScrRequest       (TI_HANDLE hScanCncnClient);
 void        scanCncnSmAppP_ScrRelease       (TI_HANDLE hScanCncnClient);
 void        scanCncnSmAppP_StartScan        (TI_HANDLE hScanCncnClient);
 void        scanCncnSmAppP_StopScan         (TI_HANDLE hScanCncnClient);
-void        scanCncnSmAppP_Recovery         (TI_HANDLE hScanCncnClient);
 void        scanCncnSmDrvP_ScrRequest       (TI_HANDLE hScanCncnClient);
 void        scanCncnSmDrvP_ScrRelease       (TI_HANDLE hScanCncnClient);
 void        scanCncnSmDrvP_StartScan        (TI_HANDLE hScanCncnClient);
 void        scanCncnSmDrvP_StopScan         (TI_HANDLE hScanCncnClient);
-void        scanCncnSmDrvP_Recovery         (TI_HANDLE hScanCncnClient);
 void        scanCncnSmCont1Shot_ScrRequest     (TI_HANDLE hScanCncnClient);
 void        scanCncnSmCont1Shot_ScrRelease     (TI_HANDLE hScanCncnClient);
 void        scanCncnSmCont1Shot_StartScan      (TI_HANDLE hScanCncnClient);
 void        scanCncnSmCont1Shot_StopScan       (TI_HANDLE hScanCncnClient);
-void        scanCncnSmCont1Shot_Recovery       (TI_HANDLE hScanCncnClient);
 void        scanCncnSmImmed1Shot_ScrRequest    (TI_HANDLE hScanCncnClient);
 void        scanCncnSmImmed1Shot_ScrRelease    (TI_HANDLE hScanCncnClient);
 void        scanCncnSmImmed1Shot_StartScan     (TI_HANDLE hScanCncnClient);
 void        scanCncnSmImmed1Shot_StopScan      (TI_HANDLE hScanCncnClient);
-void        scanCncnSmImmed1Shot_Recovery      (TI_HANDLE hScanCncnClient);
 
 #endif /* __SCAN_CNCN_SM_H__ */
 

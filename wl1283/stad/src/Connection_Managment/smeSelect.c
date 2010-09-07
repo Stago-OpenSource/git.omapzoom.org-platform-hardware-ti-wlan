@@ -47,6 +47,7 @@
 #include "GenSM.h"
 #include "smeSm.h"
 #include "tidef.h"
+#include "rsn.h"
 
 static TI_BOOL sme_SelectSsidMatch (TI_HANDLE hSme, TSsid *pSiteSsid, TSsid *pDesiredSsid, 
                                     ESsidType eDesiredSsidType);
@@ -54,7 +55,6 @@ static TI_BOOL sme_SelectBssidMatch (TMacAddr *pSiteBssid, TMacAddr *pDesiredBss
 static TI_BOOL sme_SelectBssTypeMatch (ScanBssType_e eSiteBssType, ScanBssType_e eDesiredBssType);
 static TI_BOOL sme_SelectWscMatch (TI_HANDLE hSme, TSiteEntry *pCurrentSite, 
                                    TI_BOOL *pbWscPbAbort, TI_BOOL *pbWscPbApFound);
-static TI_BOOL sme_SelectRsnMatch (TI_HANDLE hSme, TSiteEntry *pCurrentSite);
 
 /** 
  * \fn     sme_Select
@@ -138,7 +138,7 @@ TSiteEntry *sme_Select (TI_HANDLE hSme)
         if (TI_FALSE == sme_SelectBssidMatch (&(pCurrentSite->bssid), &(pSme->tBssid)))
         /* site doesn't match */
         {
-            TRACE6(pSme->hReport, REPORT_SEVERITY_INFORMATION , "sme_Select: BSSID: %02x:%02x:%02x:%02x:%02x:%02x doesn't match SSID\n", pCurrentSite->bssid[ 0 ], pCurrentSite->bssid[ 1 ], pCurrentSite->bssid[ 2 ], pCurrentSite->bssid[ 3 ], pCurrentSite->bssid[ 4 ], pCurrentSite->bssid[ 5 ]);
+            TRACE6(pSme->hReport, REPORT_SEVERITY_INFORMATION , "sme_Select: BSSID: %02x:%02x:%02x:%02x:%02x:%02x doesn't match BSSID\n", pCurrentSite->bssid[ 0 ], pCurrentSite->bssid[ 1 ], pCurrentSite->bssid[ 2 ], pCurrentSite->bssid[ 3 ], pCurrentSite->bssid[ 4 ], pCurrentSite->bssid[ 5 ]);
             pCurrentSite->bConsideredForSelect = TI_TRUE; /* don't try this site again */
             /* get the next site and continue the loop */
             pCurrentSite = scanResultTable_GetNext (pSme->hScanResultTable);
@@ -186,20 +186,6 @@ TSiteEntry *sme_Select (TI_HANDLE hSme)
 
         /* and security match */
         siteMgr_getParamWSC(pSme->hSiteMgr, &eWscMode); 
-
-        /* we don't need to check RSN match while WSC is active */
-        if ((pCurrentSite->WSCSiteMode == TIWLN_SIMPLE_CONFIG_OFF) || (pCurrentSite->WSCSiteMode != eWscMode))
-        {
-            if (TI_FALSE == sme_SelectRsnMatch (hSme, pCurrentSite))
-            /* site doesn't match */
-            {
-                TRACE6(pSme->hReport, REPORT_SEVERITY_INFORMATION , "sme_Select: BSSID: %02x:%02x:%02x:%02x:%02x:%02x doesn't match RSN\n", pCurrentSite->bssid[ 0 ], pCurrentSite->bssid[ 1 ], pCurrentSite->bssid[ 2 ], pCurrentSite->bssid[ 3 ], pCurrentSite->bssid[ 4 ], pCurrentSite->bssid[ 5 ]);
-                pCurrentSite->bConsideredForSelect = TI_TRUE; /* don't try this site again */
-                /* get the next site and continue the loop */
-                pCurrentSite = scanResultTable_GetNext (pSme->hScanResultTable);
-                continue;
-            }
-        }
 
         /* and rate match */
         if (TI_FALSE == siteMgr_SelectRateMatch (pSme->hSiteMgr, pCurrentSite))
@@ -282,7 +268,7 @@ TI_BOOL sme_SelectSsidMatch (TI_HANDLE hSme, TSsid *pSiteSsid, TSsid *pDesiredSs
 {
     TSme        *pSme = (TSme*)hSme;
 
-	/*If SSID length is 0 (hidden SSID)- Discard*/
+    /*If SSID length is 0 (hidden SSID)- Discard*/
 	if (pSiteSsid->len == 0)
 	{
 		return TI_FALSE;
@@ -421,72 +407,3 @@ TI_BOOL sme_SelectWscMatch (TI_HANDLE hSme, TSiteEntry *pCurrentSite,
     /* site doesn't match */
     return TI_FALSE;
 }
-
-/** 
- * \fn     sme_SelectRsnMatch
- * \brief  Checks if the configured scurity settings match those of a site
- * 
- * Checks if the configured scurity settings match those of a site
- * 
- * \param  hSme - handle to the SME object
- * \param  pCurrentSite - the site to check
- * \return TI_TRUE if site matches RSN settings, TI FALSE if it doesn't
- * \sa     sme_Select
- */ 
-TI_BOOL sme_SelectRsnMatch (TI_HANDLE hSme, TSiteEntry *pCurrentSite)
-{
-    TSme            *pSme = (TSme*)hSme;
-	TRsnData    	tRsnData;
-    dot11_RSN_t     *pRsnIe;
-    TI_UINT8        uRsnIECount=0;
-    TI_UINT8        uCurRsnData[255];
-    TI_UINT32       uLength = 0;
-    TI_UINT32       uMetric;
-	TRsnSiteParams  tRsnSiteParams;
-
-	tRsnSiteParams.bssType = pCurrentSite->bssType;
-	MAC_COPY(tRsnSiteParams.bssid, pCurrentSite->bssid);
-	tRsnSiteParams.pHTCapabilities = &pCurrentSite->tHtCapabilities;
-	tRsnSiteParams.pHTInfo = &pCurrentSite->tHtInformation;
-
-    /* copy all RSN IE's */
-    pRsnIe = pCurrentSite->pRsnIe;
-    while ((uLength < pCurrentSite->rsnIeLen) && (uRsnIECount < MAX_RSN_IE))
-    {
-        if (uLength + 2 + pRsnIe->hdr[ 1 ] > sizeof (uCurRsnData))
-        {
-           TRACE4( pSme->hReport, REPORT_SEVERITY_ERROR,
-                  "sme_SelectRsnMatch. uRsnIECount=%d, uLength=%d; required copy of %d bytes exceeds the buffer limit %d\n",
-                   uRsnIECount, uLength, pRsnIe->hdr[ 1 ] +2, sizeof (uCurRsnData));
-           handleRunProblem(PROBLEM_BUF_SIZE_VIOLATION);
-           return TI_FALSE;
-        }
-        uCurRsnData[ 0 + uLength ] = pRsnIe->hdr[ 0 ];
-        uCurRsnData[ 1 + uLength ] = pRsnIe->hdr[ 1 ];
-        os_memoryCopy (pSme->hOS, &uCurRsnData[ 2 + uLength ], pRsnIe->rsnIeData, pRsnIe->hdr[ 1 ]); 
-        uLength += pRsnIe->hdr[ 1 ] + 2;
-        pRsnIe += 1;
-        uRsnIECount++;
-    }
-    /* sanity check - make sure RSN IE's size is not too big */
-    if (uLength < pCurrentSite->rsnIeLen) 
-    {
-        TRACE2(pSme->hReport, REPORT_SEVERITY_ERROR , "sme_SelectRsnMatch, RSN IE is too long: rsnIeLen=%d, MAX_RSN_IE=%d\n", pCurrentSite->rsnIeLen, MAX_RSN_IE);
-    }
-
-    /* call the RSN to evaluate the site */
-    tRsnData.pIe = (pCurrentSite->rsnIeLen == 0) ? NULL : uCurRsnData;
-    tRsnData.ieLen = pCurrentSite->rsnIeLen;
-    tRsnData.privacy = pCurrentSite->privacy;
-    if (rsn_evalSite (pSme->hRsn, &tRsnData, &tRsnSiteParams , &uMetric) != TI_OK)
-    {
-        /* no match */
-        return TI_FALSE;
-    }
-    else
-    {
-        /* match! */
-        return TI_TRUE;
-    }
-}
-

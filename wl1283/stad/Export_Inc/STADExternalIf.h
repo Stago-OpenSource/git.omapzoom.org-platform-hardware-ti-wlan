@@ -77,6 +77,8 @@
 
 #define KEEP_ALIVE_MAX_USER_MESSAGES     	2
 
+/*Indicates that key management type is WPS (bit field)*/
+#define TI_AUTH_KEY_MGMT_WPS				0x80
 
 /*********************/
 /* enumeration types */

@@ -99,6 +99,8 @@ typedef struct
 #define INSERT_2_BYTES(pBuf, dataBytes) (*((TI_UINT16 *)pBuf) = (TI_UINT16)dataBytes); pBuf+=2;
 #define INSERT_4_BYTES(pBuf, dataBytes) (*((TI_UINT32 *)pBuf) = (TI_UINT32)dataBytes); pBuf+=4;
 
+#define os_profile(hos,fn,par)
+
 
 /****************************************************************************************
 						START OF OS API (Common to all GWSI LIB, Driver and TI Driver)				
@@ -529,8 +531,13 @@ void os_protectLock (TI_HANDLE OsContext, TI_HANDLE ProtectContext);
  */
 void os_protectUnlock (TI_HANDLE OsContext, TI_HANDLE ProtectContext);
 
-#define os_profile(hos,fn,par)
+/* Wakelock functionality */
+int os_wake_lock (TI_HANDLE OsContext);
+int os_wake_unlock (TI_HANDLE OsContext);
+int os_wake_lock_timeout (TI_HANDLE OsContext);
+int os_wake_lock_timeout_enable (TI_HANDLE OsContext);
 
+#define os_profile(hos,fn,par)
 
 
 /****************************************************************************************

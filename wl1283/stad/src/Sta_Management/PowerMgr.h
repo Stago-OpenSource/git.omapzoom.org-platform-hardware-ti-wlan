@@ -85,13 +85,16 @@ typedef struct
     TI_HANDLE                   hOS;                            /**< Handle to the OS object */
     TI_HANDLE                   hReport;                        /**< Handle to the Report module */
     TI_HANDLE                   hTrafficMonitor;                /**< Handle to the Traffic Monitor object */
-    TI_HANDLE                   hSiteMgr;                       /**< Handle to the Site Mgr object */
+	TI_HANDLE					hHealthMonitor;					/**< Handle to the Health Monitor object */
+	TI_HANDLE                   hSiteMgr;                       /**< Handle to the Site Mgr object */
     TI_HANDLE                   hTWD;                           /**< Handle to the TWD object */
     TI_HANDLE                   hSoftGemini;                    /**< Handle to the SG object */
     TI_HANDLE                   hTimer;                         /**< Handle to the Timer module object */
     TI_HANDLE                   hRetryPsTimer;                  /**< Handle to the retry timer */
     TI_HANDLE                   hPsPollFailureTimer;            /**< Handle to ps-poll failure timer */
+	TI_HANDLE                   hEnterPsGuardTimer;             /**< Handle to enter ps no event timer */
     TI_HANDLE                   hPowerMgrKeepAlive;             /**< Handle to the keep-alive sub module */
+	TI_HANDLE					hQosMngr;						/**< Handle to the qos manager moudle*/
     PowerMgr_PowerMode_e        desiredPowerModeProfile;        /**< 
                                                                  * The configure power mode to the system in the
                                                                  * initialization function. This parameters is Saved
@@ -104,6 +107,12 @@ typedef struct
     TI_BOOL                     psEnable;                       /**<
                                                                  * The parameter holds the enable of the power save
                                                                  * mechanism.
+                                                                 */
+	E80211PsMode                psCurrentMode;                   /**<
+                                                                 * The parameter holds the current PS mode known to the driver.
+                                                                 */
+	E80211PsMode                psLastRequest;                   /**<
+                                                                 * The parameter holds the last requested PS mode.
                                                                  */
     TI_UINT16                   autoModeInterval;               /**<
                                                                  * Time period (in ms) to test the current TP before

@@ -53,6 +53,8 @@
 #define USER_PRIORITY_4 (WMEQosTagToACTable[4])
 #define USER_PRIORITY_6 (WMEQosTagToACTable[6])
 
+
+
 /* User priority is in second byte of tsInfoField (that follows 8 bytes from beginning of the TSPEC IE) */ 
 #define GET_USER_PRIORITY_FROM_WME_TSPEC_IE(pTspecIe)   \
     (( *(((TI_UINT8 *)pData) + 9) & TS_INFO_1_USER_PRIORITY_MASK) >> USER_PRIORITY_SHIFT)
@@ -70,11 +72,11 @@ typedef struct
     TI_INT32            minimumPHYRate;
     TI_UINT16           mediumTime;
     TI_BOOL             UPSDFlag;
-    TI_UINT32           uMinimumServiceInterval;
-    TI_UINT32           uMaximumServiceInterval;
     EStreamDirection    streamDirection;
     ETrafficAdmState    trafficAdmState;
     TI_UINT8            statusCode;
+	TI_UINT32			uMinimumServiceInterval;
+	TI_UINT32			uMaximumServiceInterval;
 }tspecInfo_t;
 
 typedef enum 
@@ -141,6 +143,9 @@ void qosMngr_checkTspecRenegResults(TI_HANDLE hQosMngr, assocRsp_t *assocRsp);
 TI_UINT32 qosMngr_buildTSPec(TI_HANDLE hQosMngr, TI_UINT32 user_priority, TI_UINT8 *pQosIe);
 
 TI_STATUS qosMngr_GetWmeEnableFlag(TI_HANDLE hQosMngr, TI_BOOL *bWmeEnable);
+TI_STATUS qosMngr_MediumTimeDowngrade(TI_HANDLE hQosMngr, TI_UINT32 fromAcId, TI_UINT32 toAcId, TI_UINT32 duration);
+void qosMngr_UpdatePsTraffic   (TI_HANDLE hQosMngr,TI_BOOL bPsTrafficOn );
+
 
 #endif /* __QOS_MNGR_API_H__ */
 

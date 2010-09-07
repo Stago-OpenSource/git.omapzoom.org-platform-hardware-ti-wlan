@@ -52,14 +52,31 @@
 #include "measurementMgr.h"
 #include "MeasurementSrv.h"
 #include "MacServices_api.h"
-#include "MacServices.h"
 #include "sme.h"
 #ifdef XCC_MODULE_INCLUDED  
 #include "XCCRMMngr.h"
 #endif
 #include "SwitchChannelApi.h"
 #include "TWDriver.h"
+#include "rrmMgr.h"
 
+#include "TWDriverMsr.h"
+
+
+TI_UINT8     actionFrameBuffer[2000];
+
+
+static void measurement_buildBeaconRequestDbg(TI_HANDLE hMeasurementMgr, TI_UINT8 mode,
+                                              TI_UINT8 channel,
+                                              TI_UINT8 regClass,
+                                              TI_UINT8* pBeaconReqActionFrame, 
+                                              TI_UINT32 *outLen);
+
+static void measurement_buildTSMRequestDbg(TI_HANDLE    hMeasurementMgr, 
+                                           TI_BOOL      isTriggeredReport,
+                                           TI_UINT16    duration,
+                                           TI_UINT8     tid,
+                                           TI_UINT32    *outLen);
 
 void printMeasurementDbgFunctions(void);   
 
@@ -94,6 +111,17 @@ void measurementDebugFunction(TI_HANDLE hMeasurementMgr, TI_HANDLE hSwitchChanne
 	measurementMgr_t * pMeasurementMgr = (measurementMgr_t *) hMeasurementMgr;
 	TI_UINT8			SwitchChannelParam = *(TI_UINT8*)pParam;
 	siteMgr_t		*pSiteMgr = (siteMgr_t *) pMeasurementMgr->hSiteMgr;
+    TI_UINT32       bufferLen = 0;
+    TI_UINT8        channel = 0;
+    TI_UINT8        mode = 0; /* 0 = passive, 1=active, 2=table */
+    TI_UINT8        regClass = 12; /* 12 = B/G ,  1 = A band */
+    TI_UINT8        tid = 0; 
+    TI_UINT16       duration = 0;
+    TI_BOOL         isTriggeredReport = TI_FALSE;
+    
+
+
+    
 #ifdef XCC_MODULE_INCLUDED
     TI_UINT8           iappPacket[90] = {0xAA, 0xAA, 0x03, 0x00, 0x40, 0x96, 0x00, 0x00, 
                                       0x00, 0x20, 0x32, 0x01, 
@@ -258,8 +286,7 @@ void measurementDebugFunction(TI_HANDLE hMeasurementMgr, TI_HANDLE hSwitchChanne
 			/* Get measurement results */
 			tTwdParam.paramType = TWD_NOISE_HISTOGRAM_PARAM_ID;
 			tTwdParam.content.interogateCmdCBParams.fCb = (void *)measurement_noiseHistCallBackDbg;
-			tTwdParam.content.interogateCmdCBParams.hCb = 
-                ((MacServices_t *)(((TTwd *)pMeasurementMgr->hTWD)->hMacServices))->hMeasurementSRV;
+			tTwdParam.content.interogateCmdCBParams.hCb = ((TTwd *)pMeasurementMgr->hTWD)->hMeasurementSRV;
 			tTwdParam.content.interogateCmdCBParams.pCb = (TI_UINT8 *)&results;
 
 			TWD_GetParam (pMeasurementMgr->hTWD, &tTwdParam);
@@ -398,22 +425,410 @@ void measurementDebugFunction(TI_HANDLE hMeasurementMgr, TI_HANDLE hSwitchChanne
 	case DBG_REG_DOMAIN_PRINT_VALID_CHANNELS:
 		regDomainPrintValidTables(hRegulatoryDomain);
 		break;
+        
+    case DBG_MEASUREMENT_SIMULATE_NEIGHBOR_REPORT_REQUEST:
+        {
+            param.paramType = SITE_MGR_CURRENT_SSID_PARAM;
+            siteMgr_getParam(pMeasurementMgr->hSiteMgr, &param);
+            rrmMgr_buildAndSendNeighborAPsRequest(hMeasurementMgr, &param.content.siteMgrCurrentSSID);
+            break;
+        }
 
-		
+    case DBG_MEASUREMENT_SIMULATE_BEACON_REQUEST_SCAN_PASSIVE_BAND_BG: /* 39 */
+    {
+        bufferLen = 0;
+        channel = 6;
+        mode = 0; /* 0 = passive, 1=active, 2=table */
+        regClass = 12; /* 12 = B/G ,  1 = A band */
+        
+
+        measurement_buildBeaconRequestDbg(hMeasurementMgr, mode,channel, regClass, actionFrameBuffer, &bufferLen);
+
+        param.paramType = SITE_MGR_CURRENT_BSSID_PARAM;
+        siteMgr_getParam(pMeasurementMgr->hSiteMgr, &param);
+ 
+        rrmMgr_receiveFrameRequest(hMeasurementMgr, 
+                                   MSR_FRAME_TYPE_UNICAST,
+                                   &param.content.siteMgrDesiredBSSID,
+                                   bufferLen,
+                                   actionFrameBuffer);
+        break;
+    }
+
+    case DBG_MEASUREMENT_SIMULATE_BEACON_REQUEST_SCAN_PASSIVE_BAND_A:
+    {
+         bufferLen = 0;
+         channel = 36;
+         mode = 0; /* 0 = passive, 1=active, 2=table */
+         regClass = 1; /* 12 = B/G ,  1 = A band */
+             
+        measurement_buildBeaconRequestDbg(hMeasurementMgr, mode,channel , regClass,  actionFrameBuffer, &bufferLen);
+
+        param.paramType = SITE_MGR_CURRENT_BSSID_PARAM;
+        siteMgr_getParam(pMeasurementMgr->hSiteMgr, &param);
+        
+        rrmMgr_receiveFrameRequest(hMeasurementMgr, 
+                                   MSR_FRAME_TYPE_UNICAST,
+                                   &param.content.siteMgrDesiredBSSID,
+                                   bufferLen,
+                                   actionFrameBuffer);
+        break;
+            
+    }
+
+    case DBG_MEASUREMENT_SIMULATE_BEACON_REQUEST_SCAN_ACTIVE_BAND_BG:
+    {
+        bufferLen = 0;
+        channel = 1;
+        mode = 1;       /* 0 = passive, 1=active, 2=table */
+        regClass = 12;  /* 12 = B/G ,  1 = A band */
+
+        measurement_buildBeaconRequestDbg(hMeasurementMgr, mode, channel, regClass, actionFrameBuffer, &bufferLen);
+
+        param.paramType = SITE_MGR_CURRENT_BSSID_PARAM;
+        siteMgr_getParam(pMeasurementMgr->hSiteMgr, &param);
+
+        rrmMgr_receiveFrameRequest(hMeasurementMgr, 
+                               MSR_FRAME_TYPE_UNICAST,
+                               &param.content.siteMgrDesiredBSSID,
+                               bufferLen,
+                               actionFrameBuffer);
+        break;
+        
+    }
+    case DBG_MEASUREMENT_SIMULATE_BEACON_REQUEST_SCAN_ACTIVE_BAND_A:
+    {
+        bufferLen = 0;
+        channel = 60;
+        mode = 1;       /* 0 = passive, 1=active, 2=table */
+        regClass = 1;   /* 12 = B/G ,  1 = A band */
+
+        measurement_buildBeaconRequestDbg(hMeasurementMgr, mode, channel, regClass, actionFrameBuffer, &bufferLen);
+
+        param.paramType = SITE_MGR_CURRENT_BSSID_PARAM;
+        siteMgr_getParam(pMeasurementMgr->hSiteMgr, &param);
+
+        rrmMgr_receiveFrameRequest(hMeasurementMgr, 
+                                   MSR_FRAME_TYPE_UNICAST,
+                                   &param.content.siteMgrDesiredBSSID,
+                                   bufferLen,
+                                   actionFrameBuffer);
+        break;
+    }
+
+    case DBG_MEASUREMENT_SIMULATE_BEACON_REQUEST_SCAN_TABLE_BAND_BG: 
+    {
+        bufferLen = 0;
+        channel = 0;
+        mode = 2; /* 0 = passive, 1=active, 2=table */
+        regClass = 12; /* 12 = B/G ,  1 = A band */
+
+
+        measurement_buildBeaconRequestDbg(hMeasurementMgr, mode,channel, regClass, actionFrameBuffer, &bufferLen);
+
+        param.paramType = SITE_MGR_CURRENT_BSSID_PARAM;
+        siteMgr_getParam(pMeasurementMgr->hSiteMgr, &param);
+
+   
+        rrmMgr_receiveFrameRequest(hMeasurementMgr, 
+                                   MSR_FRAME_TYPE_UNICAST,
+                                   &param.content.siteMgrDesiredBSSID,
+                                   bufferLen,
+                                   actionFrameBuffer);
+        break;
+    }
+
+    
+    /* TSM REPORT */
+    case DBG_MEASUREMENT_SIMULATE_TSM_REQUEST_REPORT_NORMAL: 
+    {
+        bufferLen = 0;
+        tid = 0;
+        isTriggeredReport = TI_FALSE; 
+        duration  = 10000; 
+
+
+        param.paramType = SITE_MGR_CURRENT_BSSID_PARAM;
+        siteMgr_getParam(pMeasurementMgr->hSiteMgr, &param);
+
+        
+        measurement_buildTSMRequestDbg(hMeasurementMgr, isTriggeredReport, duration , tid, &bufferLen);
+       
+
+        rrmMgr_receiveFrameRequest(hMeasurementMgr, 
+                                   MSR_FRAME_TYPE_UNICAST,
+                                   &param.content.siteMgrDesiredBSSID,
+                                   bufferLen,
+                                   actionFrameBuffer);
+        break;
+    }
+
+
+    case DBG_MEASUREMENT_SIMULATE_TSM_REQUEST_REPORT_TRIGGERED: 
+    {
+        bufferLen = 0;
+        tid = 0;
+        isTriggeredReport = TI_TRUE; 
+        duration  = 0; 
+
+        param.paramType = SITE_MGR_CURRENT_BSSID_PARAM;
+        siteMgr_getParam(pMeasurementMgr->hSiteMgr, &param);
+
+        measurement_buildTSMRequestDbg(hMeasurementMgr, isTriggeredReport, duration , tid, &bufferLen);
+
+        rrmMgr_receiveFrameRequest(hMeasurementMgr, 
+                                   MSR_FRAME_TYPE_UNICAST,
+                                   &param.content.siteMgrDesiredBSSID,
+                                   bufferLen,
+                                   actionFrameBuffer);
+        break;
+    }
+        
 	default:
 		WLAN_OS_REPORT(("Invalid function type in MEASUREMENT Function Command: %d\n", funcType));
 		break;
 	}
 } 
 
+
+/* 0-passive,  1-active scan , 2-table */
+static void measurement_buildBeaconRequestDbg(TI_HANDLE hMeasurementMgr, TI_UINT8 mode, TI_UINT8 channel,TI_UINT8 regClass,
+                                              TI_UINT8* pBeaconReqActionFrame, TI_UINT32 *outLen)
+{
+    TI_UINT8* ssidBuff = "arik";
+    TI_UINT8  ssidLen = 4;
+    TI_UINT8  reqIELength = 0;
+    TI_UINT8 *pFrame = pBeaconReqActionFrame;
+    TI_UINT8 *pReqestLen = NULL;
+
+
+    measurementMgr_t * pMeasurementMgr = (measurementMgr_t *) hMeasurementMgr;
+
+
+    WLAN_OS_REPORT(("\n measurement_buildBeaconRequestDbg. mode=%d. regClass=%d. channel=%d \n\n",
+                    mode,regClass, channel));
+       
+
+    *pFrame++ = 5;      /* category */
+    *pFrame++ = 0;      /* action */
+    *pFrame++ = 0x99;   /* dialog frame token */
+    *pFrame++ = 0;
+    *pFrame++ = 0;      /* number of repetitiions */
+  
+
+    *pFrame++ = 38;    /* IE ID */
+    pReqestLen = pFrame; /* save the Measurement Request IE length position to be filled later */
+     
+    pFrame++;
+     
+    *pFrame++ = 0x88;   /* measurement Token */
+    *pFrame++ = 0;     /* ReqMode */
+    *pFrame++ = 5;     /* ReqType */
+
+    reqIELength += 3;
+
+    *pFrame++ = regClass;  /* regulatory class */
+    *pFrame++ = channel;   /* channelNumber */
+
+    reqIELength += 2;
+    
+    /* randomInterval */
+    *pFrame++ = 0x44; 
+    *pFrame++ = 0x44;
+    reqIELength += 2;
+    
+     /* duration */ 
+    *pFrame++ = 0x33;      
+    *pFrame++ = 0x00;
+    reqIELength += 2;
+
+    /* mode */
+    *pFrame++ = mode; /* 0-passive,  1-active scan , 2-table */
+    reqIELength++;
+
+    /* bssid */
+    *pFrame++ = 0xFF; 
+    *pFrame++ = 0xFF;
+    *pFrame++ = 0xFF;
+    *pFrame++ = 0xFF;
+    *pFrame++ = 0xFF;   
+    *pFrame++ = 0xFF;
+
+    reqIELength += 6;
+
+    if (ssidLen > 0) 
+
+    {
+        /* Sub-elements section ID(1 byte)-LENGTH(1-byte)-DATA(variable)*/
+        *pFrame++ = 0; /* SSID sub elemenet */
+        *pFrame++ = ssidLen;
+        os_memoryCopy(pMeasurementMgr->hOs, pFrame, ssidBuff, ssidLen);
+        pFrame += ssidLen;
+    
+        reqIELength += ssidLen + 2;
+    }
+  
+
+    
+    *pFrame++ = 2; /* Reporting detail element ID */
+    *pFrame++ = 1; /* Length */
+    *pFrame++ = 1; /* 0 = fixed values only, 1 = All fixed values & requested IEs, 2= All fixed values & IEs */
+    reqIELength += 3;
+
+    
+    *pFrame++ = 10;     /* Request sub element */
+    *pFrame++ = 3;      /* Length */
+    /* IEs ID to report  */
+    *pFrame++ = 0;      /* ssid IE*/ 
+    *pFrame++ = 48;     /* rsn IE */
+    *pFrame++ = 221;     /* vendor specific */
+    reqIELength += 5;
+
+    
+#if 0    
+    *pFrame++ = 51;     /* AP channel report sub element */
+    *pFrame++ = 3;      /* Length */
+    *pFrame++ = 12;     /* regulatory class */
+    *pFrame++ = 1;     /* channel 1 */
+    *pFrame++ = 9;     /* channel 6 */
+    reqIELength += 5;
+
+
+    *pFrame++ = 51;     /* AP channel report sub element */
+    *pFrame++ = 3;      /* Length */
+    *pFrame++ = 12;     /* regulatory class */
+    *pFrame++ = 4;     /* channel 36 */
+    *pFrame++ = 10;     /* channel 60 */
+    reqIELength += 5;
+#endif    
+    
+    *pReqestLen = reqIELength;
+    *outLen = reqIELength + 5 + 2;
+    
+   
+        
+    WLAN_OS_REPORT(("\nmeasurement_buildBeaconRequestDbg: total frame Length = %d ,beacon request IE len=%d  *****\n",
+                    *outLen, reqIELength));
+
+    WLAN_OS_REPORT(("\n measurement_buildBeaconRequestDbg: print hex dump: \n"));
+    report_PrintDump(pBeaconReqActionFrame, *outLen);
+
+    
+}
+
+
+
+static void measurement_buildTSMRequestDbg(TI_HANDLE    hMeasurementMgr, 
+                                           TI_BOOL      isTriggeredReport,
+                                           TI_UINT16    duration,
+                                           TI_UINT8     tid,
+                                           TI_UINT32    *outLen)
+{
+
+    TI_UINT8  reqIELength = 0;
+    TI_UINT8 *pFrame = actionFrameBuffer;
+    TI_UINT8 *pReqestLen = NULL;
+    TI_UINT8  macAddress[6];
+
+
+    macAddress[0] = 0x11;
+    macAddress[1] = 0x22;
+    macAddress[2] = 0x33;
+    macAddress[3] = 0x44;
+    macAddress[4] = 0x55;
+    macAddress[5] = 0x66;
+    
+
+    WLAN_OS_REPORT(("\nmeasurement_buildTSMRequestDbg: isTriggeredReport=%d. duration=%d. tid=%d \n", 
+                    isTriggeredReport ,duration, tid));
+
+
+    *pFrame++ = 5;  /* category */
+    *pFrame++ = 0; /* action */
+    *pFrame++ = 0x99; /* dialog frame token */
+    *pFrame++ = 0;
+    *pFrame++ = 0;/* number of repetitiions */
+
+
+    *pFrame++ = 38;    /* IE ID */
+    pReqestLen = pFrame; /* save the Measurement Request IE length position to be filled later */
+
+    pFrame++;
+
+    *pFrame++ = 0x77;   /* measurement Token */
+    *pFrame++ = 0;     /* ReqMode */
+    *pFrame++ = 9;     /* ReqType */
+
+    reqIELength = 3;
+
+    
+    /* The request itself starts from here */
+
+    /* randomInterval */
+    *pFrame++ = 0x44; 
+    *pFrame++ = 0x44;
+    reqIELength += 2;
+    
+    /* duration */ 
+    COPY_WLAN_WORD(pFrame, &duration);
+    pFrame += 2;
+    reqIELength += 2;
+
+    /* peer sta address */
+    MAC_COPY(pFrame, macAddress);
+    pFrame += 6;
+    reqIELength += 6;
+    
+
+    /* traffic identifier bit4-7 */
+    *pFrame++ = tid << 4; 
+    reqIELength++;
+
+
+    /* bin0 Range field */
+    *pFrame++ = 5; 
+    reqIELength++;
+    
+  
+    if (isTriggeredReport == TI_TRUE) 
+    {
+
+         *pFrame++ = 0x01;  /* reoprting deatil info element ID */
+         *pFrame++ = 0x06;  /* reoprting deatil info element len */
+         reqIELength += 2;
+        
+         *pFrame++ = 0x04;  /* trigger condition */
+         *pFrame++ = 0;     /* average error threshold  */
+         *pFrame++ = 0;     /* consecutive error threshold */
+         *pFrame++ = 13;    /* delay threshold (count =3, bin range = 1) */
+         *pFrame++ = 100;   /* measurement count */
+         *pFrame++ = 0x05;  /* timeout */
+
+         pFrame += 6;
+         reqIELength += 6;
+    }
+
+
+    *pReqestLen = reqIELength;
+    *outLen = reqIELength + 5 + 2;
+
+
+    WLAN_OS_REPORT(("\n measurement_buildTSMRequestDbg: total frame Length = %d ,beacon request IE len=%d  *****\n",
+                    *outLen, reqIELength));
+
+}
+
 void measurement_channelLoadCallBackDbg(TI_HANDLE hMeasurementMgr, TI_STATUS status, 
                                         TI_UINT8* CB_buf)
 {
+#ifdef REPORT_LOG
     TMediumOccupancy *pMediumOccupancy = (TMediumOccupancy*)(CB_buf+4);
     
     WLAN_OS_REPORT(("MediumUsage = %d\nPeriod = %d\n", 
 					pMediumOccupancy->MediumUsage/1000, pMediumOccupancy->Period/1000));            
+#endif
 }
+
 
 void measurement_noiseHistCallBackDbg(TI_HANDLE hMeasurementSRV, TI_STATUS status, 
                                       TI_UINT8* CB_buf)

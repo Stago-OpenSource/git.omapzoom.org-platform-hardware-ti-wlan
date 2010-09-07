@@ -380,7 +380,7 @@ TI_STATUS measurementMgr_dot11hBuildReport(TI_HANDLE hMeasurementMgr, Measuremen
 	measurementReport.measurementToken = (TI_UINT8)request.measurementToken;
 	
 	/* setting Parallel Bit in the measurement mode */
-	if(request.isParallel)
+	if(request.bIsParallel)
 		measurementReport.measurementMode = 0x1;
 	
 	measurementReport.measurementType = request.Type;

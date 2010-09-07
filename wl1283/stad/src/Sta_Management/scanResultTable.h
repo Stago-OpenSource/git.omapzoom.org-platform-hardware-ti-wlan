@@ -136,6 +136,8 @@ typedef struct
     TI_UINT8                   beaconBuffer[ MAX_BEACON_BODY_LENGTH ];
     TI_UINT16                  beaconLength;
 
+    TI_UINT8                  RRMEnabledCapabilities[5];
+    
 } TSiteEntry;
 
 

@@ -324,9 +324,15 @@ IP&Port classification table  */
 /***********************************************/
 /* By default, partially optimize for Tx QoS on expense of Rx throughput */
 #define  QOS_TX_BLKS_THRESHOLD_BK_DEF           0
+#ifdef TNETW1283
 #define  QOS_TX_BLKS_THRESHOLD_BE_DEF           0
 #define  QOS_TX_BLKS_THRESHOLD_VI_DEF           0
 #define  QOS_TX_BLKS_THRESHOLD_VO_DEF           5
+#else
+#define  QOS_TX_BLKS_THRESHOLD_BE_DEF           0
+#define  QOS_TX_BLKS_THRESHOLD_VI_DEF           0
+#define  QOS_TX_BLKS_THRESHOLD_VO_DEF           10
+#endif
 /* In WiFi mode, fully optimized for Tx QoS on expense of Rx throughput */
 #define  QOS_TX_BLKS_THRESHOLD_BK_DEF_WIFI_MODE 0
 #define  QOS_TX_BLKS_THRESHOLD_BE_DEF_WIFI_MODE 30
@@ -334,16 +340,53 @@ IP&Port classification table  */
 #define  QOS_TX_BLKS_THRESHOLD_VO_DEF_WIFI_MODE 30
 /* In performance-boost, optimize for Rx throughput on expense of Tx QoS */
 #define  QOS_TX_BLKS_THRESHOLD_BK_DEF_BOOST_MODE 0
-#define  QOS_TX_BLKS_THRESHOLD_BE_DEF_BOOST_MODE 10
-#define  QOS_TX_BLKS_THRESHOLD_VI_DEF_BOOST_MODE 10
-#define  QOS_TX_BLKS_THRESHOLD_VO_DEF_BOOST_MODE 10
+#define  QOS_TX_BLKS_THRESHOLD_BE_DEF_BOOST_MODE 0
+#define  QOS_TX_BLKS_THRESHOLD_VI_DEF_BOOST_MODE 0
+#define  QOS_TX_BLKS_THRESHOLD_VO_DEF_BOOST_MODE 0
 
 /* HW Rx mem-blocks Number */
 #define  RX_MEM_BLKS_NUM_MIN                    20
 #define  RX_MEM_BLKS_NUM_MAX                    120
+#ifdef TNETW1283
 #define  RX_MEM_BLKS_NUM_DEF                    40   /* By default, partially optimize for Tx QoS on expense of Rx throughput */
 #define  RX_MEM_BLKS_NUM_DEF_WIFI_MODE          40   /* In WiFi mode, fully optimize for Tx QoS on expense of Rx throughput */
 #define  RX_MEM_BLKS_NUM_DEF_BOOST_MODE         50   /* In performance-boost, optimize for Rx throughput on expense of Tx QoS */
+/*
+    Dynamic Memory Allocation Parameters for Quattro - 1283
+*/
+#define  DYNAMIC_MEMORY_ENABLE_DEF              1
+#define  DYNAMIC_MEMORY_ENABLE_MIN              0
+#define  DYNAMIC_MEMORY_ENABLE_MAX              1
+#define  TX_FREE_REQ_DEF                        45
+#define  TX_FREE_REQ_MIN                        0
+#define  TX_FREE_REQ_MAX                        120
+#define  RX_FREE_REQ_DEF                        22
+#define  RX_FREE_REQ_MIN                        0
+#define  RX_FREE_REQ_MAX                        120
+#define  TX_MIN_DEF                             27
+#define  TX_MIN_MIN                             0
+#define  TX_MIN_MAX                             120
+#else
+#define  RX_MEM_BLKS_NUM_DEF                    50   /* By default, partially optimize for Tx QoS on expense of Rx throughput */
+#define  RX_MEM_BLKS_NUM_DEF_WIFI_MODE          40   /* In WiFi mode, fully optimize for Tx QoS on expense of Rx throughput */
+#define  RX_MEM_BLKS_NUM_DEF_BOOST_MODE         70   /* In performance-boost, optimize for Rx throughput on expense of Tx QoS */
+/*
+    Dynamic Memory Allocation Parameters for Trio - 1273
+*/
+#define  DYNAMIC_MEMORY_ENABLE_DEF              0
+#define  DYNAMIC_MEMORY_ENABLE_MIN              0
+#define  DYNAMIC_MEMORY_ENABLE_MAX              1
+#define  TX_FREE_REQ_DEF                        112
+#define  TX_FREE_REQ_MIN                        0
+#define  TX_FREE_REQ_MAX                        120
+#define  RX_FREE_REQ_DEF                        22
+#define  RX_FREE_REQ_MIN                        0
+#define  RX_FREE_REQ_MAX                        120
+#define  TX_MIN_DEF                             27
+#define  TX_MIN_MIN                             0
+#define  TX_MIN_MAX                             120
+#endif
+
 
 /* WiFi mode on/off */
 #define  WIFI_MODE_DEF                          0
@@ -498,6 +541,11 @@ IP&Port classification table  */
 #define QOS_CW_CWMAX_MAX                        QOS_CWMAX_MAX
 #define QOS_CW_CWMAX_DEF                        CW_MAX_DEF
 
+/*Auto Rx Streaming */
+#define QOS_PS_TRAFFIC_RATE_MIN                        0
+#define QOS_PS_TRAFFIC_RATE_MAX                        50
+#define QOS_PS_TRAFFIC_RATE_DEF                        20
+
 /*
  * 802.11n HT settion
  */
@@ -611,7 +659,7 @@ IP&Port classification table  */
 /* 1 seconds */                                                                
 #define CONN_SELF_TIMEOUT_MIN                   (1 * 1000)
 /* 1 minute */
-#define CONN_SELF_TIMEOUT_MAX                   (60 * 1000)
+#define CONN_SELF_TIMEOUT_MAX                   (60*60*24*1000)
 /* 10 seconds */
 #define CONN_SELF_TIMEOUT_DEF                   (10 * 1000)
 
@@ -843,15 +891,6 @@ IP&Port classification table  */
 #define SME_SCAN_CHANNELS_LIST_A_VAL_DEF        "36,40,44,48,52,56,60,64"
 #define SME_SCAN_CHANNELS_LIST_A_STRING_MAX_SIZE 255
 
-/* Scan SRV parameters */
-#define SCAN_SRV_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_DEF     3
-#define SCAN_SRV_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_MIN     1
-#define SCAN_SRV_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_MAX     1000000
-
-#define SCAN_SRV_TRIGGERED_SCAN_TIME_OUT_DEF        50000
-#define SCAN_SRV_TRIGGERED_SCAN_TIME_OUT_MIN        0
-#define SCAN_SRV_TRIGGERED_SCAN_TIME_OUT_MAX        0xffffffff
-
 
 /*
   EEPROM-less support
@@ -899,7 +938,7 @@ IP&Port classification table  */
 #define TX_POWER_LEVEL_TABLE_5                  "20,12,9,6" 
 
 /* Scan concentrator init parameters - number of entries in app scan result table */
-#define SCAN_CNCN_MIN_DURATION_FOR_OS_SCANS_DEF 5
+#define SCAN_CNCN_MIN_DURATION_FOR_OS_SCANS_DEF 1
 #define SCAN_CNCN_MIN_DURATION_FOR_OS_SCANS_MIN 0
 #define SCAN_CNCN_MIN_DURATION_FOR_OS_SCANS_MAX 3600
 
@@ -920,6 +959,14 @@ IP&Port classification table  */
 #define SCAN_CNCN_RSSI_DEF                      (-100)
 #define SCAN_CNCN_RSSI_MIN                      (-100)
 #define SCAN_CNCN_RSSI_MAX                      0
+
+#define SCAN_CNCN_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_DEF     3
+#define SCAN_CNCN_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_MIN     1
+#define SCAN_CNCN_NUMBER_OF_NO_SCAN_COMPLETE_TO_RECOVERY_MAX     1000000
+
+#define SCAN_CNCN_SPLIT_SCAN_TIME_OUT_DEF        50000
+#define SCAN_CNCN_SPLIT_SCAN_TIME_OUT_MIN        0
+#define SCAN_CNCN_SPLIT_SCAN_TIME_OUT_MAX        0xffffffff
 
 /* Current BSS init paramaters - keep alive default interval */
 #define NULL_KL_PERIOD_DEF      10
@@ -969,9 +1016,13 @@ IP&Port classification table  */
 #define SOFT_GEMINI_PARAMS_NFS_SAMPLE_INTERVAL_DEF	400
 
 #define SOFT_GEMINI_PARAMS_LOAD_RATIO_MIN				0
+#ifdef TNET1283
 #define SOFT_GEMINI_PARAMS_LOAD_RATIO_MAX				100
 #define SOFT_GEMINI_PARAMS_LOAD_RATIO_DEF				50
-
+#else
+#define SOFT_GEMINI_PARAMS_LOAD_RATIO_MAX				65000
+#define SOFT_GEMINI_PARAMS_LOAD_RATIO_DEF				200
+#endif
 #define SOFT_GEMINI_PARAMS_AUTO_PS_MODE_MIN				0
 #define SOFT_GEMINI_PARAMS_AUTO_PS_MODE_MAX				1
 #define SOFT_GEMINI_PARAMS_AUTO_PS_MODE_DEF				1
@@ -1326,10 +1377,13 @@ IP&Port classification table  */
 #define RATE_MNG_RATE_CHECK_DOWN_MIN       0
 #define RATE_MNG_RATE_CHECK_DOWN_MAX       256
 
-#define RATE_MNG_RATE_RETRY_POLICY_DEF_TABLE  "1,1,1,3,3,3,6,6,6,6,9,9,9"
+#define RATE_MNG_RATE_RETRY_POLICY_DEF_TABLE  "0,0,0,0,0,0,0,0,0,0,0,0,0"
 #define RATE_MNG_MAX_RETRY_POLICY_PARAMS_LEN  13
 #define RATE_MNG_MAX_STR_LEN  255
 
+#define STA_CAPABILITY_RRM_ENABLED_DEF       1
+#define STA_CAPABILITY_RRM_ENABLED_MIN       0
+#define STA_CAPABILITY_RRM_ENABLED_MAX       1
 
 
 /* Configurable Scan Rate */
@@ -1358,19 +1412,27 @@ IP&Port classification table  */
 
 
 /* Configurable radio parameters */
+#ifdef TNETW1283
 #define RADIO_TX_PER_POWER_LIMITS_2_4_NORMAL_DEF_TABLE      "1c,1f,22,24,28,29"
 #define RADIO_TX_PER_POWER_LIMITS_2_4_DEGRADED_DEF_TABLE    "19,1f,22,23,27,28"
 #define RADIO_TX_PER_POWER_LIMITS_2_4_EXTREME_DEF_TABLE     "19,1c,1e,20,24,25"
-
-#ifdef TNETW1283
 #define RADIO_GENERAL_SETTING_DEF_TABLE     "01,00,00,00"
+#else
+#define RADIO_TX_PER_POWER_LIMITS_2_4_NORMAL_DEF_TABLE      "1d,1f,22,26,28,29"
+#define RADIO_TX_PER_POWER_LIMITS_2_4_DEGRADED_DEF_TABLE    "1a,1f,22,24,26,28"
+#define RADIO_TX_PER_POWER_LIMITS_2_4_EXTREME_DEF_TABLE     "16,1d,1e,20,24,25"
 #endif
 
 #define RADIO_TX_PER_POWER_LIMITS_2_4_11B_DEF_TABLE         "50,50,50,50,50,50,50,50,50,50,50,50,50,50"
 #define RADIO_TX_PER_POWER_LIMITS_2_4_OFDM_DEF_TABLE        "50,50,50,50,50,50,50,50,50,50,50,50,50,50"
 #define RADIO_TX_PA_GAIN_VS_BIAS_OFFSET_2_4_DEF_TABLE       "f3,54,55,56,57,58"
+#ifdef TNETW1283
 #define RADIO_TX_PD_VS_RATE_OFFSET_2_4_DEF_TABLE            "00,00,00,00,00,00 "
 #define RADIO_TX_BIAS_2_4_DEF_TABLE                         "11,11,15,11,15,15"
+#else
+#define RADIO_TX_PD_VS_RATE_OFFSET_2_4_DEF_TABLE            "01,02,02,02,02,00"
+#define RADIO_TX_BIAS_2_4_DEF_TABLE                         "11,11,15,11,15,0f"
+#endif
 #define RADIO_TX_BIP_REF_VOLTAGE_DEF_TABLE_5G               "173,188,187,18b,18a,186,18c"
 
 /* GenFwCmd */
@@ -1392,27 +1454,44 @@ IP&Port classification table  */
 #define RADIO_TX_TRACE_LOSS_5_DEF_TABLE                     "00,00,00,00,00,00,00"
 
 #define RADIO_RX_FEM_INSERT_LOSS_2_4_MIN                    0
-#define RADIO_RX_FEM_INSERT_LOSS_2_4_DEF                    375  /* 0x15e
- */
+#define RADIO_RX_FEM_INSERT_LOSS_2_4_DEF                    375  /* 0x15e*/
 #define RADIO_RX_FEM_INSERT_LOSS_2_4_MAX                    0xffff
 
+#ifdef TNETW1283
+#define FEM_VENDOR_AND_OPTIONS_MIN                    		0
+#define FEM_VENDOR_AND_OPTIONS_DEF                    		0
+#define FEM_VENDOR_AND_OPTIONS_MAX							255
+/*
 
-#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_2_4G_MIN        0
-#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_2_4G_DEF        30      /* 0x1e */
-#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_2_4G_MAX        255
+TxPDVsTemperature_2_4G
+TxPDVsChannelOffsets_
+TxPDVsTemperature_5G
+*/
+#define TX_PDVS_CHANNEL_OFFSETS_2_4G_DEF_TABLE                     "00,00,00,00,00,00,00,00,00,00,00,00,00,10"
+#define TX_PDVS_TEMPERATURE_2_4G_DEF_TABLE                         "00,00"
+#define TX_PDVS_CHANNEL_OFFSETS_5G_TABLE                           "00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,0C"
+#define TX_PDVS_TEMPERATURE_5G_DEF_TABLE                           "00,00,00,00,00,00,00,00,00,00,00,00,00,10"
+#endif
 
-#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_2_4G_MIN       0
-#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_2_4G_DEF       45      /* 0x2d */
-#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_2_4G_MAX       255
+#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_2_4G_MIN        	0
+#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_2_4G_DEF        	30      /* 0x1e */
+#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_2_4G_MAX        	255
 
-#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_5G_MIN          0
-#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_5G_DEF          30      /* 0x1e */
-#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_5G_MAX          255
+#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_2_4G_MIN       	0
+#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_2_4G_DEF       	45      /* 0x2d */
+#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_2_4G_MAX       	255
 
-#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_5G_MIN         0
-#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_5G_DEF         45      /* 0x2d */
-#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_5G_MAX         255
+#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_5G_MIN          	0
+#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_5G_DEF          	30      /* 0x1e */
+#define RADIO_DEGRADED_LOW_TO_NORMAL_THR_5G_MAX          	255
 
+#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_5G_MIN        	0
+#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_5G_DEF         	45      /* 0x2d */
+#define RADIO_NORMAL_TO_DEGRADED_HIGH_THR_5G_MAX         	255
+
+#ifdef TNETW1283
+#define TX_TRACE_LOSS_2_4G_DEF_TABLE "00,00,00,00,00,00,00,00,00,00,00,00,00,00"
+#endif
 
 #define RADIO_RX_TRACE_INSERT_LOSS_2_4_MIN                  0
 #define RADIO_RX_TRACE_INSERT_LOSS_2_4_DEF                  0
@@ -1435,7 +1514,11 @@ IP&Port classification table  */
 #define RADIO_FREF_CLOCK_ENABLED_DEF                        TI_FALSE
 
 #define RADIO_FREF_CLOCK_MIN                        		0	/* 19.2, 26, 38.4, 52 MHz */
+#ifdef TNETW1283
 #define RADIO_FREF_CLOCK_DEF                        		1
+#else
+#define RADIO_FREF_CLOCK_DEF                        		2
+#endif
 #define RADIO_FREF_CLOCK_MAX                        		31   
 
 #ifdef TNETW1283
@@ -1455,6 +1538,10 @@ IP&Port classification table  */
 #define RADIO_TCXO_CLOCK_LDO_VOLTAGE_MIN    			    0   /* (0)2.5v, (1)2.55v, (2)2.6v */
 #define RADIO_TCXO_CLOCK_LDO_VOLTAGE_DEF    			    0
 #define RADIO_TCXO_CLOCK_LDO_VOLTAGE_MAX    			    2
+
+#define XTAL_ITRIM_VAL_MIN                        			0
+#define XTAL_ITRIM_VAL_DEF                        			4
+#define XTAL_ITRIM_VAL_MAX                        			255
 
 #endif
 
@@ -1520,6 +1607,7 @@ typedef enum
     POWER_MANAGER_USER_PRIORITY,           /**< indicates the default user priority. */
     POWER_MANAGER_SG_PRIORITY,             /**< Indicate the Soft Gemini priority */
     POWER_MANAGER_REAUTH_PRIORITY,         /**< Indicate 802.1x reauthentication priority */
+	POWER_MANAGER_WPS_PRIORITY=2,         /**< Indicate WPS priority */
     POWER_MANAGER_PS_POLL_FAILURE_PRIORITY,/**< After receiving the PsPoll failure event */
     POWER_MANAGER_MAX_PRIORITY                                                      
 }PowerMgr_Priority_e;
@@ -1543,10 +1631,6 @@ enum PowerMgr_registryDefinitions
     PLL_LOCK_TIME_MAX_VALUE = 20000,
     PLL_LOCK_TIME_DEF_VALUE = 4000,
 
-    HANGOVER_PERIOD_MIN_VALUE = 5,
-    HANGOVER_PERIOD_MAX_VALUE = 255,
-    HANGOVER_PERIOD_DEF_VALUE = 10,
-
     BEACON_LISTEN_INTERVAL_MIN_VALUE = 1,
     BEACON_LISTEN_INTERVAL_MAX_VALUE = 50,
     BEACON_LISTEN_INTERVAL_DEF_VALUE = 1,
@@ -1567,17 +1651,17 @@ enum PowerMgr_registryDefinitions
     ENTER_TO_802_11_POWER_SAVE_RETRIES_MAX_VALUE = 50,
     ENTER_TO_802_11_POWER_SAVE_RETRIES_DEF_VALUE = 5,
 
-    AUTO_POWER_MODE_INTERVAL_MIN_VALUE = 100,
+    AUTO_POWER_MODE_INTERVAL_MIN_VALUE = 30,
     AUTO_POWER_MODE_INTERVAL_MAX_VALUE = 30000,
-    AUTO_POWER_MODE_INTERVAL_DEF_VALUE = 1000,
+    AUTO_POWER_MODE_INTERVAL_DEF_VALUE = 60,
 
-    AUTO_POWER_MODE_ACTIVE_TH_MIN_VALUE = 2,
+    AUTO_POWER_MODE_ACTIVE_TH_MIN_VALUE = 0,
     AUTO_POWER_MODE_ACTIVE_TH_MAX_VALUE = 30000,
-    AUTO_POWER_MODE_ACTIVE_TH_DEF_VALUE = 15,
+    AUTO_POWER_MODE_ACTIVE_TH_DEF_VALUE = 0,
 
-    AUTO_POWER_MODE_DOZE_TH_MIN_VALUE = 1,
+    AUTO_POWER_MODE_DOZE_TH_MIN_VALUE = 0,
     AUTO_POWER_MODE_DOZE_TH_MAX_VALUE = 30000,
-    AUTO_POWER_MODE_DOZE_TH_DEF_VALUE = 8,
+    AUTO_POWER_MODE_DOZE_TH_DEF_VALUE = 0,
 
     AUTO_POWER_MODE_DOZE_MODE_MIN_VALUE = POWER_MODE_SHORT_DOZE,
     AUTO_POWER_MODE_DOZE_MODE_MAX_VALUE = POWER_MODE_LONG_DOZE,
@@ -1604,13 +1688,61 @@ enum PowerMgr_registryDefinitions
      bit15 - "1" short preamble, "0" long preammle
      bit0:bit12  Rates 
      */
-    POWER_MGMNT_NULL_PACKET_RATE_MOD_DEF_VALUE =  ((1<<DRV_RATE_1M) | (1<<DRV_RATE_2M)),
+    POWER_MGMNT_NULL_PACKET_RATE_MOD_DEF_VALUE =  ((DRV_RATE_MASK_1_BARKER) | (DRV_RATE_MASK_2_BARKER)),
     POWER_MGMNT_NULL_PACKET_RATE_MOD_MIN_VALUE = 0,
     POWER_MGMNT_NULL_PACKET_RATE_MOD_MAX_VALUE = 255 ,
 
-    POWER_MGMNT_NUM_NULL_PACKET_RETRY_DEF_VALUE = 5,
-    POWER_MGMNT_NUM_NULL_PACKET_RETRY_MIN_VALUE = 1,
-    POWER_MGMNT_NUM_NULL_PACKET_RETRY_MAX_VALUE = 255,
+    POWER_MGMNT_NUM_NULL_PACKET_ENTER_RETRY_DEF_VALUE = 4,
+    POWER_MGMNT_NUM_NULL_PACKET_ENTER_RETRY_MIN_VALUE = 1,
+    POWER_MGMNT_NUM_NULL_PACKET_ENTER_RETRY_MAX_VALUE = 255,
+
+	POWER_MGMNT_NUM_NULL_PACKET_EXIT_RETRY_DEF_VALUE = 255,
+    POWER_MGMNT_NUM_NULL_PACKET_EXIT_RETRY_MIN_VALUE = 1,
+    POWER_MGMNT_NUM_NULL_PACKET_EXIT_RETRY_MAX_VALUE = 255,
+
+	HANGOVER_PERIOD_MIN_VALUE = 1,
+    HANGOVER_PERIOD_MAX_VALUE = 128,
+    HANGOVER_PERIOD_DEF_VALUE = 20,
+
+	DYNAMIC_HANGOVER_MODE_MIN_VALUE = 0,
+	DYNAMIC_HANGOVER_MODE_MAX_VALUE = 1,
+	DYNAMIC_HANGOVER_MODE_DEF_VALUE = 1,
+
+    EARLY_TERMINATION_MODE_MIN_VALUE = 0,
+	EARLY_TERMINATION_MODE_MAX_VALUE = 1,
+	EARLY_TERMINATION_MODE_DEF_VALUE = 1,
+
+	PS_RECOVER_TIME_MIN_VALUE = 0,
+	PS_RECOVER_TIME_MAX_VALUE = 120000,
+	PS_RECOVER_TIME_DEF_VALUE = 0,
+
+	PS_MAX_HANG_OVER_PERIOD_MIN_VALUE = 1,
+	PS_MAX_HANG_OVER_PERIOD_MAX_VALUE = 128,
+	PS_MAX_HANG_OVER_PERIOD_DEF_VALUE = 30,
+
+	PS_MIN_HANG_OVER_PERIOD_MIN_VALUE = 1,
+	PS_MIN_HANG_OVER_PERIOD_MAX_VALUE = 128,
+	PS_MIN_HANG_OVER_PERIOD_DEF_VALUE = 1,
+
+	PS_INCR_DELTA_TIME_FROM_HANG_OVER_MIN_VALUE = 1,
+	PS_INCR_DELTA_TIME_FROM_HANG_OVER_MAX_VALUE = 128,
+	PS_INCR_DELTA_TIME_FROM_HANG_OVER_DEF_VALUE = 1,
+
+	PS_DECR_DELTA_TIME_FROM_HANG_OVER_MIN_VALUE = 2,
+	PS_DECR_DELTA_TIME_FROM_HANG_OVER_MAX_VALUE = 128,
+	PS_DECR_DELTA_TIME_FROM_HANG_OVER_DEF_VALUE = 2,
+
+	PS_QUIET_TIME_FOR_EARLY_TERMINATION_MIN_VALUE = 1,
+	PS_QUIET_TIME_FOR_EARLY_TERMINATION_MAX_VALUE = 128,
+	PS_QUIET_TIME_FOR_EARLY_TERMINATION_DEF_VALUE = 4,
+
+	PS_INCREASE_HANG_OVER_TIME_MIN_VALUE = 1,
+	PS_INCREASE_HANG_OVER_TIME_MAX_VALUE = 128,
+	PS_INCREASE_HANG_OVER_TIME_DEF_VALUE = 1,
+
+	PS_SLIDING_WINDOW_SIZE_MIN_VALUE = 1,
+	PS_SLIDING_WINDOW_SIZE_MAX_VALUE = 128,
+	PS_SLIDING_WINDOW_SIZE_DEF_VALUE = 16,
 
 	POWER_MGMNT_RE_AUTH_ACTIVE_PRIO_DEF_VALUE = 0,
     POWER_MGMNT_RE_AUTH_ACTIVE_PRIO_MIN_VALUE = 0,

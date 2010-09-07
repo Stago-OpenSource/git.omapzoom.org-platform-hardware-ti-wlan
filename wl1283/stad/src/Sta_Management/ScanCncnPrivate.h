@@ -45,6 +45,10 @@
 #include "scrApi.h"
 #include "ScanCncnSm.h"
 
+
+#define SCAN_GUARD_TIME_MS	62000
+
+
 /** \enum EConnectionStatus
  * \brief enumerates the different connection statuses
  */
@@ -69,6 +73,8 @@ typedef struct
     TI_HANDLE               hMlme;
     TI_HANDLE               hHealthMonitor;
     TI_HANDLE               hSme;
+	TI_HANDLE               hTimer;
+
 
     /* client specific information */
     TScanCncnClient         *pScanClients[ SCAN_SCC_NUM_OF_CLIENTS ];
@@ -90,6 +96,15 @@ typedef struct
     TI_UINT32               uOSScanLastTimeStamp;
     TI_BOOL                 bOSScanRunning;
     TScanParams             tOsScanParams;
+
+    /* scan guard timer params*/
+	TI_HANDLE               hScanGuardTimer;
+	TI_UINT32           	numOfConsTimerExpiry;
+	TI_BOOL             	bScanCompleteFlag;
+    
+	EScanResultTag 			eLatestScanTag;
+	EScanType               eLatestScanType;
+	
 
 } TScanCncn;
 

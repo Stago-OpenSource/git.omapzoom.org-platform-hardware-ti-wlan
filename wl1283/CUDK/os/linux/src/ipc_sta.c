@@ -122,6 +122,7 @@ THandle IpcSta_Create(const PS8 device_name)
     if(pIpcSta->STA_socket == -1)
     {
         os_error_printf(CU_MSG_ERROR, (PS8)"ERROR - IpcSta_Create - cant open socket for communication with the driver\n");
+        os_MemoryFree(pIpcSta);
         return NULL;
     }
 

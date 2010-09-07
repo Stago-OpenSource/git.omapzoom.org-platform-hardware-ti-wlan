@@ -73,6 +73,8 @@ TI_STATUS cmdBld_CfgIeCcaThreshold              (TI_HANDLE hCmdBld, TI_UINT16 cc
 TI_STATUS cmdBld_CfgIeTxRatePolicy             	(TI_HANDLE hCmdBld, TTxRatePolicy *pTxRatePolicy, void *fCb, TI_HANDLE hCb);                                        
 TI_STATUS cmdBld_CfgIeRtsThreshold             	(TI_HANDLE hCmdBld, TI_UINT16 uRtsThreshold, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CfgIeDcoItrimParams            (TI_HANDLE hCmdBld, TI_BOOL enable, TI_UINT32 moderationTimeoutUsec, void *fCb, TI_HANDLE hCb);
+TI_STATUS cmdBld_CmdIeConfigurePsParams 		(TI_HANDLE hCmdBld, TPsParams *psParams, void *fCb, TI_HANDLE hCb);
+TI_STATUS cmdBld_CmdIeConfigureHangOverParams	(TI_HANDLE hCmdBld, TPsParams *psParams, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CfgIeFragmentThreshold         (TI_HANDLE hCmdBld, TI_UINT16 uFragmentThreshold, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CfgIePmConfig                  (TI_HANDLE hCmdBld, TI_UINT32 uHostClkSettlingTime, TI_UINT8 uHostFastWakeupSupport, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CfgIeTxCmpltPacing             (TI_HANDLE hCmdBld, TI_UINT16 uTxCompletePacingThreshold, TI_UINT16 uTxCompletePacingTimeout, void *fCb, TI_HANDLE hCb);
@@ -107,8 +109,6 @@ TI_STATUS cmdBld_CfgIeExtendedRadioParams 		(TI_HANDLE hCmdBld, IniFileExtendedR
 TI_STATUS cmdBld_CfgPlatformGenParams           (TI_HANDLE hCmdBld, IniFileGeneralParam *pGenParams, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CfgIeCoexActivity              (TI_HANDLE hCmdBld, TCoexActivity *pCoexActivity, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CfgIeBurstMode 				(TI_HANDLE hCmdBld, TI_BOOL bEnabled, void *fCb, TI_HANDLE hCb);
-TI_STATUS cmdBld_CfgIeSRDebug                   (TI_HANDLE hCmdBld, ACXSmartReflexDebugParams_t *pSRDebug, void *fCb, TI_HANDLE hCb);
-TI_STATUS cmdBld_CfgIeSRState                   (TI_HANDLE hCmdBld, uint8 SRstate, void *fCb, TI_HANDLE hCb);
 TI_STATUS cmdBld_CfgIeRateMngDbg 				(TI_HANDLE hCmdBld, RateMangeParams_t *pRateMngParams, void *fCb, TI_HANDLE hCb);
 
 

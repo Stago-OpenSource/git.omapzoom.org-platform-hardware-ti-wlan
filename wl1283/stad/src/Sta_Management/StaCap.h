@@ -44,6 +44,8 @@
 
 #include "TWDriver.h"
 #include "DrvMainModules.h"
+#include "paramOut.h"
+
 
 /* The main StaCap module structure */
 typedef struct 
@@ -53,6 +55,9 @@ typedef struct
     TI_HANDLE   hTWD;
     TI_HANDLE   hQosMngr;
     TI_HANDLE   hSme;
+
+    TI_BOOL     bRRMEnabled;
+    TI_UINT32   uRRMEnabledCapabilities; 
 
 } TStaCap;	
 
@@ -82,6 +87,15 @@ typedef struct
 TI_HANDLE StaCap_Create (TI_HANDLE hOs);
 TI_STATUS StaCap_Destroy (TI_HANDLE hStaCap);
 TI_STATUS StaCap_Init (TStadHandlesList *pStadHandles);
+TI_STATUS StaCap_SetDefaults (TI_HANDLE hStaCap, TStaCapInitParams *pInitParams);
+
+
+TI_BOOL StaCap_IsRRMCapabilityEnabled (TI_HANDLE hStaCap);
+TI_BOOL StaCap_IsCapabilitySupported (TI_HANDLE hStaCap, TI_UINT32 cap);
+TI_STATUS StaCap_getRRMEnabledCapabilitiesIE(TI_HANDLE hStaCap, TI_UINT8* pRequest,TI_UINT32* pLen);
+TI_STATUS StaCap_getParam(TI_HANDLE hStaCap, paramInfo_t *pParam);
+
+
 TI_STATUS StaCap_GetHtCapabilitiesIe (TI_HANDLE hStaCap, TI_UINT8 *pRequest, TI_UINT32 *pLen);
 void StaCap_IsHtEnable (TI_HANDLE hStaCap, TI_BOOL *b11nEnable);
 #endif  /* _STA_CAP_H_ */

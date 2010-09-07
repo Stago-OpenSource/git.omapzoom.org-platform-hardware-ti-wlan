@@ -42,11 +42,11 @@
 #include "report.h"
 #include "MeasurementSrvSM.h"
 #include "MeasurementSrv.h"
-#include "PowerSrv_API.h"
 #include "timer.h"
 #include "fsm.h"
 #include "TWDriverInternal.h"
 #include "CmdBld.h"
+
 
 
 TI_STATUS actionUnexpected( TI_HANDLE hMeasurementSrv );
@@ -71,9 +71,7 @@ TI_STATUS measurementSRVSM_init( TI_HANDLE hMeasurementSRV )
     {
         /* next state and actions for IDLE state */
         {   
-            {MSR_SRV_STATE_WAIT_FOR_DRIVER_MODE, measurementSRVSM_requestDriverMode},     /*"MESSURE_START_REQUEST"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"DRIVER_MODE_SUCCESS"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"DRIVER_MODE_FAILURE"*/
+            {MSR_SRV_STATE_WAIT_FOR_MEASURE_START, measurementSRVSM_requestMeasureStart}, /*"MESSURE_START_REQUEST"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"START_SUCCESS"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"START_FAILURE"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"ALL_TYPES_COMPLETE"*/
@@ -81,24 +79,9 @@ TI_STATUS measurementSRVSM_init( TI_HANDLE hMeasurementSRV )
             {MSR_SRV_STATE_IDLE, measurementSRVSRVSM_dummyStop}                           /*"MEASURE_STOP_REQUEST"*/
         },
 
-
-        /* next state and actions for WAIT_FOR_DRIVER_MODE state */
-        {   
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"MESSURE_START_REQUEST"*/
-            {MSR_SRV_STATE_WAIT_FOR_MEASURE_START, measurementSRVSM_requestMeasureStart}, /*"DRIVER_MODE_SUCCESS"*/
-            {MSR_SRV_STATE_IDLE, measurementSRVSM_DriverModeFailure},                     /*"DRIVER_MODE_FAILURE"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"START_SUCCESS"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"START_FAILURE"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"ALL_TYPES_COMPLETE"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"STOP_COMPLETE"*/
-            {MSR_SRV_STATE_IDLE, measurementSRVSM_stopFromWaitForDriverMode}              /*"MEASURE_STOP_REQUEST"*/
-        },
-
         /* next state and actions for WAIT_FOR_MEASURE_START state */
         {    
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"MESSURE_START_REQUEST"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"DRIVER_MODE_SUCCESS"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"DRIVER_MODE_FAILURE"*/
             {MSR_SRV_STATE_MEASURE_IN_PROGRESS, measurementSRVSM_startMeasureTypes},      /*"START_SUCCESS"*/
             {MSR_SRV_STATE_IDLE, measurementSRVSM_measureStartFailure},                   /*"START_FAILURE"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"ALL_TYPES_COMPLETE"*/
@@ -110,8 +93,6 @@ TI_STATUS measurementSRVSM_init( TI_HANDLE hMeasurementSRV )
         /* next state and actions for MEASURE_IN_PROGRESS state */
         {   
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"MESSURE_START_REQUEST"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"DRIVER_MODE_SUCCESS"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"DRIVER_MODE_FAILURE"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"START_SUCCESS"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"START_FAILURE"*/
             {MSR_SRV_STATE_WAIT_FOR_MEASURE_STOP, measurementSRVSM_requestMeasureStop},   /*"ALL_TYPES_COMPLETE"*/
@@ -123,8 +104,6 @@ TI_STATUS measurementSRVSM_init( TI_HANDLE hMeasurementSRV )
         /* next state and actions for WAIT_FOR_MEASURE_STOP state */
         {   
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"MESSURE_START_REQUEST"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"DRIVER_MODE_SUCCESS"*/
-            {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"DRIVER_MODE_FAILURE"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"START_SUCCESS"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"START_FAILURE"*/
             {MSR_SRV_STATE_IDLE, actionUnexpected},                                       /*"ALL_TYPES_COMPLETE"*/
@@ -178,67 +157,6 @@ TI_STATUS measurementSRVSM_SMEvent( TI_HANDLE hMeasurementSrv, measurements_SRVS
 /**
  * \\n
  * \date 08-November-2005\n
- * \brief Handle a MEASURE_START_REQUEST event by requesting driver mode.\n
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSrv - handle to the Measurement SRV object.\n
- * \return always TI_OK.\n
- */
-TI_STATUS measurementSRVSM_requestDriverMode( TI_HANDLE hMeasurementSRV )
-{
-    measurementSRV_t    *pMeasurementSRV  = (measurementSRV_t*)hMeasurementSRV;
-    TI_STATUS           PSStatus;
-    TTwdParamInfo       paramInfo;
-
-    /* get the current channel */
-    paramInfo.paramType = TWD_CURRENT_CHANNEL_PARAM_ID;
-    cmdBld_GetParam (pMeasurementSRV->hCmdBld, &paramInfo);
-    
-    /* check if the request is on the serving channel */
-    if ( paramInfo.content.halCtrlCurrentChannel == pMeasurementSRV->msrRequest.channel )
-    {
-        /* Switch Power Save SRV to driver mode w/o changing power save mode*/
-        PSStatus = powerSrv_ReservePS( pMeasurementSRV->hPowerSaveSRV, POWER_SAVE_KEEP_CURRENT,
-                                       TI_TRUE, hMeasurementSRV, MacServices_measurementSRV_powerSaveCB );
-    }
-    else
-    {
-        /* Switch Power Save SRV to driver mode with PS mode */      
-        PSStatus = powerSrv_ReservePS( pMeasurementSRV->hPowerSaveSRV, POWER_SAVE_ON,
-                                       TI_TRUE, hMeasurementSRV, MacServices_measurementSRV_powerSaveCB );
-    }
-
-    switch (PSStatus)
-    {
-        case POWER_SAVE_802_11_IS_CURRENT:
-            TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": Driver mode entered successfully\n");
-            /* send a power save success event */
-            return measurementSRVSM_SMEvent( hMeasurementSRV, &(pMeasurementSRV->SMState),
-                                             MSR_SRV_EVENT_DRIVER_MODE_SUCCESS );
-    
-        case POWER_SAVE_802_11_PENDING:
-        case TI_OK:
-            TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": Driver mode pending\n");
-            break;
-        
-        default: /* Error */
-            TRACE1( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, ": Error %d when requesting driver mode\n",PSStatus);
-
-            /* Set the return status to TI_NOK */
-            pMeasurementSRV->returnStatus = PSStatus;
-
-            /* send a power save failure event */
-            measurementSRVSM_SMEvent( hMeasurementSRV, &(pMeasurementSRV->SMState),
-                                      MSR_SRV_EVENT_DRIVER_MODE_FAILURE );
-            break;
-    }
-    
-    return TI_OK;
-}
-
-/**
- * \\n
- * \date 08-November-2005\n
  * \brief Handle a DRIVER_MODE_SUCCESS event by sending start measure command to the FW.\n
  *
  * Function Scope \e Public.\n
@@ -273,24 +191,69 @@ TI_STATUS measurementSRVSM_requestMeasureStart( TI_HANDLE hMeasurementSRV )
         return TI_OK;
     }
 
-    pMeasurementCmd.channel = pMeasurementSRV->msrRequest.channel;
-    pMeasurementCmd.band = pMeasurementSRV->msrRequest.band;
+    /* set channel to the first channel in the BG/A band list  */
+    if (pMeasurementSRV->msrRequest.msrTypes[0].channelListBandBG.uActualNumOfChannels > 0) 
+    {
+        pMeasurementCmd.channel = pMeasurementSRV->msrRequest.msrTypes[0].channelListBandBG.channelList[0];
+        pMeasurementCmd.band = RADIO_BAND_2_4GHZ;
+    }
+    else if (pMeasurementSRV->msrRequest.msrTypes[0].channelListBandA.uActualNumOfChannels > 0) 
+    {
+        pMeasurementCmd.channel = pMeasurementSRV->msrRequest.msrTypes[0].channelListBandA.channelList[0];
+        pMeasurementCmd.band = RADIO_BAND_5GHZ;
+    }
+    else
+    {
+        TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, "measurementSRVSM_requestMeasureStart: No channel to measure\n");
+        return TI_NOK;
+    }
+    
+
     pMeasurementCmd.duration = 0; /* Infinite */
     pMeasurementCmd.eTag = pMeasurementSRV->msrRequest.eTag;
+	pMeasurementCmd.enterPS = pMeasurementSRV->msrRequest.enterPS;
 
     if ( measurementSRVIsBeaconMeasureIncluded( hMeasurementSRV ))
     {  /* Beacon Measurement is one of the types */
 
 		/* get the current channel */
 		TTwdParamInfo	paramInfo;
+        TI_UINT8        numOfChannels = 0; 
+        TI_UINT8        bIsRequestOnServingChannelOnly = TI_FALSE;
+        
 
+        numOfChannels = pMeasurementSRV->msrRequest.msrTypes[0].channelListBandBG.uActualNumOfChannels + 
+            pMeasurementSRV->msrRequest.msrTypes[0].channelListBandA.uActualNumOfChannels;
+            
 		paramInfo.paramType = TWD_CURRENT_CHANNEL_PARAM_ID;
 		cmdBld_GetParam (pMeasurementSRV->hCmdBld, &paramInfo);
 
 		pMeasurementCmd.ConfigOptions = RX_CONFIG_OPTION_FOR_MEASUREMENT; 
 
+
+        /* If we have more than one channel in total, the scan will be probably be executed on a non-serving channel... */
+        if (numOfChannels == 1) 
+        {
+            if (pMeasurementSRV->msrRequest.msrTypes[0].channelListBandBG.uActualNumOfChannels == 1) 
+            {
+                if (pMeasurementSRV->msrRequest.msrTypes[0].channelListBandBG.channelList[0] == paramInfo.content.halCtrlCurrentChannel) 
+                {
+                    bIsRequestOnServingChannelOnly = TI_TRUE;
+                }
+            }
+            else
+            {
+                 if (pMeasurementSRV->msrRequest.msrTypes[0].channelListBandA.channelList[0] == paramInfo.content.halCtrlCurrentChannel) 
+                {
+                    bIsRequestOnServingChannelOnly = TI_TRUE;
+                }
+            }
+          
+        }
+        
+        
 		/* check if the request is on the serving channel */
-		if ( paramInfo.content.halCtrlCurrentChannel == pMeasurementSRV->msrRequest.channel )
+		if ( TI_TRUE == bIsRequestOnServingChannelOnly)
 		{
 			/* Set the RX Filter to the join one, so that any packets will 
             be received on the serving channel - beacons and probe requests for
@@ -334,7 +297,7 @@ TI_STATUS measurementSRVSM_requestMeasureStart( TI_HANDLE hMeasurementSRV )
     tmr_StartTimer (pMeasurementSRV->hStartStopTimer,
                     MacServices_measurementSRV_startStopTimerExpired,
                     (TI_HANDLE)pMeasurementSRV,
-                    MSR_FW_GUARD_TIME,
+                    MSR_FW_GUARD_TIME_START,
                     TI_FALSE);
   
     return TI_OK;
@@ -358,13 +321,14 @@ TI_STATUS measurementSRVSM_startMeasureTypes( TI_HANDLE hMeasurementSRV )
     TI_STATUS             status;
     TNoiseHistogram       pNoiseHistParams;
     TApDiscoveryParams    pApDiscoveryParams;
-    TI_UINT32                currentTime = os_timeStampMs( pMeasurementSRV->hOS );
-
+    TI_INT32              i=0 ;
+    TI_UINT32             currentTime = os_timeStampMs( pMeasurementSRV->hOS );
+    
     /* check if request time has expired (note: timer wrap-around is also handled)*/
     if ( (pMeasurementSRV->requestRecptionTimeStampMs + pMeasurementSRV->timeToRequestExpiryMs)
                     < currentTime )
     {
-        TI_INT32 i;
+        
 
         TRACE2( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, ": request time has expired, request expiry time:%d, current time:%d\n", pMeasurementSRV->requestRecptionTimeStampMs + pMeasurementSRV->timeToRequestExpiryMs, currentTime);
 
@@ -384,10 +348,10 @@ TI_STATUS measurementSRVSM_startMeasureTypes( TI_HANDLE hMeasurementSRV )
     /* Going over all request types that should be executed in parallel 
     to start their timers and execute the measurement */
     for ( requestIndex = 0; requestIndex < pMeasurementSRV->msrRequest.numberOfTypes ; requestIndex++ )
-    {
+    {      
         switch (pMeasurementSRV->msrRequest.msrTypes[ requestIndex ].msrType)
         {
-        case MSR_TYPE_CCA_LOAD_MEASUREMENT:    
+        case MSR_TYPE_XCC_CCA_LOAD_MEASUREMENT:    
             /* Clearing the Medium Occupancy Register */
             tTwdParam.paramType = TWD_MEDIUM_OCCUPANCY_PARAM_ID;
             tTwdParam.content.interogateCmdCBParams.fCb = (void *)MacServices_measurementSRV_dummyChannelLoadParamCB;
@@ -414,7 +378,7 @@ TI_STATUS measurementSRVSM_startMeasureTypes( TI_HANDLE hMeasurementSRV )
 
             break;
         
-        case MSR_TYPE_NOISE_HISTOGRAM_MEASUREMENT:
+        case MSR_TYPE_XCC_NOISE_HISTOGRAM_MEASUREMENT:
             /* Set Noise Histogram Cmd Params */
             pNoiseHistParams.cmd = START_NOISE_HIST;
             pNoiseHistParams.sampleInterval = DEF_SAMPLE_INTERVAL;
@@ -465,18 +429,56 @@ TI_STATUS measurementSRVSM_startMeasureTypes( TI_HANDLE hMeasurementSRV )
                 TRACE1( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, ": TWD_NoiseHistogramCmd returned status %d\n", status);
             }
             break;
-        
-        case MSR_TYPE_BEACON_MEASUREMENT:
+
+        case MSR_TYPE_RRM_BEACON_MEASUREMENT:
+        case MSR_TYPE_XCC_BEACON_MEASUREMENT:
+
             /* set all parameters in the AP discovery command */
-            pApDiscoveryParams.scanDuration = pMeasurementSRV->msrRequest.msrTypes[ requestIndex ].duration * 1000;
-            pApDiscoveryParams.numOfProbRqst = 1;
-            pApDiscoveryParams.txdRateSet = HW_BIT_RATE_1MBPS;
+            pApDiscoveryParams.txdRateSetBandBG = HW_BIT_RATE_1MBPS;
+            pApDiscoveryParams.txdRateSetBandA = HW_BIT_RATE_6MBPS;
+            
             pApDiscoveryParams.ConfigOptions = RX_CONFIG_OPTION_FOR_MEASUREMENT;
             pApDiscoveryParams.FilterOptions = RX_FILTER_OPTION_DEF_PRSP_BCN;
-            pApDiscoveryParams.txPowerDbm = pMeasurementSRV->msrRequest.txPowerDbm;
-            pApDiscoveryParams.scanOptions = SCAN_ACTIVE; /* both scan type and band are 0 for active and */
-                                                          /* 2.4 GHz, respectively, but 2.4 is not defined */
+            pApDiscoveryParams.scanOptions = 0;
+ 
+            
+            pApDiscoveryParams.ssid.len = pMeasurementSRV->msrRequest.msrTypes[requestIndex].ssid.len;
+            os_memoryCopy(pMeasurementSRV->hOS, pApDiscoveryParams.ssid.str, 
+                          pMeasurementSRV->msrRequest.msrTypes[requestIndex].ssid.str,
+                          pMeasurementSRV->msrRequest.msrTypes[requestIndex].ssid.len);
+            
 
+            pApDiscoveryParams.scanDuration = pMeasurementSRV->msrRequest.msrTypes[ requestIndex ].duration*1000;
+            
+            if (MSR_TYPE_RRM_BEACON_MEASUREMENT == pMeasurementSRV->msrRequest.msrTypes[requestIndex].msrType) 
+            {
+                pApDiscoveryParams.numOfProbRqst = 3;
+                pApDiscoveryParams.ConfigOptions = RX_CONFIG_OPTION_FOR_SCAN;
+                
+            }
+            else /* MSR_TYPE_XCC_BEACON_MEASUREMENT */
+            {
+                pApDiscoveryParams.numOfProbRqst = 1;
+            }
+           
+            
+            for ( i = 0; i < pMeasurementSRV->msrRequest.msrTypes[requestIndex].channelListBandBG.uActualNumOfChannels; i++ )
+            {
+                pApDiscoveryParams.channelListBandBG.channelList[i] = pMeasurementSRV->msrRequest.msrTypes[requestIndex].channelListBandBG.channelList[i];
+                pApDiscoveryParams.channelListBandBG.txPowerDbm[i] = pMeasurementSRV->msrRequest.msrTypes[requestIndex].channelListBandBG.txPowerDbm[i];
+            }
+
+            pApDiscoveryParams.channelListBandBG.uActualNumOfChannels = i;
+
+            for ( i = 0; i < pMeasurementSRV->msrRequest.msrTypes[requestIndex].channelListBandA.uActualNumOfChannels; i++ )
+            {
+                pApDiscoveryParams.channelListBandA.channelList[i] = pMeasurementSRV->msrRequest.msrTypes[requestIndex].channelListBandA.channelList[i];
+                pApDiscoveryParams.channelListBandA.txPowerDbm[i] = pMeasurementSRV->msrRequest.msrTypes[requestIndex].channelListBandA.txPowerDbm[i];
+            }
+
+            pApDiscoveryParams.channelListBandA.uActualNumOfChannels = i;
+
+            
             /* band determined at the initiate measurement command not at that structure */
 
             /* scan mode go into the scan option field */
@@ -485,18 +487,33 @@ TI_STATUS measurementSRVSM_startMeasureTypes( TI_HANDLE hMeasurementSRV )
                 pApDiscoveryParams.scanOptions |= SCAN_PASSIVE;
             }
 
+
             /* Send AP Discovery command */
             status = cmdBld_CmdApDiscovery (pMeasurementSRV->hCmdBld, &pApDiscoveryParams, NULL, NULL);
 
             if ( TI_OK == status )
             {
-                TRACE7( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": AP discovery command sent. Params:\n scanDuration=%d, scanOptions=%d, numOfProbRqst=%d, txdRateSet=%d, txPowerDbm=%d, configOptions=%d, filterOptions=%d\n Starting timer...\n", pApDiscoveryParams.scanDuration, pApDiscoveryParams.scanOptions, pApDiscoveryParams.numOfProbRqst, pApDiscoveryParams.txdRateSet, pApDiscoveryParams.txPowerDbm, pApDiscoveryParams.ConfigOptions, pApDiscoveryParams.FilterOptions);
+                TRACE8( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": AP discovery command sent. "
+                                                                               "Params:\n scanDuration=%d, "
+                                                                               "scanOptions=%d, numOfProbRqst=%d, "
+                                                                               "txdRateSetBG=%d, txdRateSetA=%d,"
+                                                                               " txPowerDbm=%d, "
+                                                                               "configOptions=%d, "
+                                                                               "filterOptions=%d\n Starting timer...\n", 
+                                                                    pApDiscoveryParams.scanDuration, 
+                                                                    pApDiscoveryParams.scanOptions, 
+                                                                    pApDiscoveryParams.numOfProbRqst, 
+                                                                    pApDiscoveryParams.txdRateSetBandBG, 
+                                                                    pApDiscoveryParams.txdRateSetBandA,
+                                                                    pApDiscoveryParams.channelListBandBG.txPowerDbm[0], 
+                                                                    pApDiscoveryParams.ConfigOptions, 
+                                                                    pApDiscoveryParams.FilterOptions);
         
                 /* Start Timer */
                 tmr_StartTimer (pMeasurementSRV->hRequestTimer[requestIndex],
                                 MacServices_measurementSRV_requestTimerExpired,
                                 (TI_HANDLE)pMeasurementSRV,
-                                pMeasurementSRV->msrRequest.msrTypes[requestIndex].duration, 
+                                (pMeasurementSRV->msrRequest.msrTypes[requestIndex].duration * 1024)/10, 
                                 TI_FALSE);
                 pMeasurementSRV->bRequestTimerRunning[ requestIndex ] = TI_TRUE;
             }
@@ -547,7 +564,7 @@ TI_STATUS measurementSRVSM_requestMeasureStop( TI_HANDLE hMeasurementSRV )
 		tmr_StopTimer (pMeasurementSRV->hStartStopTimer);
         pMeasurementSRV->bStartStopTimerRunning = TI_FALSE;
     }
-
+    
     /* Send Measurement Stop command to the FW */
     status = cmdBld_CmdMeasurementStop (pMeasurementSRV->hCmdBld, 
                                         (void *)pMeasurementSRV->commandResponseCBFunc,
@@ -572,7 +589,7 @@ TI_STATUS measurementSRVSM_requestMeasureStop( TI_HANDLE hMeasurementSRV )
     tmr_StartTimer (pMeasurementSRV->hStartStopTimer,
                     MacServices_measurementSRV_startStopTimerExpired,
                     (TI_HANDLE)pMeasurementSRV,
-                    MSR_FW_GUARD_TIME,
+                    MSR_FW_GUARD_TIME_STOP,
                     TI_FALSE);
 
     return TI_OK;
@@ -591,8 +608,6 @@ TI_STATUS measurementSRVSM_completeMeasure( TI_HANDLE hMeasurementSRV )
 {
     measurementSRV_t *pMeasurementSRV = (measurementSRV_t *)hMeasurementSRV;
 
-    /* Switch Power Save SRV back to user mode */
-    powerSrv_ReleasePS( pMeasurementSRV->hPowerSaveSRV, pMeasurementSRV->bSendNullDataWhenExitPs, NULL, NULL );
 
     /* if the response CB is still pending, call it (when requestExpiryTimeStamp was reached) */
     if ( NULL != pMeasurementSRV->commandResponseCBFunc )
@@ -605,93 +620,6 @@ TI_STATUS measurementSRVSM_completeMeasure( TI_HANDLE hMeasurementSRV )
     {
         pMeasurementSRV->measurmentCompleteCBFunc( pMeasurementSRV->measurementCompleteCBObj, 
                                                    &(pMeasurementSRV->msrReply));
-    }
-
-    return TI_OK;
-}
-
-/**
- * \\n
- * \date 08-November-2005\n
- * \brief Handle a STOP_REQUEST event when in WAIT_FOR_DRIVER_MODE state by exiting driver mode.
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSrv - handle to the Measurement SRV object.\n
- * \return always TI_OK.\n
- */
-TI_STATUS measurementSRVSM_stopFromWaitForDriverMode( TI_HANDLE hMeasurementSRV )
-{
-    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
-
-    /* Switch Power Save SRV back to user mode */
-    powerSrv_ReleasePS( pMeasurementSRV->hPowerSaveSRV, pMeasurementSRV->bSendNullDataWhenExitPs, NULL, NULL );
-
-    /* if we are not running within a stop request context (shouldn't happen), call the CBs */
-    if ( TI_FALSE == pMeasurementSRV->bInRequest )
-    {
-        TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, ": stop from wait for driver mode: not within a request context?!? \n");
-
-        /* call the response CB - this shouldn't happen, as only GWSI has response CB, and it shouldn't call
-           stop before driver */
-        if ( NULL != pMeasurementSRV->commandResponseCBFunc )
-        {
-            TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, ": stop from wait for driver mode: command response CB is not NULL?!? \n");
-            pMeasurementSRV->commandResponseCBFunc( pMeasurementSRV->commandResponseCBObj, TI_OK );
-
-            pMeasurementSRV->commandResponseCBFunc = NULL;
-            pMeasurementSRV->commandResponseCBObj = NULL;
-        }
-        /* call the complete CB */
-        if ( NULL != pMeasurementSRV->measurmentCompleteCBFunc )
-        {
-            /* mark that all types has failed */
-            TI_INT32 i;
-            for ( i = 0; i < MAX_NUM_OF_MSR_TYPES_IN_PARALLEL; i++ )
-            {
-                pMeasurementSRV->msrReply.msrTypes[ i ].status = TI_NOK;
-            }
-            /* call the complete CB */
-            pMeasurementSRV->measurmentCompleteCBFunc( pMeasurementSRV->measurementCompleteCBObj, 
-                                                       &(pMeasurementSRV->msrReply));
-        }
-        else
-        {
-            TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, ": stop from wait for driver mode and response CB is NULL!!!\n");
-        }
-    }
-    /* we are within a stop request context */
-    else
-    {
-        /* if the command response Cb is valid, send a measure stop command to the FW - 
-           although it is not necessary, we need it to get a different context for the command response.
-           This shouldn't happen, as only GWSI has command response, and it shouldn't call stop measure
-           before it got the commadn response for start measure */
-        if ( NULL != pMeasurementSRV->commandResponseCBFunc )
-        {
-            /* shouldn't happen - a command response is valid (GWSI) and stop measure called 
-               before measure start response was received (driver) */
-            TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, ": stop from wait for driver mode - within request context and command response is not NULL?!?\n");
-
-            cmdBld_CmdMeasurementStop (pMeasurementSRV->hCmdBld, 
-                                       (void *)pMeasurementSRV->commandResponseCBFunc,
-                                       pMeasurementSRV->commandResponseCBObj);
-
-            pMeasurementSRV->commandResponseCBFunc = NULL;
-            pMeasurementSRV->commandResponseCBObj = NULL;
-        }
-        if ( NULL != pMeasurementSRV->measurmentCompleteCBFunc )
-        {
-            /* Note: this is being called from request context, but there's npthing else that can be done */
-            /* mark that all types has failed */
-            TI_INT32 i;
-            for ( i = 0; i < MAX_NUM_OF_MSR_TYPES_IN_PARALLEL; i++ )
-            {
-                pMeasurementSRV->msrReply.msrTypes[ i ].status = TI_NOK;
-            }
-            /* call the complete CB */
-            pMeasurementSRV->measurmentCompleteCBFunc( pMeasurementSRV->measurementCompleteCBObj, 
-                                                       &(pMeasurementSRV->msrReply));
-        }
     }
 
     return TI_OK;
@@ -753,7 +681,8 @@ TI_STATUS measurementSRVSM_stopFromMeasureInProgress( TI_HANDLE hMeasurementSRV 
             /* if necessary, stop measurement type */
             switch ( pMeasurementSRV->msrRequest.msrTypes[ i ].msrType )
             {
-            case MSR_TYPE_BEACON_MEASUREMENT:
+            case MSR_TYPE_XCC_BEACON_MEASUREMENT:
+            case MSR_TYPE_RRM_BEACON_MEASUREMENT:
                 /* send stop AP discovery command */
                 status = cmdBld_CmdApDiscoveryStop (pMeasurementSRV->hCmdBld, NULL, NULL);
                 if ( TI_OK != status )
@@ -762,7 +691,7 @@ TI_STATUS measurementSRVSM_stopFromMeasureInProgress( TI_HANDLE hMeasurementSRV 
                 }
                 break;
 
-            case MSR_TYPE_NOISE_HISTOGRAM_MEASUREMENT:
+            case MSR_TYPE_XCC_NOISE_HISTOGRAM_MEASUREMENT:
                 /* Set Noise Histogram Cmd Params */
                 pNoiseHistParams.cmd = STOP_NOISE_HIST;
                 pNoiseHistParams.sampleInterval = 0;
@@ -779,7 +708,7 @@ TI_STATUS measurementSRVSM_stopFromMeasureInProgress( TI_HANDLE hMeasurementSRV 
 
             /* These are just to avoid compilation warnings, nothing is actualy done here! */
             case MSR_TYPE_BASIC_MEASUREMENT:
-            case MSR_TYPE_CCA_LOAD_MEASUREMENT:
+            case MSR_TYPE_XCC_CCA_LOAD_MEASUREMENT:
             case MSR_TYPE_FRAME_MEASUREMENT:
             case MSR_TYPE_MAX_NUM_OF_MEASURE_TYPES:
             default:
@@ -817,63 +746,10 @@ TI_STATUS measurementSRVSM_stopFromMeasureInProgress( TI_HANDLE hMeasurementSRV 
     tmr_StartTimer (pMeasurementSRV->hStartStopTimer,
                     MacServices_measurementSRV_startStopTimerExpired,
                     (TI_HANDLE)pMeasurementSRV,
-                    MSR_FW_GUARD_TIME,
+                    MSR_FW_GUARD_TIME_STOP,
                     TI_FALSE);
 
     return TI_OK; 
-}
-
-/**
- * \\n
- * \date 08-November-2005\n
- * \brief handle a DRIVER_MODE_FAILURE event by calling the response and complete CBs.\n
- *
- * Function Scope \e Public.\n
- * \param hMeasurementSrv - handle to the Measurement SRV object.\n
- * \return always TI_OK.\n
- */
-TI_STATUS measurementSRVSM_DriverModeFailure( TI_HANDLE hMeasurementSRV )
-{
-    measurementSRV_t* pMeasurementSRV = (measurementSRV_t*)hMeasurementSRV;
-
-    /* this function can be called from within a request (when the power save SRV returned an immediate error),
-       or in a different context, when power save entry failed. The latter is a valid status, whereas the former
-       indicates a severe error. However, as there is nothing to do with the former (other than debug it), the same
-       failure indication is used for both of them, which will make the upper layer (Palau driver or TI measurement
-       manager) to return to idle state. Still, for the former the error is returned as the return status from the
-       measurement start API call whereas for the latter the error is indicated both by the command response and
-       measurement complete CBs status */
-
-    /* if we are running within a request context, don't call the CBs! The startMeasurement function
-       will return an invalid status instead */
-    if ( TI_FALSE == pMeasurementSRV->bInRequest )
-    {
-        /* if a response CB is available (GWSI) call it */
-        if ( NULL != pMeasurementSRV->commandResponseCBFunc )
-        {
-            pMeasurementSRV->commandResponseCBFunc( pMeasurementSRV->commandResponseCBObj, TI_NOK );
-        }
-
-        /* if a complete CB is available (both GWSI and TI driver), call it */
-        if ( NULL != pMeasurementSRV->measurmentCompleteCBFunc )
-        {
-            /* mark that all types has failed */
-            TI_INT32 i;
-            for ( i = 0; i < MAX_NUM_OF_MSR_TYPES_IN_PARALLEL; i++ )
-            {
-                pMeasurementSRV->msrReply.msrTypes[ i ].status = TI_NOK;
-            }
-            /* call the complete CB */
-            pMeasurementSRV->measurmentCompleteCBFunc( pMeasurementSRV->measurementCompleteCBObj, 
-                                                       &(pMeasurementSRV->msrReply));
-        }
-        else
-        {
-            TRACE0( pMeasurementSRV->hReport, REPORT_SEVERITY_ERROR, ": driver mode failure and complete CB is NULL!!!\n");
-        }
-    }
-
-    return TI_OK;
 }
 
 /**
@@ -895,9 +771,7 @@ TI_STATUS measurementSRVSM_measureStartFailure( TI_HANDLE hMeasurementSRV )
        The error is either indicating by the measurement start API return status (if still in the request context),
        or by calling the response (if available, only in GWSI) and complete CBs with invalid status */
 
-    /* Switch Power save SRV back to user mode */
-    powerSrv_ReleasePS( pMeasurementSRV->hPowerSaveSRV, pMeasurementSRV->bSendNullDataWhenExitPs, NULL, NULL );
-
+    
     /* if we are running within a request context, don't call the CB! The startMeasurement function
        will return an invalid status instead */
     if ( TI_FALSE == pMeasurementSRV->bInRequest )

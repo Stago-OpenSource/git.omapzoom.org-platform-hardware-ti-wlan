@@ -92,6 +92,7 @@ typedef struct triggerDesc
 } triggerDesc_t;
 
 
+
 /**
 * Current BSS control block 
 * Following structure defines parameters that can be configured externally,
@@ -124,6 +125,10 @@ typedef struct _currBSS_t
     triggerDesc_t aTriggersDesc[MAX_NUM_OF_RSSI_SNR_TRIGGERS]; /* static table to be used for trigger event registration*/
     TI_UINT8	  RoamingOperationalMode;                      /* 0 - manual , 1 - Auto */
 
+
+    TI_BOOL     bRRMEnabled;
+
+    
     /* Handlers of other modules used by AP Connection */
     TI_HANDLE   hOs;
     TI_HANDLE   hPowerMngr;

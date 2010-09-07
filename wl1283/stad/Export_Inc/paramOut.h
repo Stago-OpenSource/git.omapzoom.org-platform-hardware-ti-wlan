@@ -64,6 +64,10 @@
 #include "tiwlnif.h"
 
 
+
+#define REG_DOMAIN_MAX_CHAN_NUM            15
+#define REG_DOMAIN_MAX_REG_CLASS_NUM       10
+
 #define DOT11_MAX_DEFAULT_WEP_KEYS          4
 
 #define RX_LEVEL_TABLE_SIZE                 15
@@ -106,7 +110,8 @@ typedef enum
 {
     AUTH_LEGACY_OPEN_SYSTEM     = 0,
     AUTH_LEGACY_SHARED_KEY      = 1,
-    AUTH_LEGACY_AUTO_SWITCH     = 2,
+	AUTH_LEGACY_FT              = 2,
+    AUTH_LEGACY_AUTO_SWITCH     = 3,
     AUTH_LEGACY_RESERVED1       = 128,
     AUTH_LEGACY_NONE            = 255
 } legacyAuthType_e;
@@ -126,6 +131,33 @@ typedef enum
 }radioStandByState_t;
 
 /**** Regulatory Domain module types ****/
+
+
+/* Added for the 802.11k support */
+typedef enum
+{
+    REGULATORY_ZONE_USA = 0,
+    REGULATORY_ZONE_JAPAN,
+    REGULATORY_ZONE_RST, /* Europe + Rest of the world */
+    REGULATORY_ZONE_NONE,
+    REGULATORY_ZONE_MAX
+} RegulatoryZone_e;
+
+
+typedef enum
+{
+    BAND_TYPE_2_4GHZ = 0,
+    BAND_TYPE_5_GHZ,
+    BAND_TYPE_4_9GHZ,
+    BAND_TYPE_NONE   
+} BandType_e;
+
+typedef struct
+{
+    TI_UINT8    Channel[REG_DOMAIN_MAX_CHAN_NUM];
+    BandType_e  band;
+}RegClassChannelList_t;
+
 
 /* Scan Control Table for 2.4-G band type */
 typedef struct
@@ -397,6 +429,8 @@ typedef struct{
     /* 802.11n BA session */
     TI_UINT8               aBaPolicy[MAX_NUM_OF_802_1d_TAGS];
     TI_UINT16              aBaInactivityTimeout[MAX_NUM_OF_802_1d_TAGS];
+	/*Parameter for Auto Rx streaming */
+	TI_UINT8	uPsTrafficPeriod;
 	
 }QosMngrInitParams_t;
 
@@ -590,9 +624,12 @@ typedef struct{
 
         void     							*pPrimarySite;
         TI_BOOL                             bPrimarySiteHtSupport;
+        TI_UINT8                            RRMEnabledCapabilities[5];
 
         /* WiFI SimpleConfig */
 		TWscMode 							siteMgrWSCMode; /* used to set the WiFi Simple Config mode */
+		TI_UINT8							*pProbeReqExtraIes;
+		TI_BOOL								siteMgrWpsEnabled; 
 
         /* SME SM section */
         TMacAddr                			smeDesiredBSSID;
@@ -706,7 +743,7 @@ typedef struct{
 																	or The desired Tx power (in Dbm) as forced by teh OS */
         TI_INT8                    			ExternTxPowerPreferred; /*for other extern elements that want
 																	to effect the transmit power*/
-		TpowerLevelTable_t					powerLevelTable;
+		TpowerLevelTable_t		     		powerLevelTable;
 		channelValidity_t					channelValidity;
 		channelCapabilityRet_t				channelCapabilityRet;
 		channelCapabilityReq_t				channelCapabilityReq;
@@ -720,7 +757,12 @@ typedef struct{
         TDfsChannel             			tDfsChannel;
 		ERadioBand							eRadioBand;
         TI_UINT32               			uTimeToCountryExpiryMs;
+        RegulatoryZone_e                    countryZone;
+        TI_UINT8                            regulatoryClass;
+        BandType_e                          radioBand;
 
+        TI_UINT8                            regClass;
+        RegClassChannelList_t               regClassChannelList;
 
         /* Measurement Manager section */
 		TI_UINT32							measurementEnableDisableStatus;
@@ -745,6 +787,8 @@ typedef struct{
 		TI_UINT32							roamingConnStatus;
         bssList_t*              			pScanBssList;
 		TScanPolicy*						pScanPolicy;
+        TI_UINT16                           uCandidateBufferLen;
+        TI_UINT8*                           pCandidateBuffer;
 
         /* Scan concnetrator application scan (periodic & one-shot) parameters */
         TScanParams                 		*pScanParams;
@@ -772,6 +816,7 @@ typedef struct{
 		OS_802_11_QOS_RX_TIMEOUT_PARAMS		rxTimeOut;
         OS_802_11_QOS_PARAMS        		qosOsParams;
 		OS_802_11_AC_QOS_PARAMS				qosApQosParams;
+		TBaPolicy							tBaPolicy;
 		
         /* AP Qos Capabilities */
         OS_802_11_AP_QOS_CAPABILITIES_PARAMS qosApCapabilities;
@@ -809,6 +854,13 @@ typedef struct{
         /* Current BSS params - RSSI/SNR User Trigger */
 		TUserDefinedQualityTrigger 			rssiSnrTrigger;
 
+        /* SDIO Validation Test */
+        SdioValidationTestParams_t          tSdioValidationTestParams;
+
+        /* StaCap params */
+        TI_BOOL                             staCapRRMEnabled;
+
+        
 		/* debug */
 		TDebugRegisterReq					HwRegister;
         RateMangeParams_t                   RateMng;
@@ -936,7 +988,11 @@ typedef struct
 
 typedef struct
 {
-    TI_UINT8                    parseWSCInBeacons;
+    TI_UINT8                   parseWSCInBeacons;
+	TI_UINT32                  authResponseTimeout;
+    TI_UINT32                  authMaxRetryCount;
+	TI_UINT32                  assocResponseTimeout;
+    TI_UINT32                  assocMaxRetryCount;
 } TMlmeInitParams;
 
 typedef struct
@@ -944,17 +1000,6 @@ typedef struct
     TI_UINT32                  connSelfTimeout;
 } connInitParams_t;
 
-typedef struct
-{
-    TI_UINT32                  authResponseTimeout;
-    TI_UINT32                  authMaxRetryCount;
-} authInitParams_t;
-
-typedef struct
-{
-    TI_UINT32                  assocResponseTimeout;
-    TI_UINT32                  assocMaxRetryCount;
-} assocInitParams_t;
 
 typedef struct
 {
@@ -1050,6 +1095,7 @@ typedef struct
 #ifdef XCC_MODULE_INCLUDED
     XCCMngr_mode_t      XCCEnabled;
 #endif
+    TI_BOOL             rrmEnabled;
 } measurementInitParams_t;
 
 /* Switch Channel Module module init parameters */
@@ -1087,8 +1133,6 @@ typedef struct
 	
 	/* powerMgmtConfig IE */
     TI_UINT8						mode;
-    TI_UINT8						needToSendNullData;  
-    TI_UINT8						numNullPktRetries; 
     TI_UINT8						hangOverPeriod;
     TI_UINT16						NullPktRateModulation; 
 
@@ -1129,7 +1173,7 @@ typedef struct
     TI_BOOL	        bPushMode; /*  True means Push mode. False is the default mode, storing scan results in table. */
     TI_UINT32       uSraThreshold;
     TI_INT32        nRssiThreshold;
-
+	TI_UINT32       numberOfNoScanCompleteToRecovery;
 } TScanCncnInitParams;
 
 typedef struct
@@ -1137,6 +1181,15 @@ typedef struct
     TI_UINT8       uNullDataKeepAlivePeriod;
     TI_UINT8	   RoamingOperationalMode;
 } TCurrBssInitParams;
+
+
+typedef struct
+{
+    TI_BOOL      bRRMEnabled;
+ 
+} TStaCapInitParams;
+
+
 
 typedef struct
 {
@@ -1160,8 +1213,6 @@ typedef struct
 	TTwdInitParams        		    twdInitParams;
     siteMgrInitParams_t             siteMgrInitParams;
     connInitParams_t                connInitParams;
-    authInitParams_t                authInitParams;
-    assocInitParams_t               assocInitParams;
     txDataInitParams_t              txDataInitParams;
     ctrlDataInitParams_t            ctrlDataInitParams;
     TRsnInitParams                  rsnInitParams;
@@ -1190,6 +1241,8 @@ typedef struct
     TMlmeInitParams                 tMlmeInitParams;
     TDrvMainParams                  tDrvMainParams;
     TRoamScanMngrInitParams         tRoamScanMngrInitParams;
+
+    TStaCapInitParams               tStaCapabilityParams;
 } TInitTable;
 
 

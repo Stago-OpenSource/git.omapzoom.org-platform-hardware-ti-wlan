@@ -54,7 +54,7 @@ VOID CuCmd_Show_Status(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 
 VOID CuCmd_BssidList(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_FullBssidList(THandle hCuCmd, ConParm_t parm[], U16 nParms);
-#ifdef CONFIG_EAP_WSC
+#ifdef CONFIG_WPS
 VOID CuCmd_StartEnrolleePIN(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_StartEnrolleePBC(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_StopEnrollee(THandle hCuCmd, ConParm_t parm[], U16 nParms);
@@ -94,6 +94,9 @@ VOID CuCmd_DisableRxDataFilters(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_AddRxDataFilter(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_RemoveRxDataFilter(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_GetRxDataFiltersStatistics(THandle hCuCmd, ConParm_t parm[], U16 nParms);
+VOID CuCmd_SetBaPolicy(THandle hCuCmd, ConParm_t parm[], U16 nParms);
+VOID CuCmd_ClearBaPolicy(THandle hCuCmd, ConParm_t parm[], U16 nParms);
+VOID CuCmd_PsTrafficPeriod(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 
 VOID CuCmd_ShowStatistics(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_ShowTxStatistics(THandle hCuCmd, ConParm_t parm[], U16 nParms);
@@ -194,6 +197,7 @@ VOID CuCmd_GetRateMngDebug(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 
 
 VOID CuCmd_SetArpIPFilter (THandle hCuCmd, ConParm_t parm[], U16 nParms);
+VOID CuCmd_SdioValidation(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_ShowAbout(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 VOID CuCmd_Quit(THandle hCuCmd, ConParm_t parm[], U16 nParms);
 

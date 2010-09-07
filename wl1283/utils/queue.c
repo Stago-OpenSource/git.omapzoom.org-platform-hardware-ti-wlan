@@ -177,12 +177,16 @@ TI_STATUS que_Destroy (TI_HANDLE hQue)
 {
     TQueue *pQue = (TQueue *)hQue;
 
-    if (pQue->uCount)
-    {
-        TRACE0(pQue->hReport, REPORT_SEVERITY_WARNING, "que_Destroy() Queue Not Empty!!");
+    if (pQue)
+	{
+        /* Alert if the queue is unloaded before it was cleared from items */
+        if (pQue->uCount)
+        {
+            TRACE0(pQue->hReport, REPORT_SEVERITY_WARNING, "que_Destroy() Queue Not Empty!!");
+        }
+        /* free Queue object */
+        os_memoryFree (pQue->hOs, pQue, sizeof(TQueue));
     }
-    /* free Queue object */
-	os_memoryFree (pQue->hOs, pQue, sizeof(TQueue));
 	
     return TI_OK;
 }
@@ -229,7 +233,7 @@ TI_STATUS que_Enqueue (TI_HANDLE hQue, TI_HANDLE hItem)
 	TQueue      *pQue = (TQueue *)hQue;
     TQueNodeHdr *pQueNodeHdr;  /* the Node-Header in the given item */
 
-    
+    //pQue is not verified in order to avoid TP effect on data path
     /* Check queue limit */
 	if(pQue->uCount < pQue->uLimit)
 	{
@@ -266,7 +270,7 @@ TI_STATUS que_Enqueue (TI_HANDLE hQue, TI_HANDLE hItem)
 	pQue->uOverflow++;
     TRACE0(pQue->hReport, REPORT_SEVERITY_WARNING , "que_Enqueue(): Queue Overflow\n");
 #endif
-	
+
 	return TI_NOK;
 }
 
@@ -287,6 +291,7 @@ TI_HANDLE que_Dequeue (TI_HANDLE hQue)
     TQueue   *pQue = (TQueue *)hQue;
 	TI_HANDLE hItem;
  
+	//pQue is not verified in order to avoid TP effect on data path
     if (pQue->uCount)
     {
         /* Queue is not empty, take packet from the queue tail */
@@ -303,7 +308,7 @@ TI_HANDLE que_Dequeue (TI_HANDLE hQue)
 #endif
 
          return (hItem);
-    }
+        }
     
 	/* Queue is empty */
     TRACE0(pQue->hReport, REPORT_SEVERITY_INFORMATION , "que_Dequeue(): Queue is empty\n");
@@ -405,11 +410,13 @@ TI_UINT32 que_Size (TI_HANDLE hQue)
 
 void que_Print(TI_HANDLE hQue)
 {
+#ifdef REPORT_LOG
 	TQueue *pQue = (TQueue *)hQue;
 
     WLAN_OS_REPORT(("que_Print: Count=%u MaxCount=%u Limit=%u Overflow=%u NodeHeaderOffset=%u Next=0x%x Prev=0x%x\n",
                     pQue->uCount, pQue->uMaxCount, pQue->uLimit, pQue->uOverflow, 
                     pQue->uNodeHeaderOffset, pQue->tHead.pNext, pQue->tHead.pPrev));
+#endif
 }
 
 #endif /* TI_DBG */

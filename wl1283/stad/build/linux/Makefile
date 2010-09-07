@@ -70,13 +70,13 @@ ifneq ($(KERNELRELEASE),)
 # Intermediate object name - this should be converted to the appropriate library file
 # after the kernel makefile finishes its work.
 #
-	obj-m = linux.o
-
+	obj-m = tiwlan_drv.o
+        
 #
 # List of object files the kernel makefile needs to compile.
 #
-	linux-y = $(DK_OBJS)
-
+	tiwlan_drv-y = $(DK_OBJS)
+        
 
 else	# ifneq ($(KERNELRELEASE),)
 
@@ -124,6 +124,7 @@ clean:
 # Recursively builds the library file.
 #
 $(OUTPUT_FILE):
+	@echo EXTRA_CFLAGS = $(EXTRA_CFLAGS)
 	$(MAKE) -C $(KERNEL_DIR) M=`pwd` ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) modules
 	@$(CROSS_COMPILE)$(AR) rcs $@ $(DK_OBJS)
 
