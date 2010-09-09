@@ -904,6 +904,7 @@ TI_STATUS rsn_stop (TI_HANDLE hRsn, TI_BOOL removeKeys)
 	if (removeKeys)
 	{   /* reset PMKID list if exist */
 		rsn_resetPMKIDList(pRsn);
+        rsn_clearGenInfoElement(hRsn);
 	}
 
 
@@ -2865,6 +2866,28 @@ static TI_INT16 convertAscii2Unicode(TI_INT8* userPwd, TI_INT16 len)
 }
 
 #endif
+
+/**
+ *
+ * rsn_clearGenInfoElement -
+ *
+ * \b Description:
+ *
+ * Clears the Generic IE
+ *
+ * \b ARGS:
+ *
+ * hRsn           - the object
+ *
+ */
+void rsn_clearGenInfoElement(TI_HANDLE hRsn)
+{
+    rsn_t * pRsn = (rsn_t *) hRsn;
+    TRACE0(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "rsn_clearGenInfoElement: clearing Generic IE \n");
+    os_memoryZero(pRsn->hOs, &pRsn->genericIE, sizeof(pRsn->genericIE));
+}
+
+
 
 /***************************************************************************
 *							rsn_reAuth				                   *
