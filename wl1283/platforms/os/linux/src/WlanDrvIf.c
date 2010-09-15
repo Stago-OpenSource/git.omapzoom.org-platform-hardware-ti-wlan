@@ -761,8 +761,6 @@ static int wlanDrvIf_SetupNetif (TWlanDrvIfObj *drv)
       return -ENOMEM;
    }
 
-   /* Setup the network interface */
-   ether_setup (dev);
 
 	/* Setup the network interface */
 	ether_setup (dev);
