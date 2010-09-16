@@ -3577,7 +3577,7 @@ VOID CuCmd_PsTrafficPeriod(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 	if (nParms == 0)
 	{
 	    if(OK != CuCommon_GetSetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_MNGR_PS_TRAFFIC_PERIOD,
-	            &tPsRxStreaming, sizeof(TBaPolicy))) return;
+	            &tPsRxStreaming, sizeof(TPsRxStreaming))) return;
 
 		os_error_printf(CU_MSG_INFO2, (PS8)"Ps Traffic Period: %d \n",tPsRxStreaming.uStreamPeriod);
 	}

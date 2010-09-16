@@ -674,12 +674,14 @@ static int wpa_driver_tista_driver_cmd( void *priv, char *cmd, char *buf, size_t
 		cur_res = scan_get_by_bssid(drv, wpa_s->bssid);
 		if( cur_res ) {
 			p_ssid = scan_get_ssid(cur_res);
-			len = (int)(p_ssid->ssid_len);
-			rssi = cur_res->level;
-			if( (len > 0) && (len <= MAX_SSID_LEN) && (len < (int)buf_len)) {
-				os_memcpy((void *)buf, (void *)(p_ssid->ssid), len);
-				ret = len;
-				ret += snprintf(&buf[ret], buf_len-len, " rssi %d\n", rssi);
+			if( p_ssid ) {
+				len = (int)(p_ssid->ssid_len);
+				rssi = cur_res->level;
+				if( (len > 0) && (len <= MAX_SSID_LEN) && (len < (int)buf_len)) {
+					os_memcpy((void *)buf, (void *)(p_ssid->ssid), len);
+					ret = len;
+					ret += snprintf(&buf[ret], buf_len-len, " rssi %d\n", rssi);
+				}
 			}
 		}
 	}
