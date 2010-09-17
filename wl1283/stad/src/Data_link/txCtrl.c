@@ -346,6 +346,7 @@ TI_STATUS txCtrl_SetDefaults (TI_HANDLE hTxCtrl, txDataInitParams_t *txDataInitP
 TI_STATUS txCtrl_Unload (TI_HANDLE hTxCtrl)
 {
     txCtrl_t *pTxCtrl = (txCtrl_t *)hTxCtrl;
+    TI_UINT8            i=0;
 
     if (pTxCtrl == NULL)
     {
@@ -359,6 +360,10 @@ TI_STATUS txCtrl_Unload (TI_HANDLE hTxCtrl)
 	tmr_DestroyTimer (pTxCtrl->hCreditTimer);
 	}
 
+	for (i = 0; i < TSM_REPORT_NUM_OF_MEASUREMENT_IN_PARALLEL_MAX; i++) {
+		if (pTxCtrl->tTSMTimers[i].hRequestTimer)
+			tmr_DestroyTimer (pTxCtrl->tTSMTimers[i].hRequestTimer);
+	}
     /* free Tx Data control block */
     os_memoryFree (pTxCtrl->hOs, pTxCtrl, sizeof(txCtrl_t));
 

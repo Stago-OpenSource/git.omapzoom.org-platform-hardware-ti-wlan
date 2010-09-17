@@ -251,7 +251,8 @@ void scanCncn_Recover (TI_HANDLE hScanCncn)
 {
     TScanCncn   *pScanCncn = (TScanCncn*)hScanCncn;
 
-    tmr_StopTimer(pScanCncn->hScanGuardTimer);
+	if (pScanCncn->hScanGuardTimer)
+		tmr_StopTimer(pScanCncn->hScanGuardTimer);
 }
 
 /** 
