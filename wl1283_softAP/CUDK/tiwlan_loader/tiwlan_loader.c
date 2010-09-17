@@ -240,7 +240,7 @@ S32 user_main(S32 argc, PPS8 argv)
             {
                 os_error_printf (CU_MSG_ERROR, (PS8)"Loader: unknow parameter '%s'\n", argv[i]);
 #ifdef ANDROID             
-				check_and_set_property("wlanap.driver.status", "failed");  
+				check_and_set_property("wlan.ap.driver.status", "failed");  
 #endif    
                 return 0;
             }
@@ -259,7 +259,7 @@ S32 user_main(S32 argc, PPS8 argv)
     if (init_driver (g_drv_name, eeprom_file_name, init_file_name, firmware_file_name) != 0)
 	{
 #ifdef ANDROID  
-		check_and_set_property ("wlanap.driver.status", "failed");
+		check_and_set_property ("wlan.ap.driver.status", "failed");
 		release_wake_lock(PROGRAM_NAME);
 #endif      
 
@@ -267,7 +267,7 @@ S32 user_main(S32 argc, PPS8 argv)
 	}
 
 #ifdef ANDROID  
-	check_and_set_property ("wlanap.driver.status", "ok");  
+	check_and_set_property ("wlan.ap.driver.status", "ok");  
 	release_wake_lock(PROGRAM_NAME);  
 #endif      
     
