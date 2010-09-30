@@ -44,6 +44,7 @@
  */
 
 #include <linux/mmc/host.h>
+#include <linux/slab.h>
 
 #include "SdioDrvDbg.h"
 #include "TxnDefs.h"
