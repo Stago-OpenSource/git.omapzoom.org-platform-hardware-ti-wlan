@@ -36,7 +36,7 @@ XCC ?= n
 #
 # Compile with GEM support or not
 #
-GEM ?= n
+GEM ?= y
 
 #
 # Choose the bus type (n for SDIO, y for WSPI)
