@@ -35,20 +35,23 @@
 #define CCCR_INT_PENDING                    0x05
 #define CCCR_IO_ABORT                       0x06
 #define CCCR_BUS_INTERFACE_CONTOROL         0x07
-#define CCCR_CARD_CAPABILITY	            0x08
+#define CCCR_CARD_CAPABILITY                0x08
 #define CCCR_COMMON_CIS_POINTER             0x09 /*0x09-0x0B*/
-#define CCCR_FNO_BLOCK_SIZE	                0x10 /*0x10-0x11*/
+#define CCCR_FNO_BLOCK_SIZE                 0x10 /*0x10-0x11*/
 #define FN0_CCCR_REG_32                     0x64
 
 /* Protocol defined constants */
          
-#define SD_IO_GO_IDLE_STATE		  		    0  
-#define SD_IO_SEND_RELATIVE_ADDR	  	    3 
-#define SDIO_CMD5			  			    5
-#define SD_IO_SELECT_CARD		  		    7 
+#define SD_IO_GO_IDLE_STATE                 0
+#define SD_IO_SEND_RELATIVE_ADDR            3
+#define SDIO_CMD5                           5
+#define SD_IO_SELECT_CARD                   7
 
 #define VDD_VOLTAGE_WINDOW                  0xffffc0
 #define ELP_CTRL_REG_ADDR                   0x1fffc
+
+#define VDD1_OPP1_300MHZ                    300000000
+#define VDD1_OPP2_600MHZ                    600000000
 
 /********************************************************************/
 /*	SDIO driver functions prototypes                                */
