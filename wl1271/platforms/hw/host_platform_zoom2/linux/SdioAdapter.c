@@ -116,7 +116,7 @@ int sdioAdapt_ConnectBus (void *        fCbFunc,
     /* Allocate a DMA-able buffer and provide it to the upper layer to be used for all read and write transactions */
     if (pDmaBufAddr == 0) /* allocate only once (in case this function is called multiple times) */
     {
-        pDmaBufAddr = kmalloc (MAX_BUS_TXN_SIZE, GFP_ATOMIC | GFP_DMA);
+        pDmaBufAddr = kmalloc (MAX_BUS_TXN_SIZE, GFP_KERNEL | GFP_DMA);
         if (pDmaBufAddr == 0) { return -1; }
     }
     *pRxDmaBufAddr = *pTxDmaBufAddr = pDmaBufAddr;
