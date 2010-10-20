@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/platform_device.h>
 #include <linux/errno.h>
@@ -48,6 +49,8 @@ typedef struct OMAP3430_sdiodrv
 } OMAP3430_sdiodrv_t;
 
 int g_sdio_debug_level = SDIO_DEBUGLEVEL_ERR;
+extern int sdio_reset_comm(struct mmc_card *card);
+unsigned char *pElpData;
 
 static OMAP3430_sdiodrv_t g_drv;
 static struct sdio_func *tiwlan_func[1 + SDIO_TOTAL_FUNCS];
@@ -393,12 +396,42 @@ static const struct sdio_device_id tiwl12xx_devices[] = {
 
 MODULE_DEVICE_TABLE(sdio, tiwl12xx_devices);
 
-static struct sdio_driver tiwlan_sdio_drv = {
-    .probe          = tiwlan_sdio_probe,
-    .remove         = tiwlan_sdio_remove,
-    .name           = "sdio_tiwlan",
-    .id_table       = tiwl12xx_devices,
+int sdio_tiwlan_suspend(struct device *dev)
+{
+	return 0;
+}
+
+int sdio_tiwlan_resume(struct device *dev)
+{
+	/* Waking up the wifi chip for sdio_reset_comm */
+	*pElpData = 1;
+	sdioDrv_ClaimHost(SDIO_WLAN_FUNC);
+	generic_write_bytes(0, ELP_CTRL_REG_ADDR, pElpData, 1, 1, 0);
+	sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
+	mdelay(5);
+
+	/* Configuring the host and chip back to maximum capability
+	 * (bus width and speed)
+	 */
+	sdio_reset_comm(tiwlan_func[SDIO_WLAN_FUNC]->card);
+	return 0;
+}
+
+const struct dev_pm_ops sdio_tiwlan_pmops = {
+	.suspend = sdio_tiwlan_suspend,
+	.resume = sdio_tiwlan_resume,
 };
+
+static struct sdio_driver tiwlan_sdio_drv = {
+	.probe          = tiwlan_sdio_probe,
+	.remove         = tiwlan_sdio_remove,
+	.name           = "sdio_tiwlan",
+	.id_table       = tiwl12xx_devices,
+	.drv = {
+		.pm     = &sdio_tiwlan_pmops,
+	 },
+};
+
 
 int __init sdioDrv_init(void)
 {
@@ -414,6 +447,10 @@ int __init sdioDrv_init(void)
 		goto out;
 	}
 
+	pElpData = kmalloc(sizeof (unsigned char), GFP_KERNEL);
+	if (!pElpData)
+		printk(KERN_ERR "Running out of memory\n");
+
 	printk(KERN_INFO "TI WiLink 1283 SDIO: Driver loaded\n");
 
 out:
@@ -424,6 +461,8 @@ void __exit sdioDrv_exit(void)
 {
 	sdio_unregister_driver(&tiwlan_sdio_drv);
 
+	if(pElpData);
+		kfree(pElpData);
 	printk(KERN_INFO "TI WiLink 1283 SDIO Driver unloaded\n");
 }
 
