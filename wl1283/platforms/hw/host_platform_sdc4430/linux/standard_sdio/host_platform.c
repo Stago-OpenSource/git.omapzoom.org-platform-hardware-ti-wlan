@@ -205,6 +205,7 @@ int hPlatform_initInterrupt(void *tnet_drv, void* handle_add)
 		return rc;
 	}
 
+	enable_irq_wake(drv->irq);
 	return rc;
 }
 
@@ -212,6 +213,7 @@ void hPlatform_freeInterrupt(void *tnet_drv)
 {
 	TWlanDrvIfObj *drv = tnet_drv;
 
+	disable_irq_wake(drv->irq);
 	free_irq(drv->irq, drv);
 }
 
