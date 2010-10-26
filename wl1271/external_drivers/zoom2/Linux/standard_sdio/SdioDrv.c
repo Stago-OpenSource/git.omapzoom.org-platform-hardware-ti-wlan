@@ -34,6 +34,7 @@
 #include <linux/mmc/sdio_ids.h>
 #include <linux/mmc/sdio_func.h>
 #include <linux/delay.h>
+#include <plat/omap-pm.h>
 
 #include "SdioDrvDbg.h"
 #include "SdioDrv.h"
@@ -50,6 +51,10 @@ typedef struct OMAP3430_sdiodrv
 	int           async_status;
 	struct device *dev;
 	int           sdio_host_claim_ref;
+	/* Inactivity Timer */
+	struct work_struct sdio_opp_set_work;
+	struct timer_list inact_timer;
+	int    inact_timer_running;
 } OMAP3430_sdiodrv_t;
 
 int g_sdio_debug_level = SDIO_DEBUGLEVEL_ERR;
@@ -58,6 +63,36 @@ unsigned char *pElpData;
 
 static OMAP3430_sdiodrv_t g_drv;
 static struct sdio_func *tiwlan_func[1 + SDIO_TOTAL_FUNCS];
+
+static struct platform_device dummy_cpufreq_dev = {
+	.name = "wl1271_wifi"
+};
+
+static void sdioDrv_inact_timer(unsigned long data)
+{
+	g_drv.inact_timer_running = 0;
+	schedule_work(&g_drv.sdio_opp_set_work);
+}
+
+void sdioDrv_start_inact_timer(void)
+{
+	mod_timer(&g_drv.inact_timer, jiffies + msecs_to_jiffies(1000));
+	g_drv.inact_timer_running = 1;
+}
+
+void sdioDrv_cancel_inact_timer(void)
+{
+	if(g_drv.inact_timer_running) {
+		del_timer_sync(&g_drv.inact_timer);
+		g_drv.inact_timer_running = 0;
+	}
+	cancel_work_sync(&g_drv.sdio_opp_set_work);
+}
+
+static void sdioDrv_opp_setup(struct work_struct *work)
+{
+	sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
+}
 
 void sdioDrv_ClaimHost(unsigned int uFunc)
 {
@@ -70,6 +105,7 @@ void sdioDrv_ClaimHost(unsigned int uFunc)
 
     g_drv.sdio_host_claim_ref = 1;
 
+    omap_pm_set_min_mpu_freq(&dummy_cpufreq_dev.dev, VDD1_OPP2_600MHZ);
     sdio_claim_host(tiwlan_func[uFunc]);
 }
 
@@ -84,6 +120,7 @@ void sdioDrv_ReleaseHost(unsigned int uFunc)
 
     g_drv.sdio_host_claim_ref = 0;
 
+    omap_pm_set_min_mpu_freq(&dummy_cpufreq_dev.dev, VDD1_OPP1_300MHZ);
     sdio_release_host(tiwlan_func[uFunc]);
 }
 
@@ -377,12 +414,20 @@ static int tiwlan_sdio_probe(struct sdio_func *func, const struct sdio_device_id
 	tiwlan_func[SDIO_WLAN_FUNC] = func;
 	tiwlan_func[SDIO_CTRL_FUNC] = func;
 
+	/* inactivity timer initialization*/
+	init_timer(&g_drv.inact_timer);
+	g_drv.inact_timer.function = sdioDrv_inact_timer;
+	g_drv.inact_timer_running = 0;
+
+	INIT_WORK(&g_drv.sdio_opp_set_work, sdioDrv_opp_setup);
 	return 0;
 }
 
 static void tiwlan_sdio_remove(struct sdio_func *func)
 {
 	PDEBUG("%s\n", __func__);
+
+	sdioDrv_cancel_inact_timer();
 
 	tiwlan_func[SDIO_WLAN_FUNC] = NULL;
 	tiwlan_func[SDIO_CTRL_FUNC] = NULL;

@@ -358,8 +358,8 @@ ETxnStatus sdioAdapt_TransactBytes (unsigned int  uFuncId,
 
     if(bMore == 1)
     {
-#ifdef PROPRIETARY_SDIO
         sdioDrv_cancel_inact_timer();
+#ifdef PROPRIETARY_SDIO
         sdioDrv_clk_enable();
 #else
         sdioDrv_ClaimHost(SDIO_WLAN_FUNC);
@@ -378,11 +378,7 @@ ETxnStatus sdioAdapt_TransactBytes (unsigned int  uFuncId,
 
     if(bMore == 0)
     {
-#ifdef PROPRIETARY_SDIO
         sdioDrv_start_inact_timer();
-#else
-        sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
-#endif
     }
 
     /* If failed return ERROR, if succeeded return COMPLETE */
