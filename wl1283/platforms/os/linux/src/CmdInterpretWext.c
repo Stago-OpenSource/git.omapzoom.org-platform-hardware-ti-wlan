@@ -1903,7 +1903,6 @@ static int cmdInterpret_setSecurityParams (TI_HANDLE hCmdInterpret)
     pParam->paramType = RSN_ENCRYPTION_STATUS_PARAM;
     pParam->content.rsnEncryptionStatus = encr_mode;
     cmdDispatch_SetParam ( pCmdInterpret->hCmdDispatch, pParam );
-    os_memoryFree(pCmdInterpret->hOs, pParam, sizeof(paramInfo_t));
 #ifdef SUPPL_WPS_SUPPORT
 	pParam->paramType = SITE_MGR_SIMPLE_CONFIG_MODE;
 	if (pCmdInterpret->wai.iw_auth_key_mgmt & TI_AUTH_KEY_MGMT_WPS)
@@ -1913,6 +1912,7 @@ static int cmdInterpret_setSecurityParams (TI_HANDLE hCmdInterpret)
     cmdDispatch_SetParam ( pCmdInterpret->hCmdDispatch, pParam );
 #endif
 
+    os_memoryFree(pCmdInterpret->hOs, pParam, sizeof(paramInfo_t));
 	return TI_OK;
 }
 
