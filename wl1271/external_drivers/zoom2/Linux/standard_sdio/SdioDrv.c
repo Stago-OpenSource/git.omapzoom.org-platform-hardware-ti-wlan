@@ -59,6 +59,7 @@ typedef struct OMAP3430_sdiodrv
 
 int g_sdio_debug_level = SDIO_DEBUGLEVEL_ERR;
 extern int sdio_reset_comm(struct mmc_card *card);
+extern void tick_nohz_disable(int nohz);
 unsigned char *pElpData;
 
 static OMAP3430_sdiodrv_t g_drv;
@@ -106,6 +107,8 @@ void sdioDrv_ClaimHost(unsigned int uFunc)
     g_drv.sdio_host_claim_ref = 1;
 
     omap_pm_set_min_mpu_freq(&dummy_cpufreq_dev.dev, VDD1_OPP2_600MHZ);
+    tick_nohz_disable(1);
+
     sdio_claim_host(tiwlan_func[uFunc]);
 }
 
@@ -121,6 +124,8 @@ void sdioDrv_ReleaseHost(unsigned int uFunc)
     g_drv.sdio_host_claim_ref = 0;
 
     omap_pm_set_min_mpu_freq(&dummy_cpufreq_dev.dev, VDD1_OPP1_300MHZ);
+    tick_nohz_disable(0);
+
     sdio_release_host(tiwlan_func[uFunc]);
 }
 
