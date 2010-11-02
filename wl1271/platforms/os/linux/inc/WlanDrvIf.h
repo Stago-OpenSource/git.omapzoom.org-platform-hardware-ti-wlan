@@ -123,6 +123,10 @@ typedef struct
 #endif
     NDIS_HANDLE              ConfigHandle;/* Temp - For Windows compatibility */
 
+#ifdef CONNECTION_SCAN_PM
+    int                      wake_locks_enabled;
+#endif
+
 } TWlanDrvIfObj, *TWlanDrvIfObjPtr;
 
 

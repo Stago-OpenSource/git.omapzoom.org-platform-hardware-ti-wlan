@@ -611,6 +611,17 @@ int os_wake_lock_timeout (TI_HANDLE OsContext)
 
 	if (drv) {
 		spin_lock_irqsave(&drv->lock, flags);
+
+#ifdef CONNECTION_SCAN_PM
+	if (!drv->wake_locks_enabled) {
+		/* release the spin lock */
+		spin_unlock_irqrestore(&drv->lock, flags);
+
+		/* return success */
+		return 0;
+	}
+#endif
+
 		ret = drv->wl_packet;
 		if (drv->wl_packet) {
 			drv->wl_packet = 0;
@@ -641,11 +652,70 @@ int os_wake_lock_timeout_enable (TI_HANDLE OsContext)
 
 	if (drv) {
 		spin_lock_irqsave(&drv->lock, flags);
+
+#ifdef CONNECTION_SCAN_PM
+	if (!drv->wake_locks_enabled) {
+		/* release the spin lock */
+		spin_unlock_irqrestore(&drv->lock, flags);
+
+		/* return success */
+		return 0;
+	}
+#endif
+
 		ret = drv->wl_packet = 1;
 		spin_unlock_irqrestore(&drv->lock, flags);
 	}
 	return ret;
 }
+
+
+
+#ifdef CONNECTION_SCAN_PM
+/*-----------------------------------------------------------------------------
+ * Routine Name:  os_disable_wake_locks
+ * Routine Description: Called in order to disable any use of the OS wake locks
+ * Arguments:     OsContext - handle to OS context
+ * Return Value:  -
+ * -----------------------------------------------------------------------------*/
+ void os_disable_wake_locks(TI_HANDLE OsContext)
+ {
+    TWlanDrvIfObj *drv = (TWlanDrvIfObj *)OsContext;
+    unsigned long flags;
+
+    spin_lock_irqsave(&drv->lock, flags);
+
+    drv->wake_locks_enabled = 0;
+
+    spin_unlock_irqrestore(&drv->lock, flags);
+
+    return;
+ }
+
+ /*-----------------------------------------------------------------------------
+ * Routine Name:  os_enable_wake_locks
+ * Routine Description: Called in order to enable use of the OS wake locks
+ * Arguments:     OsContext - handle to OS context
+ * Return Value:  -
+ * -----------------------------------------------------------------------------*/
+
+ void os_enable_wake_locks(TI_HANDLE OsContext)
+ {
+    TWlanDrvIfObj *drv = (TWlanDrvIfObj *)OsContext;
+    unsigned long flags;
+
+    spin_lock_irqsave(&drv->lock, flags);
+
+    drv->wake_locks_enabled = 1;
+
+    spin_unlock_irqrestore(&drv->lock, flags);
+
+    return;
+ }
+
+#endif
+
+
 
 /*-----------------------------------------------------------------------------
 Routine Name:  os_wake_lock
@@ -664,6 +734,17 @@ int os_wake_lock (TI_HANDLE OsContext)
 
 	if (drv) {
 		spin_lock_irqsave(&drv->lock, flags);
+
+#ifdef CONNECTION_SCAN_PM
+	if (!drv->wake_locks_enabled) {
+		/* release the spin lock */
+		spin_unlock_irqrestore(&drv->lock, flags);
+
+		/* return success */
+		return 0;
+	}
+#endif
+
 #ifdef CONFIG_HAS_WAKELOCK
 		if (!drv->wl_count)
 			wake_lock(&drv->wl_wifi);
@@ -693,6 +774,17 @@ int os_wake_unlock (TI_HANDLE OsContext)
 
 	if (drv) {
 		spin_lock_irqsave(&drv->lock, flags);
+
+#ifdef CONNECTION_SCAN_PM
+	if (!drv->wake_locks_enabled) {
+		/* release the spin lock */
+		spin_unlock_irqrestore(&drv->lock, flags);
+
+		/* return success */
+		return 0;
+	}
+#endif
+
 		if (drv->wl_count) {
 			drv->wl_count--;
 #ifdef CONFIG_HAS_WAKELOCK

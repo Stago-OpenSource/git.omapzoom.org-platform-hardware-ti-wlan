@@ -49,6 +49,10 @@ typedef struct OMAP3430_sdiodrv
 	void          *async_buffer;
 	unsigned int  async_length;
 	int           async_status;
+#ifdef CONNECTION_SCAN_PM
+	int (*wlanDrvIf_pm_resume)(void);
+	int (*wlanDrvIf_pm_suspend)(void);
+#endif
 	struct device *dev;
 	int           sdio_host_claim_ref;
 	/* Inactivity Timer */
@@ -446,7 +450,19 @@ MODULE_DEVICE_TABLE(sdio, tiwl12xx_devices);
 
 int sdio_tiwlan_suspend(struct device *dev)
 {
-	return 0;
+	int rc = 0;
+
+#ifdef CONNECTION_SCAN_PM
+	/* Tell WLAN driver to suspend, if a suspension function has been registered */
+	if (g_drv.wlanDrvIf_pm_suspend) {
+		rc = g_drv.wlanDrvIf_pm_suspend();
+		if (rc != 0)
+			return rc;
+	}
+	sdioDrv_cancel_inact_timer();
+	sdioDrv_ReleaseHost(SDIO_WLAN_FUNC);
+#endif
+	return rc;
 }
 
 int sdio_tiwlan_resume(struct device *dev)
@@ -462,6 +478,14 @@ int sdio_tiwlan_resume(struct device *dev)
 	 * (bus width and speed)
 	 */
 	sdio_reset_comm(tiwlan_func[SDIO_WLAN_FUNC]->card);
+
+#ifdef CONNECTION_SCAN_PM
+	sdioDrv_ClaimHost(SDIO_WLAN_FUNC);
+	if (g_drv.wlanDrvIf_pm_resume) {
+		return(g_drv.wlanDrvIf_pm_resume());
+	}
+	else
+#endif
 	return 0;
 }
 
@@ -469,6 +493,15 @@ const struct dev_pm_ops sdio_tiwlan_pmops = {
 	.suspend = sdio_tiwlan_suspend,
 	.resume = sdio_tiwlan_resume,
 };
+
+#ifdef CONNECTION_SCAN_PM
+void sdioDrv_register_pm(int (*wlanDrvIf_Resume_func)(void),
+			int (*wlanDrvIf_Suspend_func)(void))
+{
+	g_drv.wlanDrvIf_pm_resume = wlanDrvIf_Resume_func;
+	g_drv.wlanDrvIf_pm_suspend = wlanDrvIf_Suspend_func;
+}
+#endif
 
 static struct sdio_driver tiwlan_sdio_drv = {
 	.probe          = tiwlan_sdio_probe,

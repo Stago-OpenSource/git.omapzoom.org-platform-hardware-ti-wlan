@@ -70,6 +70,11 @@ FPGA1273 ?= n
 #
 TI_TRACE_BUFFER ?= n
 
+#
+# Support For Connection Scan Power Management
+#
+CONNECTION_SCAN_PM ?= n
+
 ##
 ##
 ## Driver Compilation Directives
@@ -127,6 +132,10 @@ endif
 
 # WPS Support
 DK_DEFINES += -D SUPPL_WPS_SUPPORT
+
+ifeq ($(CONNECTION_SCAN_PM),y)
+   DK_DEFINES += -D CONNECTION_SCAN_PM
+endif
 
 ##
 ##
