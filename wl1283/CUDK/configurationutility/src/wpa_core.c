@@ -201,7 +201,12 @@ S32 WpaCore_SetAuthMode(THandle hWpaCore, OS_802_11_AUTHENTICATION_MODE AuthMode
             pWpaCore->WpaSupplParams.key_mgmt = WPA_KEY_MGMT_NONE;
             pWpaCore->WpaSupplParams.auth_alg = WPA_AUTH_ALG_SHARED;
             break;
-		case os802_11AuthModeWPANone:
+        case os802_11AuthModeAutoSwitch:
+            pWpaCore->WpaSupplParams.proto = 0;
+            pWpaCore->WpaSupplParams.key_mgmt = WPA_KEY_MGMT_NONE;
+            pWpaCore->WpaSupplParams.auth_alg = (WPA_AUTH_ALG_SHARED | WPA_AUTH_ALG_OPEN);
+            break;
+        case os802_11AuthModeWPANone:
 			pWpaCore->WpaSupplParams.proto = WPA_PROTO_WPA;
 			pWpaCore->WpaSupplParams.key_mgmt = WPA_KEY_MGMT_WPA_NONE;
 			pWpaCore->WpaSupplParams.auth_alg = WPA_AUTH_ALG_OPEN;
@@ -528,6 +533,26 @@ S32 WpaCore_GetBssType(THandle hWpaCore, PU32 pBssType)
 	return OK;
 }
 
+S32 WpaCore_SetApScanMode(THandle hWpaCore, U8 apScanMode)
+{
+	TWpaCore* pWpaCore = (TWpaCore*)hWpaCore;
+	S8 cmd[10] = "AP_SCAN 1";
+
+	if (apScanMode > 2)
+	{
+	    return ECUERR_CU_ERROR;
+	}
+
+	cmd[8] = '0' + apScanMode;
+
+	if (IpcWpa_Command(pWpaCore->hIpcWpa, (PS8)cmd, FALSE))
+	{
+	    return ECUERR_CU_ERROR;
+	}
+
+	return OK;
+}
+
 S32 WpaCore_SetSsid(THandle hWpaCore, OS_802_11_SSID* ssid, TMacAddr bssid)
 {
 	TWpaCore* pWpaCore = (TWpaCore*)hWpaCore;
@@ -552,6 +577,15 @@ S32 WpaCore_SetSsid(THandle hWpaCore, OS_802_11_SSID* ssid, TMacAddr bssid)
 	NetworkID = os_strtoul(Resp, &pRespTemp, 0);
 
 	/* Set the parameters in the new new network block*/
+
+	if (pWpaCore->WpaSupplParams.mode == IEEE80211_MODE_IBSS)
+	{
+	    WpaCore_SetApScanMode(pWpaCore, 2);
+	}
+	else
+	{
+	    WpaCore_SetApScanMode(pWpaCore, 1);
+	}
 
 	/* Set the BSSID */
 	if(!((bssid[0] == 0xFF) && 
@@ -656,7 +690,9 @@ S32 WpaCore_SetSsid(THandle hWpaCore, OS_802_11_SSID* ssid, TMacAddr bssid)
 		os_sprintf(cmd, (PS8)"SET_NETWORK %d auth_alg SHARED", NetworkID);
 	else if (pWpaCore->WpaSupplParams.auth_alg == WPA_AUTH_ALG_LEAP)
 		os_sprintf(cmd, (PS8)"SET_NETWORK %d auth_alg LEAP", NetworkID);
-	else
+	else if (pWpaCore->WpaSupplParams.auth_alg == (WPA_AUTH_ALG_OPEN | WPA_AUTH_ALG_SHARED) )
+        os_sprintf(cmd, (PS8)"SET_NETWORK %d auth_alg OPEN SHARED", NetworkID);
+    else
 	{
 		SendCommand = FALSE;
 	}

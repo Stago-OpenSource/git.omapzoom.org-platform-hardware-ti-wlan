@@ -381,7 +381,16 @@ static void TWD_InitHwCb (TI_HANDLE hTWD)
     TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_InitHwCb: call fInitHwCb CB. In std drvMain_InitHwCb()\n");
 
     hwInit_InitPolarity(pTWD->hHwInit);
-   
+
+#ifndef TNETW1283
+    {
+	TFwInfo* pHwInfo;
+
+		pHwInfo = TWD_GetFWInfo(pTWD);
+		txXfer_SetHwInfo(pTWD->hTxXfer, pHwInfo );
+		rxXfer_SetHwInfo(pTWD->hRxXfer, pHwInfo );
+    }
+#endif
 }
 
 void TWD_Init (TI_HANDLE    hTWD, 
@@ -623,9 +632,9 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
 
     TWlanParams         		*pWlanParams = &DB_WLAN(pTWD->hCmdBld);
     TKeepAliveList      		*pKlvParams = &DB_KLV(pTWD->hCmdBld);
-    IniFileRadioParam   		*pRadioParams = &DB_RADIO(pTWD->hCmdBld);
+    IniFileRadioParam   		*pRadioParams = DB_RADIO(pTWD->hCmdBld);
 #ifndef TNETW1283
-	IniFileExtendedRadioParam   *pExtRadioParams = &DB_EXT_RADIO(pTWD->hCmdBld);
+	IniFileExtendedRadioParam   *pExtRadioParams = DB_EXT_RADIO(pTWD->hCmdBld);
 #endif
     IniFileGeneralParam 		*pGenParams = &DB_GEN(pTWD->hCmdBld);
 	TRateMngParams      		*pRateMngParams = &DB_RM(pTWD->hCmdBld);
@@ -803,7 +812,7 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
     
     /* Configure HT capabilities setting */
     pWlanParams->tTwdHtCapabilities.uChannelWidth = CHANNEL_WIDTH_20MHZ;                  
-    pWlanParams->tTwdHtCapabilities.uRxSTBC       = RXSTBC_NOT_SUPPORTED;
+    pWlanParams->tTwdHtCapabilities.uRxSTBC       = RXSTBC_SUPPORTED_ONE_SPATIAL_STREAM;
     pWlanParams->tTwdHtCapabilities.uMaxAMSDU     = MAX_MSDU_3839_OCTETS;                         
     pWlanParams->tTwdHtCapabilities.uMaxAMPDU     = pInitParams->tGeneral.uMaxAMPDU;
 
@@ -834,9 +843,9 @@ TI_STATUS TWD_SetDefaults (TI_HANDLE hTWD, TTwdInitParams *pInitParams)
                                                               CAP_BIT_MASK_SHORT_GI_FOR_20MHZ_PACKETS);
     pWlanParams->tTwdHtCapabilities.uMCSFeedback =           MCS_FEEDBACK_NO; 
 
-    os_memoryCopy(pTWD->hOs, (void*)pRadioParams, (void*)&pInitParams->tIniFileRadioParams, sizeof(IniFileRadioParam));
+    os_memoryCopy(pTWD->hOs, (void*)pRadioParams, (void*)&pInitParams->tIniFileRadioParams, sizeof(IniFileRadioParam) * NUMBER_OF_FEM_TYPES_E);
 #ifndef TNETW1283
-	os_memoryCopy(pTWD->hOs, (void*)pExtRadioParams, (void*)&pInitParams->tIniFileExtRadioParams, sizeof(IniFileExtendedRadioParam));
+	os_memoryCopy(pTWD->hOs, (void*)pExtRadioParams, (void*)&pInitParams->tIniFileExtRadioParams, sizeof(IniFileExtendedRadioParam) * NUMBER_OF_FEM_TYPES_E);
 #endif
     os_memoryCopy(pTWD->hOs, (void*)pGenParams, (void*)&pInitParams->tPlatformGenParams, sizeof(IniFileGeneralParam));
 
@@ -1143,7 +1152,18 @@ TI_STATUS TWD_InterruptRequest (TI_HANDLE hTWD)
 
     return TI_OK;
 }
- 
+
+TI_STATUS TWD_InterruptRequestWithinWlanThread (TI_HANDLE hTWD)
+{
+    TTwd *pTWD = (TTwd *)hTWD;
+
+    TRACE0(pTWD->hReport, REPORT_SEVERITY_INFORMATION , "TWD_InterruptRequest: called\n");
+
+    fwEvent_InterruptRequestWithinWlanThread (pTWD->hFwEvent);
+
+    return TI_OK;
+}
+
 TI_STATUS TWD_RegisterEvent (TI_HANDLE hTWD, TI_UINT32 event, void *fCb, TI_HANDLE hCb)
 {
     TTwd  *pTWD = (TTwd *)hTWD;
@@ -1765,30 +1785,12 @@ TI_UINT8 TWD_GetFEMType (TI_HANDLE hTWD)
 
 }
 
-/** 
- *  \brief TWD end function of read radio state machine
- *  *  * 
- * \param  Handle        	- handle to object
- * \return void
- * 
- * \par Description
- * The function calling to HwInit call back function, after finish reading FEM registers * 
- * \sa
- */ 
-void TWD_FinalizeFEMRead(TI_HANDLE hTWD)
+
+void TWD_FinalizePolarityRead(TI_HANDLE hTWD)
 {
   TTwd *pTWD = (TTwd *)hTWD;
 
   (*pTWD->fInitHwCb) (pTWD->hUser, TI_OK);
 }
 
-
-
-
-void TWD_FinalizePolarityRead(TI_HANDLE hTWD)
-{
-  TTwd *pTWD = (TTwd *)hTWD;
-  /*  allways read FEM type from Radio Registers */ 
-   hwInit_ReadRadioParams(pTWD->hHwInit);   
-}
 

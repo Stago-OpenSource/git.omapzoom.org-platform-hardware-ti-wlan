@@ -151,6 +151,7 @@ void mlme_init (TStadHandlesList *pStadHandles)
     pHandle->reAssoc = TI_FALSE;
     pHandle->disConnType = DISCONNECT_IMMEDIATE;
     pHandle->disConnReason = STATUS_UNSPECIFIED;
+    pHandle->bSharedFailed = TI_FALSE;
 
     pHandle->hSiteMgr          = pStadHandles->hSiteMgr;
     pHandle->hCtrlData         = pStadHandles->hCtrlData;
@@ -418,16 +419,22 @@ TI_STATUS mlme_start(TI_HANDLE hMlme, TI_UINT8 connectionType)
 
 	pParam->paramType = RSN_EXT_AUTHENTICATION_MODE;
 	rsn_getParam(pMlme->hRsn, pParam);
-
-	switch (econnectionType)
+	pMlme->legacyAuthType = AUTH_LEGACY_NONE;
+    switch (econnectionType)
 	{
 	case CONN_TYPE_FIRST_CONN:
 	case CONN_TYPE_ROAM:
-		if (AUTH_LEGACY_SHARED_KEY == pParam->content.rsnExtAuthneticationMode)
-		{
-			pMlme->authInfo.authType = AUTH_LEGACY_SHARED_KEY;
-		}
-		else
+        if (RSN_AUTH_SHARED_KEY == pParam->content.rsnExtAuthneticationMode)
+        {
+            pMlme->authInfo.authType = AUTH_LEGACY_SHARED_KEY;
+        }
+        else if (RSN_AUTH_AUTO_SWITCH == pParam->content.rsnExtAuthneticationMode)
+        {
+            pMlme->authInfo.authType = AUTH_LEGACY_SHARED_KEY;  /* the default of AutoSwitch mode is SHARED mode */
+			pMlme->legacyAuthType = RSN_AUTH_AUTO_SWITCH;   /* legacyAuthType indecate that the auth mode is AutoSwitch */
+			pMlme->bSharedFailed = TI_FALSE;
+        }
+        else
 		{
 			pMlme->authInfo.authType = AUTH_LEGACY_OPEN_SYSTEM;
 		}
@@ -606,7 +613,6 @@ TI_STATUS mlme_authMsgBuild(mlme_t *pMlme, legacyAuthType_e authType, TI_UINT16 
 TI_STATUS mlme_sendAssocRequest(mlme_t *pMlme)
 {
 	TI_STATUS status = TI_OK;
-	static TI_UINT8            assocMsg[MAX_ASSOC_MSG_LENGTH];
 	TI_UINT32           msgLen;
 	dot11MgmtSubType_e  assocType=ASSOC_REQUEST;
 
@@ -625,13 +631,13 @@ TI_STATUS mlme_sendAssocRequest(mlme_t *pMlme)
 		assocType = RE_ASSOC_REQUEST;
 	}
 
-	status = mlme_assocRequestMsgBuild(pMlme, assocMsg, &msgLen);
+	status = mlme_assocRequestMsgBuild(pMlme, pMlme->assocMsg, &msgLen);
 	if (status == TI_OK) {
 
-        TRACE_INFO_HEX(pMlme->hReport,(TI_UINT8 *)assocMsg, msgLen);
+        TRACE_INFO_HEX(pMlme->hReport,(TI_UINT8 *)(pMlme->assocMsg), msgLen);
 		/* Save the association request message */
-		mlme_saveAssocReqMessage(pMlme, assocMsg, msgLen);
-		status = mlmeBuilder_sendFrame(pMlme, assocType, assocMsg, msgLen, 0);
+		mlme_saveAssocReqMessage(pMlme, pMlme->assocMsg, msgLen);
+		status = mlmeBuilder_sendFrame(pMlme, assocType, pMlme->assocMsg, msgLen, 0);
 	}
 
     return status;
@@ -835,19 +841,6 @@ TI_STATUS mlme_assocRequestMsgBuild(mlme_t *pCtx, TI_UINT8* reqBuf, TI_UINT32* r
 
     }
 
-
-
-	/* insert QoS capability information element */
-    status = qosMngr_getQosCapabiltyInfeElement(pCtx->hQosMngr,pRequest,&len);
-    if (status != TI_OK)
-    {
-		TRACE0(pCtx->hReport, REPORT_SEVERITY_ERROR, "mlme_assocRequestMsgBuild: failed to build QoS capa IE\n");
-        return TI_NOK;
-    }
-    pRequest += len;
-    *reqLen += len;
-
-
     /* Primary Site support HT ? */
     param.paramType = SITE_MGR_PRIMARY_SITE_HT_SUPPORT;
     siteMgr_getParam(pCtx->hSiteMgr, &param);
@@ -918,6 +911,7 @@ TI_STATUS mlme_assocCapBuild(mlme_t *pCtx, TI_UINT16 *cap)
     TI_UINT8            ratesBuf[DOT11_MAX_SUPPORTED_RATES];
     TI_UINT32           len = 0, ofdmIndex = 0;
     TI_BOOL             b11nEnable, bWmeEnable;
+    ECipherSuite        rsnEncryption;
 
     *cap = 0;
 
@@ -939,6 +933,7 @@ TI_STATUS mlme_assocCapBuild(mlme_t *pCtx, TI_UINT16 *cap)
     /* Privacy */
     param.paramType = RSN_ENCRYPTION_STATUS_PARAM;
     status =  rsn_getParam(pCtx->hRsn, &param);
+    rsnEncryption = param.content.rsnEncryptionStatus;
     if (status == TI_OK)
     {
         if (param.content.rsnEncryptionStatus != TWD_CIPHER_NONE)
@@ -1024,22 +1019,28 @@ TI_STATUS mlme_assocCapBuild(mlme_t *pCtx, TI_UINT16 *cap)
 */
     }
 
-    /* Primary Site support HT ? */
-    param.paramType = SITE_MGR_PRIMARY_SITE_HT_SUPPORT;
-    siteMgr_getParam(pCtx->hSiteMgr, &param);
-
-    if (param.content.bPrimarySiteHtSupport == TI_TRUE)
+    /* if chiper = TKIP/WEP then 11n is not used */
+    if (rsnEncryption != TWD_CIPHER_TKIP &&
+        rsnEncryption != TWD_CIPHER_WEP &&
+        rsnEncryption != TWD_CIPHER_WEP104)
     {
-        /* Immediate Block Ack subfield - (is WME on?) AND (is HT Enable?) */
-        /* verify 11n_Enable and Chip type */
-        StaCap_IsHtEnable (pCtx->hStaCap, &b11nEnable);
-        /* verify that WME flag enable */
-        qosMngr_GetWmeEnableFlag (pCtx->hQosMngr, &bWmeEnable);
+		/* Primary Site support HT ? */
+		param.paramType = SITE_MGR_PRIMARY_SITE_HT_SUPPORT;
+		siteMgr_getParam(pCtx->hSiteMgr, &param);
 
-        if ((b11nEnable != TI_FALSE) && (bWmeEnable != TI_FALSE))
-        {
-            *cap |= DOT11_CAPS_IMMEDIATE_BA;
-        }
+		if (param.content.bPrimarySiteHtSupport == TI_TRUE)
+		{
+			/* Immediate Block Ack subfield - (is WME on?) AND (is HT Enable?) */
+			/* verify 11n_Enable and Chip type */
+			StaCap_IsHtEnable (pCtx->hStaCap, &b11nEnable);
+			/* verify that WME flag enable */
+			qosMngr_GetWmeEnableFlag (pCtx->hQosMngr, &bWmeEnable);
+
+			if ((b11nEnable != TI_FALSE) && (bWmeEnable != TI_FALSE))
+			{
+				*cap |= DOT11_CAPS_IMMEDIATE_BA;
+			}
+		}
     }
 
     return TI_OK;
@@ -1304,6 +1305,8 @@ TI_STATUS mlme_stop(TI_HANDLE hMlme, DisconnectType_e disConnType, mgmtStatus_e 
 
     pMlme = (mlme_t*)hMlme;
 
+	mlme_smEvent(pMlme->hMlmeSm, MLME_SM_EVENT_STOP, pMlme);
+
     if (pMlme->authInfo.authType == AUTH_LEGACY_NONE)
 	{
         return TI_NOK;
@@ -1504,7 +1507,7 @@ TI_STATUS mlme_assocRecv(TI_HANDLE hMlme, mlmeFrameInfo_t *pFrame)
         }
 
        pMlme->mlmeData.mgmtStatus = STATUS_ASSOC_REJECT;
-       pMlme->mlmeData.uStatusCode = TI_OK;
+       pMlme->mlmeData.uStatusCode = rspStatus;
        mlme_smEvent(pMlme->hMlmeSm, MLME_SM_EVENT_FAIL, pMlme);
     }
 

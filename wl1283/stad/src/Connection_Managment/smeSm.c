@@ -182,7 +182,8 @@ void smeSm_Start (TI_HANDLE hSme)
     TSme    *pSme = (TSme*)hSme;
 
     /* set SCR group according to connection mode */
-    if (CONNECT_MODE_AUTO == pSme->eConnectMode)
+    if (CONNECT_MODE_AUTO == pSme->eConnectMode  ||
+			BSS_INDEPENDENT == pSme->eBssType)
     {
         TRACE0(pSme->hReport, REPORT_SEVERITY_INFORMATION , "smeSm_Start: changing SCR group to DRV scan\n");
         scr_setGroup (pSme->hScr, SCR_GID_DRV_SCAN);
@@ -242,8 +243,6 @@ void smeSm_Stop (TI_HANDLE hSme)
 void smeSm_PreConnect (TI_HANDLE hSme)
 {
     TSme *pSme = (TSme *)hSme;
-    paramInfo_t	*pParam;
-
 
     /* set the connection mode with which this connection attempt is starting */
     pSme->eLastConnectMode = pSme->eConnectMode;
@@ -261,7 +260,8 @@ void smeSm_PreConnect (TI_HANDLE hSme)
     /* no candidate */
     else
     {
-        if (CONNECT_MODE_AUTO == pSme->eConnectMode)
+        if (CONNECT_MODE_AUTO == pSme->eConnectMode ||
+				BSS_INDEPENDENT == pSme->eBssType)
         {
             /* automatic mode - start scanning */
             if (TI_OK != sme_StartScan (hSme))
@@ -293,66 +293,9 @@ void smeSm_PreConnect (TI_HANDLE hSme)
 
 			else		/* IBSS */
 			{
-				TI_UINT8     uDesiredChannel;     
-                TI_BOOL     channelValidity;
-		        pSme->bConnectRequired = TI_FALSE;
-
-                pParam = (paramInfo_t *)os_memoryAlloc(pSme->hOS, sizeof(paramInfo_t));
-                if (!pParam)
-                {
-                    return;
-                }
-
-				pParam->paramType = SITE_MGR_DESIRED_CHANNEL_PARAM;
-				siteMgr_getParam(pSme->hSiteMgr, pParam);
-				uDesiredChannel = pParam->content.siteMgrDesiredChannel;
-
-				if (uDesiredChannel >= SITE_MGR_CHANNEL_A_MIN)
-				{
-				   pParam->content.channelCapabilityReq.band = RADIO_BAND_5_0_GHZ;
-				} 
-				else 
-				{
-				   pParam->content.channelCapabilityReq.band = RADIO_BAND_2_4_GHZ;
-				}
-
-				/*
-				update the regulatory domain with the selected band
-				*/
-				/* Check if the selected channel is valid according to regDomain */
-				pParam->paramType = REGULATORY_DOMAIN_GET_SCAN_CAPABILITIES;
-				pParam->content.channelCapabilityReq.scanOption = ACTIVE_SCANNING;
-				pParam->content.channelCapabilityReq.channelNum = uDesiredChannel;
-
-				regulatoryDomain_getParam (pSme->hRegDomain,pParam);
-                channelValidity = pParam->content.channelCapabilityRet.channelValidity;
-                os_memoryFree(pSme->hOS, pParam, sizeof(paramInfo_t));
-				if (!channelValidity)
-				{
-				   TRACE0(pSme->hReport, REPORT_SEVERITY_INFORMATION , "IBSS SELECT FAILURE  - No channel !!!\n\n");
-
-				   sme_SmEvent (pSme->hSmeSm, SME_SM_EVENT_CONNECT_FAILURE, hSme);
-
-				   return;
-				}
-
-				pSme->pCandidate = (TSiteEntry *)addSelfSite(pSme->hSiteMgr);
-
-				if (pSme->pCandidate == NULL)
-				{
-				   TRACE0(pSme->hReport, REPORT_SEVERITY_ERROR , "IBSS SELECT FAILURE  - could not open self site !!!\n\n");
-
-				   sme_SmEvent (pSme->hSmeSm, SME_SM_EVENT_CONNECT_FAILURE, hSme);
-
-				   return;
-				}
-
-#ifdef REPORT_LOG    
-				TRACE6(pSme->hReport, REPORT_SEVERITY_CONSOLE,"%%%%%%%%%%%%%%	SELF SELECT SUCCESS, bssid: %X-%X-%X-%X-%X-%X	%%%%%%%%%%%%%%\n\n", pSme->pCandidate->bssid[0], pSme->pCandidate->bssid[1], pSme->pCandidate->bssid[2], pSme->pCandidate->bssid[3], pSme->pCandidate->bssid[4], pSme->pCandidate->bssid[5]);
-                WLAN_OS_REPORT (("%%%%%%%%%%%%%%	SELF SELECT SUCCESS, bssid: %02x.%02x.%02x.%02x.%02x.%02x %%%%%%%%%%%%%%\n\n", pSme->pCandidate->bssid[0], pSme->pCandidate->bssid[1], pSme->pCandidate->bssid[2], pSme->pCandidate->bssid[3], pSme->pCandidate->bssid[4], pSme->pCandidate->bssid[5]));
-#endif
-				/* a connection candidate is available, send a connect event */
-				sme_SmEvent (pSme->hSmeSm, SME_SM_EVENT_CONNECT, hSme);
+			    TRACE0(pSme->hReport, REPORT_SEVERITY_ERROR, "smeSm_PreConnect: "
+			            "ERROR - Ibss mode: drvier should work like in auto mode\n");
+			    return;
 			}
         }
     }

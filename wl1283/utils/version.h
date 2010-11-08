@@ -43,18 +43,18 @@
 #ifndef _VERSION_H_                                                                                                             
 #define _VERSION_H_                                                                                                             
 
-#define MCP_WL7_VERSION_STR "MCP-WL_2.5.0.3"
+#define MCP_WL7_VERSION_STR "MCP-WL_2.5.0.4"
 
-#define SW_VERSION_STR      "MCP-WiLink_Driver_2.5.0.0.7"
+#define SW_VERSION_STR      "MCP-WiLink_Driver_2.5.0.0.9"
 /*
 based on WiLink 6.1.0.0.144
 */
 
-#define SW_RELEASE_MONTH    08
-#define SW_RELEASE_DAY      11
+#define SW_RELEASE_MONTH    10
+#define SW_RELEASE_DAY      31
 
 /*
-Navilink version. Navilink/inc/version.h
+Navilink version.  Navilink/inc/version.h
 */
 
 #define GPS_SW_VERSION_STR "NL6.2 M3"
@@ -62,7 +62,7 @@ Navilink version. Navilink/inc/version.h
 BT version.     MCP_Common/Platform/bthal/LINUX/android_zoom2/inc/EBTIPS_version.h
 */
 
-#define BT_SW_VERSION_STR "L2.22.32"
+#define BT_SW_VERSION_STR "L2.22.35"
 
 
 #define FM_SW_VERSION_STR "L2.00.4"
@@ -70,7 +70,7 @@ BT version.     MCP_Common/Platform/bthal/LINUX/android_zoom2/inc/EBTIPS_version
 /*
 BSP version
 */
-#define BSP_VERSION_STR "Android 25.19"
+#define BSP_VERSION_STR "Android L25.inc.3.3 Froyo"
 
 #endif /* _VERSION_H_ */
                                                                                                        

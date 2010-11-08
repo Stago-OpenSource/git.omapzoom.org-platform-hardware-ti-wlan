@@ -615,8 +615,6 @@ TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_setSite:failed to init
     pQosMngr->voiceTspecConfigured = TI_FALSE;
     pQosMngr->videoTspecConfigured = TI_FALSE;
 
-    /* Mark that no Qos Null template is currently set into firmware */
-    pQosMngr->QosNullDataTemplateUserPriority = 0xFF;
 
 TRACE0(pQosMngr->hReport, REPORT_SEVERITY_INFORMATION, "qosMngr_disconnect : QoS disconnect complete!");
 
@@ -852,14 +850,16 @@ TI_STATUS qosMngr_getParams(TI_HANDLE  hQosMngr,paramInfo_t *pParamInfo)
 			/* Store voice TSPEC params - must be configured */
 			pTspecParams = &pQosMngr->tspecRenegotiationParams[USER_PRIORITY_6];
 			pConfiguredParams = &pQosMngr->resourceMgmtTable.candidateTspecInfo[USER_PRIORITY_6];
-
 			pTspecParams->uUserPriority = pConfiguredParams->userPriority;
 			pTspecParams->uNominalMSDUsize = pConfiguredParams->nominalMsduSize;
 			pTspecParams->uMeanDataRate = pConfiguredParams->meanDataRate;
 			pTspecParams->uMinimumPHYRate = pConfiguredParams->minimumPHYRate;
+			pTspecParams->eDirection = pConfiguredParams->streamDirection;
 			pTspecParams->uSurplusBandwidthAllowance = pConfiguredParams->surplausBwAllowance;
 			pTspecParams->uAPSDFlag = pConfiguredParams->UPSDFlag;
 			pTspecParams->uMediumTime = pConfiguredParams->mediumTime;
+			pTspecParams->uTid = pConfiguredParams->tid;
+
 		}
 		else
 		{
@@ -882,6 +882,8 @@ TI_STATUS qosMngr_getParams(TI_HANDLE  hQosMngr,paramInfo_t *pParamInfo)
 				pTspecParams->uSurplusBandwidthAllowance = pConfiguredParams->surplausBwAllowance;
 				pTspecParams->uAPSDFlag = pConfiguredParams->UPSDFlag;
 				pTspecParams->uMediumTime = pConfiguredParams->mediumTime;
+				pTspecParams->eDirection = pConfiguredParams->streamDirection;
+				pTspecParams->uTid = pConfiguredParams->tid;
 			}
 			else
 			{
@@ -889,25 +891,10 @@ TI_STATUS qosMngr_getParams(TI_HANDLE  hQosMngr,paramInfo_t *pParamInfo)
 		}
 		break;
 		
-	case QOS_MNGR_AC_STATUS:
-		switch (qosMngr_getCurrAcStatus (hQosMngr,&pParamInfo->content.qosCurrentAcStatus))
-		{
-   			case TI_OK:
-      			return TI_OK;
-			case NOT_CONNECTED:
-                TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Not connected to an AP...\n");
-				break;
-   			case NO_QOS_AP:
-                TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "AP does not support QOS...\n");
-      			break;
-   			case TI_NOK:
-                TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Invalid parameter...\n");
-      			break;
-   			default:
-                TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Unknown return value...\n");
-      			break;			
-   		}
-		return TI_NOK;
+    case QOS_MNGR_AC_STATUS:
+        {
+		return qosMngr_getCurrAcStatus (hQosMngr,&pParamInfo->content.qosCurrentAcStatus);
+        }
 		
 	case QOS_MNGR_OS_TSPEC_PARAMS: 
 
@@ -1156,37 +1143,12 @@ TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_setParams :Error  tryi
     case QOS_MNGR_ADD_TSPEC_REQUEST:
 		pQosMngr->TSPECNegotiationResultCallb = NULL;
 		pQosMngr->TSPECNegotiationResultModule = NULL;
-		status = qosMngr_requestAdmission(hQosMngr,  &pParamInfo->content.qosAddTspecRequest);
-		switch (status)
-   		{
-   			case TI_OK:
-      			return TI_OK;
-      			
-   			case TRAFIC_ADM_PENDING:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Driver is still waiting for a response of previous request...\n");
-      			break;
-   			case AC_ALREADY_IN_USE:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Other user priority from the same AC has already used a TSPEC...\n");
-      			break;
-   			case NOT_CONNECTED:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Not connected to an AP...\n");
-      			break;
-   			case NO_QOS_AP:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "AP does not support QOS...\n");
-      			break;
-   			case TI_NOK:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Invalid parameter...\n");
-      			break;
-   			default:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Unknown return value...\n");
-      			break;
-   		}
-		return TI_NOK;
-		
+		return qosMngr_requestAdmission(hQosMngr,  &pParamInfo->content.qosAddTspecRequest);
+
 	case QOS_MNGR_RESEND_TSPEC_REQUEST:
 TRACE0(pQosMngr->hReport, REPORT_SEVERITY_INFORMATION, "qosMngr_setParams: QOS_MNGR_RESEND_TSPEC_REQUEST\n");
 		pQosMngr->TSPECNegotiationResultCallb = (qosMngrCallb_t)pParamInfo->content.qosRenegotiateTspecRequest.callback;
-		pQosMngr->TSPECNegotiationResultModule = pParamInfo->content.qosRenegotiateTspecRequest.handler; 
+		pQosMngr->TSPECNegotiationResultModule = pParamInfo->content.qosRenegotiateTspecRequest.handler;
 		status = qosMngr_requestAdmission(hQosMngr,  &pQosMngr->tspecRenegotiationParams[USER_PRIORITY_6]);
 
 		if ((status == TI_OK) && (pQosMngr->tspecRenegotiationParams[USER_PRIORITY_4].uUserPriority != MAX_USER_PRIORITY))
@@ -1197,21 +1159,27 @@ TRACE0(pQosMngr->hReport, REPORT_SEVERITY_INFORMATION, "qosMngr_setParams: QOS_M
 		
     case QOS_MNGR_DEL_TSPEC_REQUEST:
 		status = qosMngr_deleteAdmission(hQosMngr, &pParamInfo->content.qosDelTspecRequest);
+        if (TI_OK == status)
+        {
+            return TI_OK;
+        }
 		switch (status)
    		{
-   			case TI_OK:
-      			return TI_OK;
 			case NOT_CONNECTED:
-TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Not connected to an AP...\n");
+                TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Not connected to an AP...\n");
 				break;
    			case NO_QOS_AP:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "AP does not support QOS...\n");
+                TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "AP does not support QOS...\n");
       			break;
-   			case TI_NOK:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Invalid parameter...\n");
-      			break;
-   			default:
-      TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Unknown return value...\n");
+            default:
+                if (TI_NOK == status)
+                {
+                    TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Invalid parameter...\n");
+                }
+                else
+                {
+                    TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "Unknown return value...\n");
+                }
       			break;			
    		}
 		return TI_NOK;
@@ -2338,21 +2306,21 @@ TI_STATUS qosMngr_requestAdmission(TI_HANDLE			hQosMngr,
 	if(pQosMngr->isConnected == TI_FALSE)
 	{
 TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_requestAdmission: Not connected - Ignoring request !!!\n");
-		return NOT_CONNECTED;
+		return TI_NOK;
 	}
 
 	/* check if AP support QOS_WME */
 	if(pQosMngr->activeProtocol != QOS_WME)
 	{
 TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_requestAdmission: Not connected to a QOS AP - Ignoring request !!!\n");
-		return NO_QOS_AP;
+		return TI_NOK;
 	}
 
 	/* check if Traffic Admission Control is enable */
 	if(pQosMngr->trafficAdmCtrlEnable == TI_FALSE)
 	{
 TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_requestAdmission: Admission-Control is disabled - Ignoring request !!!\n");
-		return ADM_CTRL_DISABLE;
+		return TI_NOK;
 	}
 
 	/* check UP validity */
@@ -2369,7 +2337,7 @@ TRACE1(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "uUserPriority = %d > 7 !!!\n",
 	if(pQosMngr->resourceMgmtTable.candidateTspecInfo[acID].trafficAdmState == AC_WAIT_ADMISSION)
 	{
 TRACE1(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_requestAdmission: AC = %d , signaling is in process -> Ignore Request !!!\n",acID);
-		return TRAFIC_ADM_PENDING;
+		return TI_NOK;
 	}
 	
 	/* check if AC is already admitted with other UP */
@@ -2378,7 +2346,7 @@ TRACE1(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_requestAdmission: AC =
 		(pQosMngr->resourceMgmtTable.currentTspecInfo[acID].userPriority != addTspecParams->uUserPriority) )
 	{
 TRACE2(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_requestAdmission: AC = %d , another UP (%d) on same AC is already admited -> Ignoring request !!!\n",			acID, pQosMngr->resourceMgmtTable.currentTspecInfo[acID].userPriority);
-		return AC_ALREADY_IN_USE;
+		return TI_NOK;
 	}
 
 	/* check msdu size validity */
@@ -3027,14 +2995,14 @@ static TI_STATUS qosMngr_getCurrAcStatus(TI_HANDLE hQosMngr, OS_802_11_AC_UPSD_S
 	if(pQosMngr->isConnected == TI_FALSE)
 	{	
 		TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_getCurrAcStatus: pQosMngr->connected == TI_FALSE -> Ignore !!!");
-		return NOT_CONNECTED;
+		return TI_NOK;
 	}
 	
 	 /* check if AP support QOS_WME */
 	if(pQosMngr->activeProtocol != QOS_WME)
 	{	
 		TRACE0(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_getCurrAcStatus: activeProtocol != QOS_WME -> Ignore !!!");
-		return NO_QOS_AP;
+		return TI_NOK;
 	}
 
 	pAcStatusParams->uCurrentUAPSDStatus = pQosMngr->acParams[pAcStatusParams->uAC].currentWmeAcPsMode;
@@ -3105,6 +3073,13 @@ TI_STATUS qosMngr_MediumTimeDowngrade(TI_HANDLE hQosMngr, TI_UINT32 fromAcId, TI
     qosMngr_t *pQosMngr = (qosMngr_t *)hQosMngr;
     TAcQosParams tempAcParams;
     TI_STATUS status;
+
+    if (fromAcId > QOS_AC_VO)
+    {
+        TRACE1(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_MediumTimeDowngrade: ac %d, incorrect parameter\n", fromAcId);
+        return TI_NOK;
+    }
+
     if (pQosMngr->acParams[fromAcId].apInitAdmissionState != ADMISSION_REQUIRED)
     {
         TRACE1(pQosMngr->hReport, REPORT_SEVERITY_ERROR, "qosMngr_MediumTimeDowngrade: ac %d, can not be downgraded since it doesn't require admission\n", fromAcId);

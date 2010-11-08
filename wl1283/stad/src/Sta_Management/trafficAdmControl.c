@@ -404,6 +404,11 @@ TI_STATUS trafficAdmCtrl_sendDeltsFrame(TI_HANDLE hTrafficAdmCtrl, tspecInfo_t *
 
 	/* Allocate a TxCtrlBlk and data buffer (large enough for the max packet) */
     pPktCtrlBlk = TWD_txCtrlBlk_Alloc (pTrafficAdmCtrl->hTWD);
+    if (pPktCtrlBlk == NULL)
+    {
+        TRACE0(pTrafficAdmCtrl->hReport, REPORT_SEVERITY_ERROR , "trafficAdmCtrl_sendDeltsFrame: No memory\n");
+        return TI_NOK;
+    }
     pPktBuffer  = txCtrl_AllocPacketBuffer (pTrafficAdmCtrl->hTxCtrl, pPktCtrlBlk, 2000);
     if (pPktBuffer == NULL)
     {
@@ -665,6 +670,12 @@ TRACE0(pTrafficAdmCtrl->hReport, REPORT_SEVERITY_INFORMATION, "admCtrlQos_smAdmi
 
 	/* Allocate a TxCtrlBlk and data buffer (large enough for the max packet) */
     pPktCtrlBlk = TWD_txCtrlBlk_Alloc (pTrafficAdmCtrl->hTWD);
+    if (pPktCtrlBlk == NULL)
+    {
+        TRACE0(pTrafficAdmCtrl->hReport, REPORT_SEVERITY_ERROR , "trafficAdmCtrl_sendAdmissionReq: No memory\n");
+        return TI_NOK;
+    }
+
     pPktBuffer  = txCtrl_AllocPacketBuffer (pTrafficAdmCtrl->hTxCtrl, pPktCtrlBlk, 2000);
     if (pPktBuffer == NULL)
     {

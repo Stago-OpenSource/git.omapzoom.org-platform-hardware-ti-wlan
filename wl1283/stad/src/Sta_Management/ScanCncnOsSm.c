@@ -57,16 +57,16 @@
 #define SCAN_OID_DEFAULT_PROBE_REQUEST_NUMBER_A                     3
 #define SCAN_OID_DEFAULT_MAX_DWELL_TIME_PASSIVE_G                   100000
 #define SCAN_OID_DEFAULT_MAX_DWELL_TIME_PASSIVE_A                   100000
-#define SCAN_OID_DEFAULT_MAX_DWELL_TIME_ACTIVE_G                    30000
-#define SCAN_OID_DEFAULT_MAX_DWELL_TIME_ACTIVE_A                    30000
+#define SCAN_OID_DEFAULT_MAX_DWELL_TIME_ACTIVE_G                    60000
+#define SCAN_OID_DEFAULT_MAX_DWELL_TIME_ACTIVE_A                    60000
 #define SCAN_OID_DEFAULT_MIN_DWELL_TIME_PASSIVE_G                   100000
 #define SCAN_OID_DEFAULT_MIN_DWELL_TIME_PASSIVE_A                   100000
-#define SCAN_OID_DEFAULT_MIN_DWELL_TIME_ACTIVE_G                    15000
-#define SCAN_OID_DEFAULT_MIN_DWELL_TIME_ACTIVE_A                    15000
-#define SCAN_OID_DEFAULT_EARLY_TERMINATION_EVENT_PASSIVE_G          SCAN_ET_COND_BEACON
-#define SCAN_OID_DEFAULT_EARLY_TERMINATION_EVENT_PASSIVE_A          SCAN_ET_COND_BEACON
-#define SCAN_OID_DEFAULT_EARLY_TERMINATION_EVENT_ACTIVE_G           SCAN_ET_COND_ANY_FRAME
-#define SCAN_OID_DEFAULT_EARLY_TERMINATION_EVENT_ACTIVE_A           SCAN_ET_COND_ANY_FRAME
+#define SCAN_OID_DEFAULT_MIN_DWELL_TIME_ACTIVE_G                    30000
+#define SCAN_OID_DEFAULT_MIN_DWELL_TIME_ACTIVE_A                    30000
+#define SCAN_OID_DEFAULT_EARLY_TERMINATION_EVENT_PASSIVE_G          0 /*SCAN_ET_COND_BEACON*/
+#define SCAN_OID_DEFAULT_EARLY_TERMINATION_EVENT_PASSIVE_A          0 /*SCAN_ET_COND_BEACON*/
+#define SCAN_OID_DEFAULT_EARLY_TERMINATION_EVENT_ACTIVE_G           0 /*SCAN_ET_COND_ANY_FRAME*/
+#define SCAN_OID_DEFAULT_EARLY_TERMINATION_EVENT_ACTIVE_A           0 /*SCAN_ET_COND_ANY_FRAME*/
 
 /* For WiFi  WPA OOB scenario, 4 APs need to be configure on the same channel */
 #define SCAN_OID_DEFAULT_EARLY_TERMINATION_COUNT_PASSIVE_G          4 
@@ -483,8 +483,8 @@ TI_UINT32 scanCncnOsSm_FillAllAvailableChannels (TI_HANDLE hScanCncn, ERadioBand
             pChannelArray[ uValidChannelsCnt ].normalChannelEntry.maxChannelDwellTime = uMaxDwellTime;
             pChannelArray[ uValidChannelsCnt ].normalChannelEntry.earlyTerminationEvent = eETCondition;
             pChannelArray[ uValidChannelsCnt ].normalChannelEntry.ETMaxNumOfAPframes = uETFrameNumber;
-            pChannelArray[ uValidChannelsCnt ].normalChannelEntry.txPowerDbm  = 
-                tParam.content.channelCapabilityRet.maxTxPowerDbm;
+            pChannelArray[ uValidChannelsCnt ].normalChannelEntry.txPowerDbm  = 205;
+                /*tParam.content.channelCapabilityRet.maxTxPowerDbm;*/
 
             /* Fill broadcast BSSID */
             for (j = 0; j < 6; j++)

@@ -68,7 +68,7 @@
 #endif
 #include "TWDriver.h"
 #include "DrvMainModules.h"
-#include "PowerMgr_API.h" 
+#include "PowerMgr_API.h"
 
 /* Constants */
 #define PMKID_CAND_LIST_MEMBUFF_SIZE  (2*sizeof(TI_UINT32) + (sizeof(OS_802_11_PMKID_CANDIDATE) * PMKID_MAX_NUMBER))
@@ -166,7 +166,7 @@ TI_STATUS rsn_getPMKIDList (rsn_t * pRsn,OS_802_11_PMKID *pmkidList);
 *
 * rsn_Create - allocate memory for rsniation SM
 *
-* \b Description: 
+* \b Description:
 *
 * Allocate memory for rsniation SM. \n
 *       Allocates memory for Rsniation context. \n
@@ -195,9 +195,9 @@ TI_HANDLE rsn_create(TI_HANDLE hOs)
     }
 
     os_memoryZero (hOs, pRsn, sizeof(rsn_t));
-    
+
     pRsn->hOs = hOs;
-    
+
     return pRsn;
 }
 
@@ -206,7 +206,7 @@ TI_HANDLE rsn_create(TI_HANDLE hOs)
 *
 * rsn_Unload - unload rsniation SM from memory
 *
-* \b Description: 
+* \b Description:
 *
 * Unload rsniation SM from memory
 *
@@ -218,7 +218,7 @@ TI_HANDLE rsn_create(TI_HANDLE hOs)
 *
 *  TI_OK if successful, TI_NOK otherwise.
 *
-* \sa rsn_mainSecKeysOnlyStop() 
+* \sa rsn_mainSecKeysOnlyStop()
 */
 TI_STATUS rsn_unload (TI_HANDLE hRsn)
 {
@@ -337,7 +337,7 @@ TI_STATUS rsn_getNetworkEap(rsn_t *pRsn, OS_XCC_NETWORK_EAP *networkEap)
 *
 * rsn_init - Init module
 *
-* \b Description: 
+* \b Description:
 *
 * Init module handles and variables.
 *
@@ -353,7 +353,7 @@ void rsn_init (TStadHandlesList *pStadHandles)
 
     pRsn->eGroupKeyUpdate = GROUP_KEY_UPDATE_FALSE;
     pRsn->ePairwiseKeyUpdate = PAIRWISE_KEY_UPDATE_FALSE;
-    
+
 	pRsn->hTxCtrl   = pStadHandles->hTxCtrl;
     pRsn->hRx       = pStadHandles->hRxData;
     pRsn->hConn     = pStadHandles->hConn;
@@ -375,6 +375,13 @@ void rsn_init (TStadHandlesList *pStadHandles)
 	pRsn->numOfBannedSites = 0;
 }
 
+
+void rsn_clearGenInfoElement(TI_HANDLE hRsn)
+{
+	rsn_t *pRsn = (rsn_t*)(hRsn);
+
+	pRsn->genericIE.length = 0;
+}
 
 /*-----------------------------------------------------------------------------
 Routine Name: rsn_notifyPreAuthStatus
@@ -571,7 +578,7 @@ TI_STATUS rsn_addPMKID (rsn_t *pRsn, TMacAddr *pBSSID, pmkidValue_t pmkID)
 	TI_UINT8      cacheIndex;
 	TI_STATUS     status = TI_NOK;
 
-	TRACE6(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "rsn_addPMKID: received new PMKID for " MACSTR "\n", 
+	TRACE6(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "rsn_addPMKID: received new PMKID for " MACSTR "\n",
            (*pBSSID)[0],
            (*pBSSID)[1],
            (*pBSSID)[2],
@@ -822,11 +829,11 @@ TI_STATUS rsn_SetDefaults (TI_HANDLE hRsn, TRsnInitParams *pInitParam)
 
 
 
-/** 
+/**
 *
 * rsn_Start - Start event for the rsniation SM
 *
-* \b Description: 
+* \b Description:
 *
 * Start event for the rsniation SM
 *
@@ -862,7 +869,7 @@ TI_STATUS rsn_start(TI_HANDLE hRsn)
 *
 * rsn_Stop - Stop event for the rsniation SM
 *
-* \b Description: 
+* \b Description:
 *
 * Stop event for the rsniation SM
 *
@@ -886,7 +893,7 @@ TI_STATUS rsn_stop (TI_HANDLE hRsn, TI_BOOL removeKeys)
     {
         return TI_NOK;
     }
-    
+
     TRACE1(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "RSN: calling STOP... removeKeys=%d\n", removeKeys);
 
     pRsn->eGroupKeyUpdate = GROUP_KEY_UPDATE_FALSE;
@@ -904,7 +911,6 @@ TI_STATUS rsn_stop (TI_HANDLE hRsn, TI_BOOL removeKeys)
 	if (removeKeys)
 	{   /* reset PMKID list if exist */
 		rsn_resetPMKIDList(pRsn);
-        rsn_clearGenInfoElement(hRsn);
 	}
 
 
@@ -992,7 +998,7 @@ TI_STATUS rsn_getExtAuthMode(rsn_t *pRsn, EExternalAuthMode *pExtAuthMode)
 *
 * rsn_GetParam - Get a specific parameter from the rsniation SM
 *
-* \b Description: 
+* \b Description:
 *
 * Get a specific parameter from the rsniation SM.
 *
@@ -1062,7 +1068,7 @@ TI_STATUS rsn_getParam(TI_HANDLE hRsn, void *param)
     default:
         return TI_NOK;
     }
-    
+
     return status;
 }
 
@@ -1160,7 +1166,7 @@ TI_STATUS rsn_setExtAuthMode(rsn_t *pRsn, EExternalAuthMode extAuthMode)
 *
 * rsn_SetParam - Set a specific parameter to the rsniation SM
 *
-* \b Description: 
+* \b Description:
 *
 * Set a specific parameter to the rsniation SM.
 *
@@ -1193,7 +1199,7 @@ TI_STATUS rsn_setParam (TI_HANDLE hRsn, void *param)
     switch (pParam->paramType)
     {
 
-    
+
     case RSN_ENCRYPTION_STATUS_PARAM:
         {
             TRACE1(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "RSN: Set RSN_ENCRYPTION_STATUS_PARAM rsnEncryptionStatus  %d \n", pParam->content.rsnEncryptionStatus);
@@ -1240,9 +1246,9 @@ TI_STATUS rsn_setParam (TI_HANDLE hRsn, void *param)
             if (networkEap != pParam->content.networkEap)
             {
                 TRACE1(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "RSN: Set RSN_XCC_NETWORK_EAP networkEap  %d \n", pParam->content.networkEap);
-                
+
                 status = rsn_setNetworkEap (pRsn, pParam->content.networkEap);
-                if (status == TI_OK) 
+                if (status == TI_OK)
                 {
                     /*status = RE_SCAN_NEEDED;*/
                 }
@@ -1298,26 +1304,26 @@ TI_STATUS rsn_setParam (TI_HANDLE hRsn, void *param)
 	    		status = rsn_setKey (pRsn, pSecurityKey);  /* send key to FW*/
 	    }
 	    break;
-	    
+
     case RSN_PORT_STATUS_PARAM:
 	    TRACE1(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "RSN: Set Port Status %d \n", pParam->content.rsnPortStatus);
 	    status = rsn_setPortStatus( hRsn, pParam->content.rsnPortStatus );
 	    break;
-	    
+
     case RSN_GENERIC_IE_PARAM:
-	    TRACE4(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "RSN: Set Generic IE: length=%d, IE=%02x%02x%02x... \n", 
-		   pParam->content.rsnGenericIE.length, 
+	    TRACE4(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "RSN: Set Generic IE: length=%d, IE=%02x%02x%02x... \n",
+		   pParam->content.rsnGenericIE.length,
 	       pParam->content.rsnGenericIE.data[0], pParam->content.rsnGenericIE.data[1],pParam->content.rsnGenericIE.data[2] );
 
 	    status = TI_OK;
 
 	    /* make sure it's a valid IE: datal-ength > 2 AND a matching length field */
-	    if ((pParam->content.rsnGenericIE.length > 2) && 
+	    if ((pParam->content.rsnGenericIE.length > 2) &&
 		((pParam->content.rsnGenericIE.data[1] + 2) == pParam->content.rsnGenericIE.length)) {
 		    /* Setting the IE */
 		    pRsn->genericIE.length = pParam->content.rsnGenericIE.length;
 		    os_memoryCopy(pRsn->hOs,(void*)pRsn->genericIE.data, (TI_UINT8*)pParam->content.rsnGenericIE.data, pParam->content.rsnGenericIE.length);
-	    } else if ( pParam->content.rsnGenericIE.length == 0 ) { 
+	    } else if ( pParam->content.rsnGenericIE.length == 0 ) {
 		    /* Deleting the IE */
 		    pRsn->genericIE.length = pParam->content.rsnGenericIE.length;
 	    } else {
@@ -1401,7 +1407,7 @@ TI_STATUS rsn_parseIe(rsn_t *pRsn, TRsnData *pRsnData, TI_UINT8 **pIe, TI_UINT8 
 *
 * rsn_eventRecv - Set a specific parameter to the rsniation SM
 *
-* \b Description: 
+* \b Description:
 *
 * Set a specific parameter to the rsniation SM.
 *
@@ -1425,7 +1431,7 @@ TI_STATUS rsn_reportStatus (rsn_t *pRsn, TI_STATUS rsnStatus)
     {
         return TI_NOK;
     }
-    
+
     if (rsnStatus == TI_OK)
     {
     	if (pRsn->unicastSuite == TWD_CIPHER_NONE)
@@ -1454,7 +1460,7 @@ TI_STATUS rsn_reportStatus (rsn_t *pRsn, TI_STATUS rsnStatus)
     {
         return status;
     }
-    
+
     if (rsnStatus == TI_OK)
     {
         EvHandlerSendEvent (pRsn->hEvHandler, IPC_EVENT_AUTH_SUCC, NULL, 0);
@@ -1478,7 +1484,7 @@ TI_STATUS rsn_reportStatus (rsn_t *pRsn, TI_STATUS rsnStatus)
 *
 * rsn_eventRecv - Set a specific parameter to the rsniation SM
 *
-* \b Description: 
+* \b Description:
 *
 * Set a specific parameter to the rsniation SM.
 *
@@ -1507,13 +1513,13 @@ TI_STATUS rsn_getNetworkMode(rsn_t *pRsn, ERsnNetworkMode *pNetMode)
         if (param.content.ctrlDataCurrentBssType == BSS_INFRASTRUCTURE)
         {
             *pNetMode = RSN_INFRASTRUCTURE;
-        } 
-        else 
+        }
+        else
         {
             *pNetMode = RSN_IBSS;
         }
     }
-    else 
+    else
     {
         return TI_NOK;
     }
@@ -1525,9 +1531,9 @@ TI_STATUS rsn_getNetworkMode(rsn_t *pRsn, ERsnNetworkMode *pNetMode)
 
 /**
 *
-* rsn_getInfoElement - 
+* rsn_getInfoElement -
 *
-* \b Description: 
+* \b Description:
 *
 * Get the RSN information element.
 *
@@ -1543,7 +1549,7 @@ TI_STATUS rsn_getNetworkMode(rsn_t *pRsn, ERsnNetworkMode *pNetMode)
 *
 *  TI_OK if successful, TI_NOK otherwise.
 *
-* \sa 
+* \sa
 */
 TI_STATUS rsn_getInfoElement(TI_HANDLE hRsn, TI_UINT8 *pRsnIe, TI_UINT32 *pRsnIeLen)
 {
@@ -1569,9 +1575,9 @@ TI_STATUS rsn_getInfoElement(TI_HANDLE hRsn, TI_UINT8 *pRsnIe, TI_UINT32 *pRsnIe
 #ifdef XCC_MODULE_INCLUDED
 /**
 *
-* rsn_getXCCExtendedInfoElement - 
+* rsn_getXCCExtendedInfoElement -
 *
-* \b Description: 
+* \b Description:
 *
 * Get the Aironet information element.
 *
@@ -1585,7 +1591,7 @@ TI_STATUS rsn_getInfoElement(TI_HANDLE hRsn, TI_UINT8 *pRsnIe, TI_UINT32 *pRsnIe
 *
 *  TI_OK if successful, TI_NOK otherwise.
 *
-* \sa 
+* \sa
 */
 TI_STATUS rsn_getXCCExtendedInfoElement(TI_HANDLE hRsn, TI_UINT8 *pRsnIe, TI_UINT8 *pRsnIeLen)
 {
@@ -1603,7 +1609,7 @@ TI_STATUS rsn_getXCCExtendedInfoElement(TI_HANDLE hRsn, TI_UINT8 *pRsnIe, TI_UIN
 
     TRACE1(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "rsn_getXCCExtendedInfoElement pRsnIeLen= %d\n",*pRsnIeLen);
 
-    return status;    
+    return status;
 }
 
 
@@ -1836,14 +1842,14 @@ TI_STATUS rsn_setDefaultKeyId(rsn_t *pRsn, TI_UINT8 keyId)
     tTwdParam.content.configureCmdCBParams.pCb = &keyId;
     tTwdParam.content.configureCmdCBParams.fCb = NULL;
     tTwdParam.content.configureCmdCBParams.hCb = NULL;
-    status = TWD_SetParam (pRsn->hTWD, &tTwdParam); 
-    
+    status = TWD_SetParam (pRsn->hTWD, &tTwdParam);
+
     TRACE1(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "RSN: rsn_setDefaultKeyId, KeyId = 0x%lx\n", keyId);
     return status;
 }
 
 
-TI_STATUS rsn_reportAuthFailure(TI_HANDLE hRsn, EAuthStatus authStatus) 
+TI_STATUS rsn_reportAuthFailure(TI_HANDLE hRsn, EAuthStatus authStatus)
 {
 	TI_STATUS    status = TI_OK;
 	rsn_t       *pRsn;
@@ -1880,7 +1886,7 @@ TI_STATUS rsn_reportAuthFailure(TI_HANDLE hRsn, EAuthStatus authStatus)
 }
 
 /******
-This is the CB function for mic failure event from the FW 
+This is the CB function for mic failure event from the FW
  *******/
 TI_STATUS rsn_reportMicFailure(TI_HANDLE hRsn, TI_UINT8 *pType, TI_UINT32 Length)
 {
@@ -2236,7 +2242,8 @@ TI_STATUS rsn_parseRsnIe(rsn_t *pRsn, TI_UINT8 *pWpa2Ie, wpa2IeData_t *pWpa2Data
          dataOffset += 4;
 
 		 /* Include all AP key management supported suites in the wpaData structure */
-            pWpa2Data->KeyMngSuite[i+1] = curKeyMngSuite;
+         /* pWpa2Data->KeyMngSuite[i+1] = curKeyMngSuite;*/
+
      }
 
     /* If we've reached the end of the received RSN IE */
@@ -2375,7 +2382,7 @@ static void rsn_buildAndSendPMKIDCandList (TI_HANDLE hHandle, TBssidList4PreAuth
     }
 
     /* Go over AP list and find APs supporting pre-authentication */
-    for(apIndex = 0; apIndex < apList->NumOfItems || candIndex < PMKID_MAX_NUMBER; apIndex++)
+    for(apIndex = 0; apIndex < apList->NumOfItems && candIndex < PMKID_MAX_NUMBER; apIndex++)
     {
         TI_UINT8 *bssidMac, i = 0;
 
@@ -2441,7 +2448,7 @@ static void rsn_buildAndSendPMKIDCandList (TI_HANDLE hHandle, TBssidList4PreAuth
 
     }
     /* Add candidates that have valid PMKID, but were not in the list */
-    for (apIndex=0; apIndex<pRsn->pmkid_cache.entriesNumber || candIndex < PMKID_MAX_NUMBER; apIndex++)
+    for (apIndex=0; apIndex<pRsn->pmkid_cache.entriesNumber && candIndex < PMKID_MAX_NUMBER; apIndex++)
     {
         if (!pRsn->pmkid_cache.pmkidTbl[apIndex].preAuthenticate)
         {
@@ -2569,11 +2576,11 @@ TI_BOOL rsn_isSiteBanned(TI_HANDLE hRsn, TMacAddr siteBssid)
 
 /**
  *
- * rsn_PortStatus_Set API implementation- 
+ * rsn_PortStatus_Set API implementation-
  *
- * \b Description: 
+ * \b Description:
  *
- * set the status port according to the status flag 
+ * set the status port according to the status flag
  *
  * \b ARGS:
  *
@@ -2599,9 +2606,9 @@ TI_STATUS rsn_setPortStatus(TI_HANDLE hRsn, TI_BOOL state)
 
 /**
  *
- * rsn_banSite - 
+ * rsn_banSite -
  *
- * \b Description: 
+ * \b Description:
  *
  * Bans the specified site from being associated to for the specified duration.
  * If a ban level of WARNING is given and no previous ban was in effect the
@@ -2655,11 +2662,11 @@ ERsnSiteBanLevel rsn_banSite(TI_HANDLE hRsn, TMacAddr siteBssid, ERsnSiteBanLeve
 
 /**
  *
- * findEntryForInsert - 
+ * findEntryForInsert -
  *
- * \b Description: 
+ * \b Description:
  *
- * Returns a place to insert a new banned site. 
+ * Returns a place to insert a new banned site.
  *
  * \b ARGS:
  *
@@ -2688,14 +2695,14 @@ static rsn_siteBanEntry_t * findEntryForInsert(TI_HANDLE hRsn)
 
 /**
  *
- * findBannedSiteAndCleanup - 
+ * findBannedSiteAndCleanup -
  *
- * \b Description: 
+ * \b Description:
  *
  * Searches the banned sites list for the desired site while cleaning up
  * expired sites found along the way.
- * 
- * Note that this function might change the structure of the banned sites 
+ *
+ * Note that this function might change the structure of the banned sites
  * list so old iterators into the list might be invalidated.
  *
  * \b ARGS:
@@ -2770,9 +2777,9 @@ TI_BOOL rsn_getPortStatus(rsn_t *pRsn)
 
 /**
  *
- * rsn_getGenInfoElement - 
+ * rsn_getGenInfoElement -
  *
- * \b Description: 
+ * \b Description:
  *
  * Copies the Generic IE to a given buffer
  *
@@ -2851,7 +2858,7 @@ static TI_INT16 convertAscii2Unicode(TI_INT8* userPwd, TI_INT16 len)
 {
     TI_INT16 i;
     TI_INT8 unsiiPwd[MAX_PASSWD_LEN];
-    
+
 
     for (i=0; i<len; i++)
     {
@@ -2862,50 +2869,28 @@ static TI_INT16 convertAscii2Unicode(TI_INT8* userPwd, TI_INT16 len)
         userPwd[i*2] = unsiiPwd[i];
         userPwd[i*2+1] = 0;
     }
-    return (TI_INT16)(len*2);     
+    return (TI_INT16)(len*2);
 }
 
 #endif
 
-/**
- *
- * rsn_clearGenInfoElement -
- *
- * \b Description:
- *
- * Clears the Generic IE
- *
- * \b ARGS:
- *
- * hRsn           - the object
- *
- */
-void rsn_clearGenInfoElement(TI_HANDLE hRsn)
-{
-    rsn_t * pRsn = (rsn_t *) hRsn;
-    TRACE0(pRsn->hReport, REPORT_SEVERITY_INFORMATION, "rsn_clearGenInfoElement: clearing Generic IE \n");
-    os_memoryZero(pRsn->hOs, &pRsn->genericIE, sizeof(pRsn->genericIE));
-}
-
-
-
 /***************************************************************************
 *							rsn_reAuth				                   *
 ****************************************************************************
-* DESCRIPTION:	This is a callback function called by the whalWPA module whenever 
-*				a broadcast TKIP key was configured to the FW. 
+* DESCRIPTION:	This is a callback function called by the whalWPA module whenever
+*				a broadcast TKIP key was configured to the FW.
 *				It does the following:
 *					-	resets the ReAuth flag
 *					-	stops the ReAuth timer
 *					-	restore the PS state
 *					-	Send RE_AUTH_COMPLETED event to the upper layer.
-* 
+*
 * INPUTS:		hRsn - the object
-*		
-* OUTPUT:		None		
-* 
+*
+* OUTPUT:		None
+*
 * RETURNS:		None
-*				
+*
 ***************************************************************************/
 //void rsn_reAuth(TI_HANDLE hRsn)
 //{

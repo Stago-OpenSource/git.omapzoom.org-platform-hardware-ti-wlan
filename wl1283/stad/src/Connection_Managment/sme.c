@@ -162,7 +162,13 @@ void sme_SetDefaults (TI_HANDLE hSme, TSmeModifiedInitParams *pModifiedInitParam
         pSme->hScanResultTable = pSme->hScanCncnScanResulTable;
     }
 
+    /* When connecting to IBSS use the sme scan result table */
     pSme->eBssType = pModifiedInitParams->eDesiredBssType;
+    if (BSS_INDEPENDENT == pSme->eBssType)
+    {
+         pSme->hScanResultTable = pSme->hSmeScanResultTable;
+    }
+
     MAC_COPY (pSme->tBssid, pModifiedInitParams->tDesiredBssid);
 
     pSme->tSsid.len = pModifiedInitParams->tDesiredSsid.len;
@@ -460,9 +466,10 @@ TI_STATUS sme_SetParam (TI_HANDLE hSme, paramInfo_t *pParam)
             {
                 pSme->hScanResultTable = pSme->hSmeScanResultTable;
             }
-            else if (CONNECT_MODE_MANUAL == pSme->eConnectMode) 
+	    else if (CONNECT_MODE_MANUAL == pSme->eConnectMode
+			&& BSS_INDEPENDENT != pSme->eBssType)
             {
-                pSme->hScanResultTable = pSme->hScanCncnScanResulTable;
+		pSme->hScanResultTable = pSme->hScanCncnScanResulTable;
             }
         /* now send a disconnect event */
         sme_SmEvent (pSme->hSmeSm, SME_SM_EVENT_DISCONNECT, hSme);
@@ -478,6 +485,23 @@ TI_STATUS sme_SetParam (TI_HANDLE hSme, paramInfo_t *pParam)
             pSme->uScanCount = 0;
             /* now send a disconnect event */
             sme_SmEvent (pSme->hSmeSm, SME_SM_EVENT_DISCONNECT, hSme);
+
+            /* When in IBSS mode the STA will work in auto mode */
+		if (BSS_INDEPENDENT == pSme->eBssType)
+		{
+			pSme->hScanResultTable = pSme->hSmeScanResultTable;
+		}
+		else /* In BSS infrastructure set the scanResultTable according to the eConnectMode */
+		{
+			if (CONNECT_MODE_AUTO == pSme->eConnectMode)
+			{
+				pSme->hScanResultTable = pSme->hSmeScanResultTable;
+			}
+			else if (CONNECT_MODE_MANUAL == pSme->eConnectMode)
+			{
+				pSme->hScanResultTable = pSme->hScanCncnScanResulTable;
+			}
+		}
         }
         break;
 
@@ -610,9 +634,10 @@ void sme_ScanResultCB (TI_HANDLE hSme, EScanCncnResultStatus eStatus,
          * country IE in passive scan, to avoid a table overflow (in manual mode, the SME table must be equal to the app
          * table, the app is responsible to decide which SSIDs to use for scan)
          */
-        if (CONNECT_MODE_AUTO == pSme->eConnectMode)
+        if (CONNECT_MODE_AUTO == pSme->eConnectMode ||
+		BSS_INDEPENDENT == pSme->eBssType)
         {
-            if (SSID_TYPE_SPECIFIC == pSme->eSsidType)
+	    if (SSID_TYPE_SPECIFIC == pSme->eSsidType)
             {
 #ifndef XCC_MODULE_INCLUDED
                 if ((pSme->tSsid.len == pFrameInfo->parsedIEs->content.iePacket.pSsid->hdr[ 1 ]) &&
@@ -659,7 +684,8 @@ void sme_ScanResultCB (TI_HANDLE hSme, EScanCncnResultStatus eStatus,
         /* stablizie the scan result table - delete its contenst if no results were recived during last scan */
         scanResultTable_SetStableState (pSme->hScanResultTable);
 
-        if (CONNECT_MODE_AUTO == pSme->eConnectMode)
+        if (CONNECT_MODE_AUTO == pSme->eConnectMode
+			|| BSS_INDEPENDENT == pSme->eBssType)
         {
  
            /* try to select a site */

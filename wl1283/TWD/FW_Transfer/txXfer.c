@@ -58,6 +58,10 @@
 #define     DBG_MAX_AGGREG_PKTS     16
 #endif
 
+#ifndef TNETW1283
+#define TXXFER_FLAG_EOT_WORKAROUND	BIT_1	/* Enable (1) / Disable (0) the End Of Transaction workaround */
+#endif
+
 typedef struct 
 {
     TTxnStruct              tTxnStruct;
@@ -83,6 +87,9 @@ typedef struct
     TI_UINT32               uPktsCntr;               /* Counts all Tx packets. Written to FW after each packet transaction */
     TI_UINT32               uPktsCntrTxnIndex;       /* The current indext of the aPktsCntrTxn[] used for the counter workaround transactions */
     TPktsCntrTxn            aPktsCntrTxn[CTRL_BLK_ENTRIES_NUM]; /* Transaction structures for sending the packets counter */
+#ifndef TNETW1283
+    TI_UINT32				uFlags;                  /* See TXXFER_FLAG_* */
+#endif
 #ifdef TI_DBG
     TI_UINT32               aDbgCountPktAggreg[DBG_MAX_AGGREG_PKTS];
 #endif
@@ -170,6 +177,9 @@ void txXfer_SetDefaults (TI_HANDLE hTxXfer, TTwdInitParams *pInitParams)
     TTxXferObj *pTxXfer = (TTxXferObj *)hTxXfer;
 
     pTxXfer->uAggregMaxPkts = pInitParams->tGeneral.uTxAggregPktsLimit;
+#ifndef TNETW1283
+    pTxXfer->uFlags         = 0;
+#endif
 }
 
 
@@ -180,6 +190,35 @@ void txXfer_SetBusParams (TI_HANDLE hTxXfer, TI_UINT32 uDmaBufLen)
     pTxXfer->uAggregMaxLen = uDmaBufLen;
 }
 
+#ifndef TNETW1283
+/****************************************************************************
+ *                      txXfer_SetHwInfo()
+ ****************************************************************************
+ * DESCRIPTION: Configure the module according to present HW and FW capabilities
+ *
+ * INPUTS:      hTxXfer - module handle
+ *              pHwInfo - HW and FW information
+ *
+ * OUTPUT:  None
+ *
+ * RETURNS: None
+ ****************************************************************************/
+void txXfer_SetHwInfo(TI_HANDLE hTxXfer, TFwInfo* pHwInfo)
+{
+	TTxXferObj *pTxXfer = (TTxXferObj *)hTxXfer;
+	TI_BOOL bEnableEOTWorkaroud;
+
+	if (NULL==pHwInfo) {
+		return;
+	}
+
+	bEnableEOTWorkaroud = (pHwInfo->uPGVersion < 3);
+	if (bEnableEOTWorkaroud)
+	{
+		pTxXfer->uFlags |= TXXFER_FLAG_EOT_WORKAROUND;
+	}
+}
+#endif
 
 void txXfer_RegisterCb (TI_HANDLE hTxXfer, TI_UINT32 CallBackID, void *CBFunc, TI_HANDLE CBObj)
 {
@@ -349,6 +388,7 @@ static ETxnStatus txXfer_SendAggregatedPkts (TTxXferObj *pTxXfer, TI_BOOL bLastP
 #if defined(TNETW1283) //|| defined(TNETW1273_FPGA)
         /* Skip EOT and Rx counter workarounds */
 #else
+    if (pTxXfer->uFlags & TXXFER_FLAG_EOT_WORKAROUND)
     {
         pPktsCntrTxn->uPktsCntr = ENDIAN_HANDLE_LONG(pTxXfer->uPktsCntr);
         pPktsCntrTxn->tTxnStruct.uHwAddr = HOST_WR_ACCESS_REG;

@@ -787,7 +787,7 @@ TI_STATUS cmdQueue_Error (TI_HANDLE hCmdQueue, TI_UINT32 command, TI_UINT32 stat
                         cmdQueue_GetCmdString (command),
                         command,
                         (param) ? cmdQueue_GetIEString (command, *((TI_UINT16 *) param)) : "",
-                        *((TI_UINT16 *) param)));
+                        (param) ? (*(TI_UINT16 *) param): -1 ));
     }
     else
     {

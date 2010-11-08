@@ -503,6 +503,11 @@ static void CuCmd_xtoa_string (U8* srcBuffer, U32 srcBufferLength, U8* dstString
 static VOID CuCmd_set_DefPeriodic_Scan_Params(CuCmd_t* pCuCmd)
 {
     U8 i;
+//  U8 channListBand5[] = {36 , 40 , 44 , 48 , 52 , 56 , 60 , 64 , 100, 104,
+//    					   108, 112, 116, 120, 124, 128, 132, 136, 140, 149,
+//    					   153, 157, 161, 165};
+    U8 channListBand5[] = {36,40,44,48,52,56,60,64};
+
     /* init periodic application scan params */
     pCuCmd->tPeriodicAppScanParams.uSsidNum = 0;
     pCuCmd->tPeriodicAppScanParams.uSsidListFilterEnabled = 1;
@@ -518,7 +523,8 @@ static VOID CuCmd_set_DefPeriodic_Scan_Params(CuCmd_t* pCuCmd)
     pCuCmd->tPeriodicAppScanParams.bTerminateOnReport = TRUE;
     pCuCmd->tPeriodicAppScanParams.eBssType = BSS_ANY;
     pCuCmd->tPeriodicAppScanParams.uProbeRequestNum = 3;
-    pCuCmd->tPeriodicAppScanParams.uChannelNum = 14;
+    pCuCmd->tPeriodicAppScanParams.uChannelNum = sizeof(channListBand5)+14 /*PERIODIC_SCAN_MAX_CHANNEL_NUM*/;
+
     for ( i = 0; i < 14; i++ )
     {
         pCuCmd->tPeriodicAppScanParams.tChannels[ i ].eBand = RADIO_BAND_2_4_GHZ;
@@ -529,6 +535,15 @@ static VOID CuCmd_set_DefPeriodic_Scan_Params(CuCmd_t* pCuCmd)
         pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uTxPowerLevelDbm = DEF_TX_POWER;
     }
 
+    for ( i = 14; i < sizeof(channListBand5)+14/*PERIODIC_SCAN_MAX_CHANNEL_NUM*/; i++ )
+	{
+		pCuCmd->tPeriodicAppScanParams.tChannels[ i ].eBand = RADIO_BAND_5_0_GHZ;
+		pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uChannel = channListBand5[i-14] ;
+		pCuCmd->tPeriodicAppScanParams.tChannels[ i ].eScanType = SCAN_TYPE_NORMAL_ACTIVE;
+		pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uMinDwellTimeMs = 5;
+		pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uMaxDwellTimeMs = 20;
+		pCuCmd->tPeriodicAppScanParams.tChannels[ i ].uTxPowerLevelDbm = DEF_TX_POWER;
+	}
    
 }
 
@@ -654,7 +669,7 @@ static VOID CuCmd_PrintBssidList(OS_802_11_BSSID_LIST_EX* bssidList, S32 IsFullP
             pBssid->MacAddress[4],
             pBssid->MacAddress[5],
             pBssid->Privacy, 
-			(char)pBssid->Rssi | 0xffffff00, /* need the 0xffffff00 to get negative value display */
+			pBssid->Rssi?(char)pBssid->Rssi | 0xffffff00:pBssid->Rssi,/* need the 0xffffff00 to get negative value display */
             connectionTypeStr,
             CuCmd_Freq2Chan(pBssid->Configuration.Union.channel),
             (pBssid->Ssid.Ssid[0] == '\0')?(PS8)"****":((PS8)pBssid->Ssid.Ssid) );
@@ -1131,7 +1146,11 @@ VOID CuCmd_FullBssidList(THandle hCuCmd, ConParm_t parm[], U16 nParms)
     }
 
     /* get currently connected bssid */
-    if(OK != CuOs_Get_BSSID(pCuCmd->hCuWext, bssid)) return;
+    if(OK != CuOs_Get_BSSID(pCuCmd->hCuWext, bssid))
+    {
+        os_MemoryFree (bssidList);
+        return;
+    }
     
     /* print the list to the terminal */
     CuCmd_PrintBssidList(bssidList, TRUE, bssid);
@@ -2207,7 +2226,7 @@ VOID CuCmd_ShowAdvancedParams(THandle hCuCmd, ConParm_t parm[], U16 nParms)
     TPowerMgr_PowerMode Mode;
     S32 txPowerLevel;
 #ifndef NO_WPA_SUPPL
-    OS_802_11_ENCRYPTION_TYPES EncryptionTypePairwise;
+    OS_802_11_ENCRYPTION_TYPES EncryptionTypePairwise = OS_ENCRYPTION_TYPE_NONE;
     OS_802_11_ENCRYPTION_TYPES EncryptionTypeGroup;
 #endif
     S32 Preamble;       
@@ -3175,6 +3194,8 @@ VOID CuCmd_GetTspec(THandle hCuCmd, ConParm_t parm[], U16 nParms)
     CuCmd_t* pCuCmd = (CuCmd_t*)hCuCmd;
     OS_802_11_QOS_TSPEC_PARAMS TspecParams;
 
+    os_memset(&TspecParams, 0, sizeof(OS_802_11_QOS_TSPEC_PARAMS));
+
     TspecParams.uUserPriority = parm[0].value;
     
     if(OK != CuCommon_GetSetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_GET_TSPEC_PARAMS,
@@ -3599,7 +3620,7 @@ VOID CuCmd_PsTrafficPeriod(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 	if (nParms == 0)
 	{
 	    if(OK != CuCommon_GetSetBuffer(pCuCmd->hCuCommon, TIWLN_802_11_MNGR_PS_TRAFFIC_PERIOD,
-	            &tPsRxStreaming, sizeof(TBaPolicy))) return;
+	            &tPsRxStreaming, sizeof(tPsRxStreaming))) return;
 
 		os_error_printf(CU_MSG_INFO2, (PS8)"Ps Traffic Period: %d \n",tPsRxStreaming.uStreamPeriod);
 	}
@@ -4339,7 +4360,7 @@ VOID CuCmd_ReportSeverityLevel(THandle hCuCmd, ConParm_t parm[], U16 nParms)
 
             for( i=1; i<SIZE_ARR(report_severity); i++ )
             {
-                os_error_printf(CU_MSG_INFO2, (PS8)"%d\t%c\t%s\n", report_severity[i].value, (SeverityTable[i] == '1') ? '+' : ' ', report_severity[i].name );
+                os_error_printf(CU_MSG_INFO2, (PS8)"%d\t%c\t%s\n", report_severity[i].value, (SeverityTable[i - 1] == '1') ? '+' : ' ', report_severity[i].name );
             }
 
             os_error_printf(CU_MSG_INFO2, (PS8)"* Use '0' to clear all table.\n");

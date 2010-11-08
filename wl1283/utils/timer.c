@@ -482,7 +482,15 @@ void tmr_StartTimer (TI_HANDLE     hTimerInfo,
 void tmr_StopTimer (TI_HANDLE hTimerInfo)
 {
     TTimerInfo   *pTimerInfo   = (TTimerInfo *)hTimerInfo;                 /* The timer handle */     
-	TTimerModule *pTimerModule = (TTimerModule *)pTimerInfo->hTimerModule; /* The timer module handle */
+    TTimerModule *pTimerModule ;
+
+    if(!pTimerInfo)
+    {
+        WLAN_OS_REPORT (("tmr_StopTimer(): ERROR - NULL timer!\n"));
+        return;
+    }
+
+    pTimerModule = (TTimerModule *)pTimerInfo->hTimerModule; /* The timer module handle */
 
     if (!pTimerModule)
     {

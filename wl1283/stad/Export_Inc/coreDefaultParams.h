@@ -376,7 +376,7 @@ IP&Port classification table  */
 #define  DYNAMIC_MEMORY_ENABLE_DEF              0
 #define  DYNAMIC_MEMORY_ENABLE_MIN              0
 #define  DYNAMIC_MEMORY_ENABLE_MAX              1
-#define  TX_FREE_REQ_DEF                        112
+#define  TX_FREE_REQ_DEF                        104
 #define  TX_FREE_REQ_MIN                        0
 #define  TX_FREE_REQ_MAX                        120
 #define  RX_FREE_REQ_DEF                        22
@@ -972,11 +972,6 @@ IP&Port classification table  */
 #define NULL_KL_PERIOD_DEF      10
 #define NULL_KL_PERIOD_MIN      0
 #define NULL_KL_PERIOD_MAX      3600       
-
-/* Context-Engine init paramaters */
-#define CONTEXT_SWITCH_REQUIRED_DEF     TI_TRUE
-#define CONTEXT_SWITCH_REQUIRED_MIN     TI_FALSE
-#define CONTEXT_SWITCH_REQUIRED_MAX     TI_TRUE
 
 /* WSC */
 #define WSC_PARSE_IN_BEACON_DEF 1

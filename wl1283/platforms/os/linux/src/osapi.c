@@ -729,22 +729,24 @@ Arguments:
 
 Return Value:  TI_OK
 -----------------------------------------------------------------------------*/
-int os_RequestSchedule (TI_HANDLE OsContext)
+int os_RequestSchedule (TI_HANDLE OsContext, TI_BOOL *pContextSwitchRequired)
 {
-	TWlanDrvIfObj *drv = (TWlanDrvIfObj *)OsContext;
+   TWlanDrvIfObj *drv = (TWlanDrvIfObj *)OsContext;
+   int  iRes = TI_OK;
 
-	/* Note: The performance trace below doesn't inclose the schedule
-	 *   itself because the rescheduling can occur immediately and call
-	 *   os_RequestSchedule again which will confuse the trace tools */
-	CL_TRACE_START_L3();
-	CL_TRACE_END_L3("tiwlan_drv.ko", "OS", "TASK", "");
+   *pContextSwitchRequired = TI_TRUE;
+   /* Note: The performance trace below doesn't inclose the schedule itself because the rescheduling
+    *         can occur immediately and call os_RequestSchedule again which will confuse the trace tools
+    */
+   CL_TRACE_START_L3();
+   CL_TRACE_END_L3("tiwlan_drv.ko", "OS", "TASK", "");
 
-	if( !queue_work(drv->tiwlan_wq, &drv->tWork) ) {
-		/* printk("%s: Fail\n",__func__); */
+	if( !queue_work(drv->tiwlan_wq, &drv->tWork) )
+	{
 		return TI_NOK;
 	}
 
-	return TI_OK;
+   return iRes;
 }
 
 
@@ -779,10 +781,12 @@ Return Value: TI_OK
 int os_SignalObjectWait (TI_HANDLE OsContext, void *signalObject)
 {
 	if (!signalObject)
+    {
 		return TI_NOK;
-	if (!wait_for_completion_timeout((struct completion *)signalObject,
-					msecs_to_jiffies(10000))) {
-		printk("tiwlan: 10 sec %s timeout\n", __func__);
+    }
+	if (!wait_for_completion_timeout((struct completion *)signalObject, msecs_to_jiffies(10000)))
+    {
+		printk("os_SignalObjectWait: 10 sec %s timeout\n", __func__);
 	}
 	return TI_OK;
 }
@@ -799,10 +803,12 @@ Return Value: TI_OK
 -----------------------------------------------------------------------------*/
 int os_SignalObjectSet (TI_HANDLE OsContext, void *signalObject)
 {
-	if (!signalObject)
+    if (!signalObject)
+    {
 		return TI_NOK;
-	complete ((struct completion *)signalObject);
-	return TI_OK;
+    }
+   complete ((struct completion *)signalObject);
+   return TI_OK;
 }
 
 

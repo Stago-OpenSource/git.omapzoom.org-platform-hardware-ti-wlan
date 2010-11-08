@@ -143,6 +143,7 @@ TI_STATUS txCtrlServ_buildWlanHeader(TI_HANDLE hTxCtrl, TI_UINT8* pFrame, TI_UIN
     dot11_header_t   *pDot11Header = (dot11_header_t*)(tPktCtrlBlk.aPktHdr);
     Wlan_LlcHeader_T *pWlanSnapHeader;
 
+    os_memoryZero(pTxCtrl->hOs, &currBssId,  sizeof(currBssId));
     /* 
      * If QoS is used, add two bytes padding before the header for 4-bytes alignment.
      * Note that the header length doesn't include it, so the txCtrl detects the pad existence
@@ -170,6 +171,12 @@ TI_STATUS txCtrlServ_buildWlanHeader(TI_HANDLE hTxCtrl, TI_UINT8* pFrame, TI_UIN
     txCtrlParams_getCurrentEncryptionInfo (hTxCtrl, 
                                            &currentPrivacyInvokedMode,
                                            &encryptionFieldSize);
+
+    if (AES_AFTER_HEADER_FIELD_SIZE < encryptionFieldSize) /*The longest encryption filed size is for AES */
+    {
+        return TI_NOK;
+    }
+
     if (currentPrivacyInvokedMode)
     {
         headerFlags |= DOT11_FC_WEP;

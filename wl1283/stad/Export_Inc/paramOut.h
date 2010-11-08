@@ -1237,7 +1237,7 @@ typedef struct
     TI_UINT8                        trafficMonitorMinIntervalPercentage;
     TReportInitParams               tReport;
     TCurrBssInitParams              tCurrBssInitParams;
-    TContextInitParams              tContextInitParams;
+
     TMlmeInitParams                 tMlmeInitParams;
     TDrvMainParams                  tDrvMainParams;
     TRoamScanMngrInitParams         tRoamScanMngrInitParams;

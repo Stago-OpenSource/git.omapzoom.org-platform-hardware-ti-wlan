@@ -53,6 +53,8 @@
 #include "connApi.h"
 #include "scrApi.h"
 
+#define DISCONNECT_TIMEOUT_MSEC      800
+
 typedef struct
 {
 	mgmtStatus_e			disAssocEventReason;		/* Disassoc reason to be used for upper layer	*/

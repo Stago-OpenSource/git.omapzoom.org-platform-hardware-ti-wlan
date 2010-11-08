@@ -159,6 +159,7 @@ typedef struct
                                                                  */                                                                          
     EPowerPolicy    			defaultPowerLevel;              /**< Power level when PS not active */
     EPowerPolicy    			PowerSavePowerLevel;            /**< Power level when PS active */
+    EPowerPolicy                eLastPowerAuth;                 /**< The last Power-Authority that was set */
     EventsPowerSave_e           lastPsTransaction;              /**< Last result of PS request */
     TI_UINT32                   maxFullBeaconInterval;          /**< Maximal time between full beacon reception */
     TI_UINT8	                betEnable;                      /**< last configuration of BET enable/disable */

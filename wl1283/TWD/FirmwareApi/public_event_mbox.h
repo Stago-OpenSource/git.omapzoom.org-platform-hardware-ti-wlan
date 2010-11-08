@@ -98,7 +98,7 @@ typedef enum
     BSS_LOSE_EVENT_ID                        = BIT_18,
     REGAINED_BSS_EVENT_ID                    = BIT_19,
     ROAMING_TRIGGER_MAX_TX_RETRY_EVENT_ID    = BIT_20,
-    RESERVED_21                              = BIT_21,
+    DUMMY_PACKET_ID                          = BIT_21,
     SOFT_GEMINI_SENSE_EVENT_ID               = BIT_22,
     SOFT_GEMINI_PREDICTION_EVENT_ID          = BIT_23,
     SOFT_GEMINI_AVALANCHE_EVENT_ID           = BIT_24,

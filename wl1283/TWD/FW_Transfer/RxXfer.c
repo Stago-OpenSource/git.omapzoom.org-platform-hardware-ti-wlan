@@ -67,6 +67,10 @@
 #define MAX_CONSECUTIVE_READ_TXN    16
 #define MAX_PACKET_SIZE             8192    /* Max Txn size */
 
+#ifndef TNETW1283
+#define RXXFER_FLAG_EOT_WORKAROUND	BIT_1	/* Enable (1) / Disable (0) the End Of Transaction workaround */
+#endif
+
 #ifdef PLATFORM_SYMBIAN	/* UMAC is using only one buffer and therefore we can't use consecutive reads */
     #define MAX_CONSECUTIVE_READS   1
 #else
@@ -162,6 +166,10 @@ typedef struct
     TFailureEventCb     fErrCb;                                 /* The upper layer CB function for error handling */
     TI_HANDLE           hErrCb;                                 /* The CB function handle */
     TI_UINT32           uHostIfCfgBitmap;                       /* Host interface configuration bitmap */
+
+#ifndef TNETW1283
+    TI_UINT32				uFlags;                             /* See RXXFER_FLAG_* */
+#endif
 
 #ifdef TI_DBG
     TRxXferDbgStat      tDbgStat;
@@ -301,6 +309,9 @@ void rxXfer_SetDefaults (TI_HANDLE hRxXfer, TTwdInitParams *pInitParams)
     TRxXfer *pRxXfer = (TRxXfer *)hRxXfer;
 
     pRxXfer->uMaxAggregPkts = pInitParams->tGeneral.uRxAggregPktsLimit;
+#ifndef TNETW1283
+    pRxXfer->uFlags         = 0;
+#endif
 }
 
 
@@ -323,6 +334,35 @@ void rxXfer_SetBusParams (TI_HANDLE hRxXfer, TI_UINT32 uDmaBufLen)
     pRxXfer->uMaxAggregLen = uDmaBufLen;
 }
 
+#ifndef TNETW1283
+/****************************************************************************
+ *                      rxXfer_SetHwInfo()
+ ****************************************************************************
+ * DESCRIPTION: Configure the module according to present HW and FW capabilities
+ *
+ * INPUTS:      hRxXfer - module handle
+ *              pHwInfo - HW and FW information
+ *
+ * OUTPUT:  None
+ *
+ * RETURNS: None
+ ****************************************************************************/
+void rxXfer_SetHwInfo(TI_HANDLE hRxXfer, TFwInfo* pHwInfo)
+{
+	TRxXfer *pRxXfer = (TRxXfer *)hRxXfer;
+	TI_BOOL bEnableEOTWorkaroud;
+
+	if (NULL==pHwInfo) {
+		return;
+	}
+
+	bEnableEOTWorkaroud = (pHwInfo->uPGVersion < 3);
+	if (bEnableEOTWorkaroud)
+	{
+		pRxXfer->uFlags |= RXXFER_FLAG_EOT_WORKAROUND;
+	}
+}
+#endif
 
 /****************************************************************************
  *                      rxXfer_Register_CB()
@@ -802,12 +842,15 @@ static ETxnStatus rxXfer_IssueTxn (TI_HANDLE hRxXfer, TI_UINT32 uRxDesc,TI_UINT3
 #else
     /* Write driver packets counter to FW. This write automatically generates interrupt to FW */
     /* Note: Workaround for WL6-PG1.0 is still needed for PG2.0 */
-    pTxn = &pRxXfer->aCounterTxn[uIndex].tTxnStruct;
-    pTxn->uHwAddr = RX_DRIVER_COUNTER_ADDRESS;
-    pRxXfer->aCounterTxn[uIndex].uCounter = ENDIAN_HANDLE_LONG(pRxXfer->uDrvRxCntr);
-    twIf_Transact(pRxXfer->hTwIf, pTxn);
+    if (pRxXfer->uFlags & RXXFER_FLAG_EOT_WORKAROUND)
+    {
+		pTxn = &pRxXfer->aCounterTxn[uIndex].tTxnStruct;
+		pTxn->uHwAddr = RX_DRIVER_COUNTER_ADDRESS;
+		pRxXfer->aCounterTxn[uIndex].uCounter = ENDIAN_HANDLE_LONG(pRxXfer->uDrvRxCntr);
+		twIf_Transact(pRxXfer->hTwIf, pTxn);
 
-    TRACE5(pRxXfer->hReport, REPORT_SEVERITY_INFORMATION , "rxXfer_IssueTxn: Counter-Txn: HwAddr=0x%x, Len0=%d, Data0=%d, DrvCount=%d, TxnParams=0x%x\n", pTxn->uHwAddr, pTxn->aLen[0], *(TI_UINT32 *)(pTxn->aBuf[0]), pRxXfer->uDrvRxCntr, pTxn->uTxnParams);
+		TRACE5(pRxXfer->hReport, REPORT_SEVERITY_INFORMATION , "rxXfer_IssueTxn: Counter-Txn: HwAddr=0x%x, Len0=%d, Data0=%d, DrvCount=%d, TxnParams=0x%x\n", pTxn->uHwAddr, pTxn->aLen[0], *(TI_UINT32 *)(pTxn->aBuf[0]), pRxXfer->uDrvRxCntr, pTxn->uTxnParams);
+    }
 #endif
 
     /* Return the status of the packet(s) transaction - COMPLETE, PENDING or ERROR */

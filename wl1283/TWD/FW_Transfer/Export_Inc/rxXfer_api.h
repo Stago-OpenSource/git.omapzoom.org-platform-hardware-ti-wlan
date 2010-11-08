@@ -85,6 +85,23 @@ void rxXfer_PrintStats( TI_HANDLE hRxXfer );
 
 TI_STATUS rxXfer_Config (TI_HANDLE hRxXfer, TTwdInitParams *pInitParams);
 
+#ifndef TNETW1283
+/**
+ * \fn     rxXfer_SetHwInfo
+ * \brief  Set up HW/FW related settings
+ *
+ * Sets up HW and FW related settings of this module (like whether to use the EOT
+ * workaround, depending on the PG version)
+ *
+ * \param  hTxXfer - This module's object
+ * \param  pHwInfo - HW and FW information
+ * \return void
+ * \sa
+ */
+void rxXfer_SetHwInfo(TI_HANDLE hRxXfer, TFwInfo* pHwInfo);
+#endif
+
+
 #endif /* _RX_XFER_API_H */
 
 

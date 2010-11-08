@@ -118,18 +118,21 @@ typedef struct
     DisconnectType_e    disConnType;
     mgmtStatus_e        disConnReason;
     TI_BOOL             bParseBeaconWSC;
+    TI_BOOL             bSharedFailed;
 
 	legacyAuthType_e	legacyAuthType;
 	auth_t				authInfo;
 	assoc_t				assocInfo;
 
-	TI_UINT8			extraIes[MAX_EXTRA_IES_LEN];
+    TI_UINT8			extraIes[MAX_EXTRA_IES_LEN];
 	TI_UINT16			extraIesLen;
 
 	TI_HANDLE			hMlmeTimer;
 
     /* temporary frame info */
     mlmeIEParsingParams_t tempFrameInfo;
+
+    TI_UINT8            assocMsg[MAX_ASSOC_MSG_LENGTH];
 
     /* debug info - start */
     TI_UINT32           debug_lastProbeRspTSFTime;

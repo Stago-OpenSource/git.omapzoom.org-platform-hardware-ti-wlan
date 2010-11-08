@@ -68,6 +68,7 @@
 #define     TX_ATTR_RATE_POLICY           (BIT_5 | BIT_6 | BIT_7 | BIT_8 | BIT_9)
 #define     TX_ATTR_LAST_WORD_PAD         (BIT_10 | BIT_11)
 #define     TX_ATTR_TX_CMPLT_REQ          BIT_12
+#define     TX_ATTR_TX_DUMMY_REQ          BIT_13
 
 #define     TX_ATTR_OFST_SAVE_RETRIES     0
 #define     TX_ATTR_OFST_HEADER_PAD       1
@@ -75,6 +76,7 @@
 #define     TX_ATTR_OFST_RATE_POLICY      5
 #define     TX_ATTR_OFST_LAST_WORD_PAD    10
 #define     TX_ATTR_OFST_TX_CMPLT_REQ     12
+#define     TX_ATTR_OFST_TX_DUMMY_REQ     13
 
 /* The packet transmission result, written in the status field of TxResultDescriptor_t */
 typedef enum

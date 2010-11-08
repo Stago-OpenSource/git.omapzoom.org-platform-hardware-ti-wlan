@@ -346,7 +346,7 @@ TI_STATUS txCtrl_SetDefaults (TI_HANDLE hTxCtrl, txDataInitParams_t *txDataInitP
 TI_STATUS txCtrl_Unload (TI_HANDLE hTxCtrl)
 {
     txCtrl_t *pTxCtrl = (txCtrl_t *)hTxCtrl;
-    TI_UINT8            i=0;
+    TI_UINT8 i;
 
     if (pTxCtrl == NULL)
     {
@@ -360,10 +360,14 @@ TI_STATUS txCtrl_Unload (TI_HANDLE hTxCtrl)
 	tmr_DestroyTimer (pTxCtrl->hCreditTimer);
 	}
 
-	for (i = 0; i < TSM_REPORT_NUM_OF_MEASUREMENT_IN_PARALLEL_MAX; i++) {
-		if (pTxCtrl->tTSMTimers[i].hRequestTimer)
-			tmr_DestroyTimer (pTxCtrl->tTSMTimers[i].hRequestTimer);
+	/* Destroy the TSM timers */
+	for (i = 0; i < TSM_REPORT_NUM_OF_MEASUREMENT_IN_PARALLEL_MAX; i++)
+	{
+		if (pTxCtrl->tTSMTimers[i].hRequestTimer) {
+			tmr_DestroyTimer( pTxCtrl->tTSMTimers[i].hRequestTimer );
+		}
 	}
+
     /* free Tx Data control block */
     os_memoryFree (pTxCtrl->hOs, pTxCtrl, sizeof(txCtrl_t));
 
@@ -956,10 +960,7 @@ static void txCtrl_BuildDataPkt (txCtrl_t *pTxCtrl, TTxCtrlBlk *pPktCtrlBlk,
 	{
 		uTxDescAttr |= TX_ATTR_HEADER_PAD;
 	}
-	if (uBackpressure)
-    {
-		uTxDescAttr |= TX_ATTR_TX_CMPLT_REQ;  /* Request immediate Tx-Complete from FW if the AC is busy */
-    }
+
     if (TI_UNLIKELY(pTxCtrl->currBssType == BSS_INDEPENDENT) &&
         (pPktCtrlBlk->tTxPktParams.uFlags & TX_CTRL_FLAG_MULTICAST))
 	{
@@ -1044,10 +1045,40 @@ static void txCtrl_BuildMgmtPkt (txCtrl_t *pTxCtrl, TTxCtrlBlk *pPktCtrlBlk, TI_
 	uTxDescAttr |= pTxCtrl->txSessionCount << TX_ATTR_OFST_SESSION_COUNTER;
     uTxDescAttr |= uLastWordPad << TX_ATTR_OFST_LAST_WORD_PAD;
 	uTxDescAttr |= TX_ATTR_TX_CMPLT_REQ;
+
 	if (uHdrAlignPad)
     {
 		uTxDescAttr |= TX_ATTR_HEADER_PAD;
     }
+
+	/* For Dummy Blocks Packets, set relevant fields */
+	if (TX_PKT_TYPE_DUMMY_BLKS == pPktCtrlBlk->tTxPktParams.uPktType)
+	{
+		/* FW expects the dummy packet to have an invalid session id - any session id
+		 * that is different than the one set in the join process */
+		uTxDescAttr |= ((~(pTxCtrl->txSessionCount)) << TX_ATTR_OFST_SESSION_COUNTER) & TX_ATTR_SESSION_COUNTER;
+
+		/* Mark as dummy packet for FW */
+		uTxDescAttr |= TX_ATTR_TX_DUMMY_REQ;
+
+		/* Initialize WLAN header */
+		{
+			dot11_mgmtHeader_t* pWLANHeader;
+			TMacAddr saBssid;
+
+			pWLANHeader = (dot11_mgmtHeader_t *)(pPktCtrlBlk->aPktHdr);
+			pWLANHeader->fc = ENDIAN_HANDLE_WORD(DOT11_FC_DATA_NULL_FUNCTION | DOT11_FC_TO_DS);
+			pWLANHeader->duration = 0;
+			pWLANHeader->seqCtrl = 0;
+			MAC_COPY (pWLANHeader->DA, pTxCtrl->currBssId);
+			MAC_COPY (pWLANHeader->BSSID, pTxCtrl->currBssId);
+
+			/* Set Source Address */
+			ctrlData_getParamMacAddr(pTxCtrl->hCtrlData, saBssid);
+			MAC_COPY (pWLANHeader->SA, saBssid);
+		}
+	}
+
 	pPktCtrlBlk->tTxDescriptor.txAttr = ENDIAN_HANDLE_WORD(uTxDescAttr); 
 
     /* Translate packet timestamp to FW time (also updates lifeTime and driverHandlingTime) */

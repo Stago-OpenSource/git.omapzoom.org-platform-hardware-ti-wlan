@@ -278,7 +278,7 @@
 #define TWD_TX_CMPLT_THRESHOLD_MIN      0
 #define TWD_TX_CMPLT_THRESHOLD_MAX      30
 
-#define TWD_TX_CMPLT_TIMEOUT_DEF        700 /* The Tx Complete interrupt pacing timeout in microseconds! */
+#define TWD_TX_CMPLT_TIMEOUT_DEF        1200 /* The Tx Complete interrupt pacing timeout in microseconds! */
 #define TWD_TX_CMPLT_TIMEOUT_MIN        1
 #define TWD_TX_CMPLT_TIMEOUT_MAX        50000
 
@@ -287,7 +287,7 @@
 #define TWD_RX_INTR_THRESHOLD_MAX       30
 #define TWD_RX_INTR_THRESHOLD_DEF_WIFI_MODE  0 /* No Rx interrupt pacing so send interrupt on every event */
 
-#define TWD_RX_INTR_TIMEOUT_DEF         600  /* The Rx interrupt pacing timeout in microseconds! */  
+#define TWD_RX_INTR_TIMEOUT_DEF         1200  /* The Rx interrupt pacing timeout in microseconds! */
 #define TWD_RX_INTR_TIMEOUT_MIN         1 
 #define TWD_RX_INTR_TIMEOUT_MAX         50000
 
@@ -297,7 +297,7 @@
 #define TWD_RX_AGGREG_PKTS_LIMIT_MAX    5
 
 /* Tx aggregation packets number limit (max packets in one aggregation) */
-#define TWD_TX_AGGREG_PKTS_LIMIT_DEF    0
+#define TWD_TX_AGGREG_PKTS_LIMIT_DEF    8
 #define TWD_TX_AGGREG_PKTS_LIMIT_MIN    0 
 #define TWD_TX_AGGREG_PKTS_LIMIT_MAX    32
 
@@ -372,7 +372,12 @@
 #define TX_PKT_TYPE_MGMT                   1   /* Management Packet						  */
 #define TX_PKT_TYPE_EAPOL                  2   /* EAPOL packet (Ethernet)				  */
 #define TX_PKT_TYPE_ETHER                  3   /* Data packet from the Network interface  */
-#define TX_PKT_TYPE_WLAN_DATA	           4   /* Driver generated WLAN Data Packet (currently used for IAPP packet) */
+#define TX_PKT_TYPE_WLAN_DATA	           4   /* Driver generated WLAN Data Packet
+                                                * (currently used for IAPP packet)        */
+#define TX_PKT_TYPE_DUMMY_BLKS             5   /* Dummy Blocks Packet (for Dynamic Memory
+                                                * management). Sent in response to Dummy
+                                                * Packet Request FW event. Used by FW to
+                                                * move memory blocks from TX to RX.       */
 
 
 #define ALIGN_4BYTE_MASK                   0x3 /* Masked LS bits for 4-bytes aligned addresses or lengths. */
@@ -722,7 +727,7 @@ typedef enum
 /*	18	*/  TWD_OWN_EVENT_BSS_LOSE,                     /**< */
 /*	19	*/  TWD_OWN_EVENT_BSS_REGAIN,                   /**< */
 /*	20	*/  TWD_OWN_EVENT_MAX_TX_RETRY,                 /**< */
-/*  21  */  RESERVED21,									/**< */
+/*  21  */  TWD_OWN_EVENT_DUMMY_PKT_REQ,				/**< */
 /*	22	*/  TWD_OWN_EVENT_SOFT_GEMINI_SENSE,            /**< */
 /*	23	*/  TWD_OWN_EVENT_SOFT_GEMINI_PREDIC,           /**< */
 /*	24	*/  TWD_OWN_EVENT_SOFT_GEMINI_AVALANCHE,        /**< */
@@ -1691,7 +1696,12 @@ typedef struct
     TMacAddr                            macAddress;				/**< MAC Address								*/
     TI_UINT8                            txPowerTable[NUMBER_OF_SUB_BANDS_E][NUM_OF_POWER_LEVEL]; /**< Maximun Dbm in Dbm/10 units */
     TI_UINT32                           uHardWareVersion;		/**< HW Version									*/
-
+#ifndef TNETW1283
+    TI_UINT32                           uPGVersion;             /**< PG Version (Major Revision):
+                                                                      - 0 for PG1
+                                                                      - 1 for PG2
+                                                                      - 3 for PG3 */
+#endif
 } TFwInfo;  
 
 /** \struct TJoinBss
@@ -2771,9 +2781,9 @@ typedef struct
     TGeneralInitParams                  tGeneral;			 /**< General Initialization Parameters			*/
     TArpIpFilterInitParams              tArpIpFilter;		 /**< ARP IP filter Initialization Parameters	*/
     TMacAddrFilterInitParams            tMacAddrFilter;		 /**< MAC Address Initialization Parameters		*/
-    IniFileRadioParam                   tIniFileRadioParams; /**< Radio Initialization Parameters   		*/
+    IniFileRadioParam                   tIniFileRadioParams[NUMBER_OF_FEM_TYPES_E]; /**< Radio Initialization Parameters   		*/
 #ifndef TNETW1283
-    IniFileExtendedRadioParam			tIniFileExtRadioParams; /**< Radio Initialization Parameters   		*/
+    IniFileExtendedRadioParam			tIniFileExtRadioParams[NUMBER_OF_FEM_TYPES_E]; /**< Radio Initialization Parameters   		*/
 #endif
     IniFileGeneralParam                 tPlatformGenParams; /**< Radio Initialization Parameters   	        */
 	RateMangeParams_t					tRateMngParams;			  
@@ -3222,6 +3232,18 @@ TI_STATUS TWD_ConfigFw (TI_HANDLE hTWD);
  * \sa
  */ 
 TI_STATUS TWD_InterruptRequest (TI_HANDLE hTWD);
+/** @ingroup Control
+ * \brief Handle FW interrupt from signal context
+ *
+ * \param  hTWD         - TWD module object handle
+ * \return TI_OK on success or TI_NOK on failure
+ *
+ * \par Description
+ * The driver task is scheduled to hadnle FW-Events
+ *
+ * \sa
+ */
+TI_STATUS TWD_InterruptRequestWithinWlanThread (TI_HANDLE hTWD);
 /** @ingroup Control
  * \brief Enable Recovery
  * 

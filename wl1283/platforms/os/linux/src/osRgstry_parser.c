@@ -47,6 +47,7 @@ static PNDIS_CONFIGURATION_PARAMETER pNdisParm;
 
 int osInitTable_IniFile (TI_HANDLE hOs, TInitTable *InitTable, char *file_buf, int file_length)
 {
+    TI_STATUS eStatus;
     TWlanDrvIfObjPtr drv = (TWlanDrvIfObjPtr)hOs;
     
     static NDIS_CONFIGURATION_PARAMETER vNdisParm;
@@ -55,12 +56,15 @@ int osInitTable_IniFile (TI_HANDLE hOs, TInitTable *InitTable, char *file_buf, i
     init_file_length  = file_length;
     pNdisParm = &vNdisParm;
     
-    regFillInitTable (drv, InitTable);
+
+    eStatus =  regFillInitTable (drv, InitTable);
+    if(eStatus == TI_OK)
+    {
 #ifdef TI_DBG
-    regReadLastDbgState(drv);
+        regReadLastDbgState(drv);
 #endif
-   
-    return 0;
+    }
+    return eStatus;
 }
 
 unsigned long TiDebugFlag;

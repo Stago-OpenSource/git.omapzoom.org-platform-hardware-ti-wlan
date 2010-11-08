@@ -277,6 +277,10 @@ static TI_STATUS rsnWait_to_connected(void *pData)
     /* Update current BSS connection type and mode */
     currBSS_updateConnectedState(pConn->hCurrBss, TI_TRUE, BSS_INDEPENDENT);
 
+    WLAN_OS_REPORT(("************ NEW CONNECTION ************\n"));
+    siteMgr_printPrimarySiteDesc(pConn->hSiteMgr);
+    WLAN_OS_REPORT(("****************************************\n"));
+
 	sme_ReportConnStatus(((conn_t *)pData)->hSmeSm, STATUS_SUCCESSFUL, 0);
 
     return TI_OK;
@@ -439,6 +443,7 @@ static TI_STATUS rsnWait_to_waitToDisconnCmplt(void *pData)
 {
     paramInfo_t     param;
 	TI_STATUS		tStatus;
+	conn_t          *pConn = (conn_t *)pData;
 
     tStatus = rsn_stop(((conn_t *)pData)->hRsn, TI_FALSE);
 
@@ -451,6 +456,10 @@ static TI_STATUS rsnWait_to_waitToDisconnCmplt(void *pData)
 
     /* Update current BSS connection type and mode */
     currBSS_updateConnectedState(((conn_t *)pData)->hCurrBss, TI_FALSE, BSS_INDEPENDENT);
+
+    /* Start the disconnect complete time out timer.
+       Disconect Complete event, which stops the timer. */
+    tmr_StartTimer (pConn->hConnTimer, conn_timeout, (TI_HANDLE)pConn, DISCONNECT_TIMEOUT_MSEC, TI_FALSE);
 
     /* Stop beacon generation */
     TWD_CmdFwDisconnect (((conn_t *)pData)->hTWD, DISCONNECT_IMMEDIATE, STATUS_UNSPECIFIED); 

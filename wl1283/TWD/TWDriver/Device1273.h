@@ -966,7 +966,18 @@
 #define OCP_CMD                        (REGISTERS_BASE + 0x9C0)
 #define FUNC7_SEL                      0xC8C
 #define FUNC7_PULL                     0xCB0
-#define FN0_CCCR_REG_32                0x64  
+#define FN0_CCCR_REG_32                0x64 
+
+#ifndef TNETW1283
+#define CLK_REQ                        (0x448)
+#define TESTMODE_CLK_REQ_OUTN_SEL      (0xCB2)
+#endif
+
+#ifndef TNETW1283
+#define FUSE_DATA_2_1				   0x050A
+#define PG_VERSION_MASK				   (BIT_3 | BIT_2)
+#define PG_VERSION_OFFSET			   2
+#endif
 
 #define PLL_PARAMETERS_CLK_VAL_19_2M   0x01			
 #define PLL_PARAMETERS_CLK_VAL_26M     0x02				
@@ -1009,9 +1020,7 @@
 #define MCS_PLL_M_REG_VAL           (0xC8)
 #define MCS_PLL_N_REG_VAL           (0x07)
 
-
-
-
+#define CLK_REQ                     (0x08A)
 
 
 #define MCS_SEL_IN_FREQ_MASK        (0x0070)

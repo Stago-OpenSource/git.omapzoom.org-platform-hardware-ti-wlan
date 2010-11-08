@@ -1875,6 +1875,8 @@ static void apConn_smReportDisconnected(void *pData)
     
     pAPConnection->firstAttempt2Roam = TI_TRUE;
 
+    rsn_clearGenInfoElement(pAPConnection->hRsn);
+
     /* Notify SME */
     apConn_reportConnStatusToSME(pAPConnection);
 }

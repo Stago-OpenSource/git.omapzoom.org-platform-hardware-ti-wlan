@@ -189,6 +189,21 @@ ETxnStatus txXfer_SendPacket (TI_HANDLE hTxXfer, TTxCtrlBlk *pPktCtrlBlk);
  */ 
 void txXfer_EndOfBurst (TI_HANDLE hTxXfer);
 
+#ifndef TNETW1283
+/**
+ * \fn     txXfer_SetHwInfo
+ * \brief  Set up HW/FW related settings
+ *
+ * Sets up HW and FW related settings of this module (like whether to use the EOT
+ * workaround, depending on the PG version)
+ *
+ * \param  hTxXfer - This module's object
+ * \param  pHwInfo - HW and FW information
+ * \return void
+ * \sa
+ */
+void txXfer_SetHwInfo(TI_HANDLE hTxXfer, TFwInfo* pHwInfo);
+#endif
 
 
 #ifdef TI_DBG

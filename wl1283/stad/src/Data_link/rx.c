@@ -1242,7 +1242,6 @@ static void rxData_rcvPacketData(TI_HANDLE hRxData, void *pBuffer, TRxAttr* pRxA
     rxData_t *pRxData = (rxData_t *)hRxData;
     TEthernetHeader *pEthernetHeader;
     TI_UINT16 EventMask = 0;        
-    TFwInfo *pFwInfo;
 
 
     TRACE0(pRxData->hReport, REPORT_SEVERITY_INFORMATION, " rxData_rcvPacketData() : Received DATA frame tranferred to OS\n");
@@ -1271,21 +1270,6 @@ static void rxData_rcvPacketData(TI_HANDLE hRxData, void *pBuffer, TRxAttr* pRxA
             /* free Buffer */
             TRACE0(pRxData->hReport, REPORT_SEVERITY_WARNING, " rxData_rcvPacketData() : exclude broadcast unencrypted is TI_TRUE & packet encryption is OFF\n");
 
-            RxBufFree(pRxData->hOs, pBuffer);
-            return;
-        }
-
-        /*
-         * Discard multicast/broadcast frames that we sent ourselves.
-         * Per IEEE 802.11-2007 section 9.2.7: "STAs shall filter out
-         * broadcast/multicast messages that contain their address as
-         * the source address."
-         */
-        pFwInfo = TWD_GetFWInfo (pRxData->hTWD);
-        if (MAC_EQUAL(pFwInfo->macAddress, pEthernetHeader->src))
-        {
-            pRxData->rxDataDbgCounters.excludedFrameCounter++;
-            /* free Buffer */
             RxBufFree(pRxData->hOs, pBuffer);
             return;
         }
@@ -1382,6 +1366,7 @@ static void rxData_rcvPacketIapp(TI_HANDLE hRxData, void *pBuffer, TRxAttr* pRxA
 * 
 * RETURNS:      TI_OK/TI_NOK
 ***************************************************************************/
+
 static TI_STATUS rxData_convertWlanToEthHeader (TI_HANDLE hRxData, void *pBuffer, TI_UINT16 * etherType)
 {
     TEthernetHeader      EthHeader;

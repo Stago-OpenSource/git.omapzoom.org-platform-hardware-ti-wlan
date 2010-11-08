@@ -493,11 +493,10 @@ TI_STATUS measurementSRVSM_startMeasureTypes( TI_HANDLE hMeasurementSRV )
 
             if ( TI_OK == status )
             {
-                TRACE8( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": AP discovery command sent. "
+                TRACE7( pMeasurementSRV->hReport, REPORT_SEVERITY_INFORMATION, ": AP discovery command sent. "
                                                                                "Params:\n scanDuration=%d, "
                                                                                "scanOptions=%d, numOfProbRqst=%d, "
                                                                                "txdRateSetBG=%d, txdRateSetA=%d,"
-                                                                               " txPowerDbm=%d, "
                                                                                "configOptions=%d, "
                                                                                "filterOptions=%d\n Starting timer...\n", 
                                                                     pApDiscoveryParams.scanDuration, 
@@ -505,7 +504,6 @@ TI_STATUS measurementSRVSM_startMeasureTypes( TI_HANDLE hMeasurementSRV )
                                                                     pApDiscoveryParams.numOfProbRqst, 
                                                                     pApDiscoveryParams.txdRateSetBandBG, 
                                                                     pApDiscoveryParams.txdRateSetBandA,
-                                                                    pApDiscoveryParams.channelListBandBG.txPowerDbm[0], 
                                                                     pApDiscoveryParams.ConfigOptions, 
                                                                     pApDiscoveryParams.FilterOptions);
         

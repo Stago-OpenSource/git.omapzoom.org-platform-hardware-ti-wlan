@@ -1001,6 +1001,7 @@ TI_STATUS siteMgr_setParam(TI_HANDLE        hSiteMgr,
             staIp[2] = pParam->content.StationIP[2];
             staIp[3] = pParam->content.StationIP[3];
 
+
             templateStruct.type = ARP_RSP_TEMPLATE;
             templateStruct.ptr  = (TI_UINT8 *)&ArpRspTemplate;
 
@@ -2993,6 +2994,7 @@ void siteMgr_printPrimarySiteDesc(TI_HANDLE hSiteMgr )
 	WLAN_OS_REPORT(("-- BSSID = %02x-%02x-%02x-%02x-%02x-%02x\n",
 					pPrimarySite->bssid[0], pPrimarySite->bssid[1], pPrimarySite->bssid[2], pPrimarySite->bssid[3], 
 					pPrimarySite->bssid[4], pPrimarySite->bssid[5]));
+	WLAN_OS_REPORT(("-- MODE  = %s \n", pPrimarySite->bssType == BSS_INDEPENDENT ? "Adhoc" : "infrastructure" ));
 }
 #endif
 

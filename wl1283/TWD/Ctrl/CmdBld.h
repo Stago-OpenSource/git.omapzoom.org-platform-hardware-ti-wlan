@@ -182,7 +182,9 @@ TI_STATUS cmdBld_SetRadioBand           (TI_HANDLE hCmdBld, ERadioBand eRadioBan
 TI_STATUS cmdBld_SetRxFilter            (TI_HANDLE hCmdBld, TI_UINT32 uRxConfigOption, TI_UINT32 uRxFilterOption);
 TI_STATUS cmdBld_SetSecuritySeqNum      (TI_HANDLE hCmdBld, TI_UINT8 securitySeqNumLsByte);
 TI_STATUS cmdBld_CfgRateMngDbg 			(TI_HANDLE hCmdBld, RateMangeParams_t *pRateMngParams ,void *fCb, TI_HANDLE  hCb);
-
+#ifndef TNETW1283
+TI_STATUS cmdBld_SetPGVersion           (TI_HANDLE hCmdBld, TI_UINT32 uPGVersion);
+#endif
 
 /* this is a solution for the EMP project Enable/Disable Rx Data*/
 TI_STATUS cmdBld_SetDownlinkData  (TI_HANDLE hCmdBld, TI_BOOL bDownlinkFlag);
@@ -191,6 +193,9 @@ TI_STATUS cmdBld_SetDownlinkData  (TI_HANDLE hCmdBld, TI_BOOL bDownlinkFlag);
 #ifdef TI_DBG
 void cmdBld_DbgForceTemplatesRates (TI_HANDLE hCmdBld, TI_UINT32 uRateMask);
 #endif
+
+/* Definition of CB function */
+typedef void (*InitSeqCB) (TI_HANDLE handle);
 
 #define CMD_IS_INVALID  0
 #define CMD_IS_VALID    1
@@ -342,6 +347,7 @@ typedef struct
     TI_HANDLE                  hJoinCmpltOriginalCbHndl;
 
     TI_UINT32                  uIniSeq;         /* Init sequence counter */
+    void                       *fInitSeqCB;     /* CB function pointer */
     TI_BOOL                    bReconfigInProgress;
 
     TI_UINT32                  uLastElpCtrlMode;/* Init sleep mode */

@@ -353,7 +353,7 @@ TRACE1(pHandle->hReport, REPORT_SEVERITY_SM, "MLME_PARSER: recieved ASSOC_RESPON
                 rsnIeIdx ++;
                 break;
 
-			case DOT11_QOS_CAPABILITY_ELE_ID:
+			case QOS_CAPABILITY_IE_ID:
 				pHandle->tempFrameInfo.frame.content.assocRsp.QoSCapParameters = &(pHandle->tempFrameInfo.QosCapParams);
                 status = mlmeParser_readQosCapabilityIE(pHandle, pData, bodyDataLen, &readLen, 
                                                         &(pHandle->tempFrameInfo.QosCapParams));
@@ -1781,7 +1781,7 @@ TI_STATUS mlmeParser_parseIEs(TI_HANDLE hMlme,
 			rsnIeIdx ++;
 			break;
 
-		case DOT11_QOS_CAPABILITY_ELE_ID:
+		case QOS_CAPABILITY_IE_ID:
 			frame->QoSCapParameters = &params->QosCapParams;
 			status = mlmeParser_readQosCapabilityIE(pHandle, pData, bodyDataLen, &readLen, &params->QosCapParams);
 			CHECK_PARSING_ERROR_CONDITION((status != TI_OK), ("MLME_PARSER: error reading QOS CapabilityIE\n"),TI_TRUE);
@@ -1799,7 +1799,7 @@ TI_STATUS mlmeParser_parseIEs(TI_HANDLE hMlme,
 		CHECK_PARSING_ERROR_CONDITION((status != TI_OK), ("MLME_PARSER: error reading HT Information IE\n"),TI_TRUE);
 		break;
         
-    case RRM_ENABLED_CAPABILITIES_ELE_ID:
+    case RRM_ENABLED_CAPABILITIES_IE_ID:
          frame->pRRMCapabilities = &params->tRRMEnabledCap;
          status = mlmeParser_readRMEnabledCapIE(pHandle, pData, bodyDataLen, &readLen, &params->tRRMEnabledCap);
          CHECK_PARSING_ERROR_CONDITION((status != TI_OK), ("MLME_PARSER: error reading RRM_ENABLED_CAPABILITIES IE\n"),TI_TRUE);

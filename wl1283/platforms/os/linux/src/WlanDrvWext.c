@@ -79,7 +79,7 @@ static const iw_handler aWextHandlers[] = {
 	(iw_handler) NULL,		                    /* SIOCSIWPRIV - not used */
 	(iw_handler) NULL,                    		/* SIOCGIWPRIV - kernel code */
 	(iw_handler) NULL,                          /* SIOCSIWSTATS - not used */
-	(iw_handler) wlanDrvWext_GetWirelessStats,  /* SIOCGIWSTATS - kernel code */
+	(iw_handler) wlanDrvWext_GetWirelessStats,           /* SIOCGIWSTATS - kernel code */
 	(iw_handler) NULL,		                    /* SIOCSIWSPY */
 	(iw_handler) NULL,		                    /* SIOCGIWSPY */
 	(iw_handler) NULL,		                    /* SIOCSIWTHRSPY */
@@ -167,6 +167,7 @@ int wlanDrvWext_Handler (struct net_device *dev,
    ti_private_cmd_t my_command; 
    struct iw_mlme   mlme;
    struct iw_scan_req scanreq;
+
    void             *copy_to_buf=NULL, *param3=NULL; 
 
    os_memoryZero(drv, &my_command, sizeof(ti_private_cmd_t));
@@ -190,7 +191,7 @@ int wlanDrvWext_Handler (struct net_device *dev,
            switch (my_command.cmd)
            {
            case DRIVER_INIT_PARAM:
-                return wlanDrvIf_LoadFiles (drv, my_command.in_buffer);
+               return wlanDrvIf_LoadFiles (drv, my_command.in_buffer);
                 
            case DRIVER_START_PARAM:
                return wlanDrvIf_Start (dev);

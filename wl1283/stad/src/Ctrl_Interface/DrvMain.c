@@ -884,12 +884,18 @@ static TI_STATUS drvMain_SetDefaults (TI_HANDLE hDrvMain, TI_UINT8 *pBuf, TI_UIN
 
     /* Parse defaults */
     eStatus = osInitTable_IniFile (pDrvMain->tStadHandles.hOs, pInitTable, (char*)pBuf, (int)uLength);
+    if(eStatus != TI_OK)
+    {
+        /* Release the init table memory */
+        os_memoryFree (pDrvMain->tStadHandles.hOs, pInitTable, sizeof(TInitTable));
+        return TI_NOK;
+    }
+
 
     /*
      *  Configure modules with their default settings
      */
     report_SetDefaults (pDrvMain->tStadHandles.hReport, &pInitTable->tReport);
-    context_SetDefaults (pDrvMain->tStadHandles.hContext, &pInitTable->tContextInitParams);
     TWD_SetDefaults (pDrvMain->tStadHandles.hTWD, &pInitTable->twdInitParams);
     conn_SetDefaults (pDrvMain->tStadHandles.hConn, &pInitTable->connInitParams);
     ctrlData_SetDefaults (pDrvMain->tStadHandles.hCtrlData, &pInitTable->ctrlDataInitParams);
@@ -915,6 +921,7 @@ static TI_STATUS drvMain_SetDefaults (TI_HANDLE hDrvMain, TI_UINT8 *pBuf, TI_UIN
 
     scanMngr_SetDefaults(pDrvMain->tStadHandles.hScanMngr, &pInitTable->tRoamScanMngrInitParams);
     roamingMngr_setDefaults(pDrvMain->tStadHandles.hRoamingMngr, &pInitTable->tRoamScanMngrInitParams);
+    txMgmtQ_SetDefaults (pDrvMain->tStadHandles.hTxMgmtQ);
 
     /* Note: The siteMgr_SetDefaults includes many settings that relate to other modules so keep it last!! */ 
     siteMgr_SetDefaults (pDrvMain->tStadHandles.hSiteMgr, &pInitTable->siteMgrInitParams);
@@ -981,7 +988,7 @@ static void drvMain_TwdStopCb (TI_HANDLE hDrvMain, TI_STATUS eStatus)
     TDrvMain *pDrvMain = (TDrvMain *)hDrvMain;
 
     HANDLE_CALLBACKS_FAILURE_STATUS(hDrvMain, eStatus);
-    if (pDrvMain->eSmState == SM_STATE_STOPPING) 
+    if ((pDrvMain->eSmState == SM_STATE_STOPPING) || (pDrvMain->eSmState == SM_STATE_STOPPING_ON_FAIL))
     {
         drvMain_SmEvent (hDrvMain, SM_EVENT_STOP_COMPLETE);
     }
@@ -1374,7 +1381,6 @@ TI_STATUS drvMain_Recovery (TI_HANDLE hDrvMain)
 {
     TDrvMain         *pDrvMain = (TDrvMain *) hDrvMain;
 
-	pDrvMain->uNumOfRecoveryAttempts++;
 	if (!pDrvMain->bRecovery)
 	{
         TRACE1(pDrvMain->tStadHandles.hReport, REPORT_SEVERITY_CONSOLE,".....drvMain_Recovery, ts=%d\n", os_timeStampMs(pDrvMain->tStadHandles.hOs));
@@ -1563,11 +1569,14 @@ static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent)
         if (eEvent == SM_EVENT_INI_FILE_READY) 
         {
             pDrvMain->eSmState = SM_STATE_WAIT_NVS_FILE;
-            drvMain_SetDefaults (hDrvMain, pDrvMain->tFileInfo.pBuffer, pDrvMain->tFileInfo.uLength);
-            hPlatform_DevicePowerOn ();
+            eStatus = drvMain_SetDefaults (hDrvMain, pDrvMain->tFileInfo.pBuffer, pDrvMain->tFileInfo.uLength);
 
-            pDrvMain->tFileInfo.eFileType = FILE_TYPE_NVS;
-            eStatus = wlanDrvIf_GetFile (hOs, &pDrvMain->tFileInfo);
+            if(eStatus == TI_OK )
+            {
+                hPlatform_DevicePowerOn ();
+                pDrvMain->tFileInfo.eFileType = FILE_TYPE_NVS;
+                eStatus = wlanDrvIf_GetFile (hOs, &pDrvMain->tFileInfo);
+            }
         }
         break;
 
@@ -1812,7 +1821,8 @@ static void drvMain_Sm (TI_HANDLE hDrvMain, ESmEvent eEvent)
 		}
 		else if (pDrvMain->uNumOfRecoveryAttempts < MAX_NUM_OF_RECOVERY_TRIGGERS) 
 		{
-			pDrvMain->eSmState = SM_STATE_STOPPING;
+            pDrvMain->uNumOfRecoveryAttempts++;
+            pDrvMain->eSmState = SM_STATE_STOPPING;
 			eStatus = drvMain_StopActivities (pDrvMain);
 		}
         break;

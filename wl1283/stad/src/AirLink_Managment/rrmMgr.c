@@ -508,6 +508,13 @@ TI_STATUS rrmMgr_ParseRequestElement(TI_HANDLE hMeasurementMgr, TI_UINT8 *pData,
                 {
                     TI_UINT8 numOfChannels = currSubEleLen - 1; /*  list of channel length - one regClass field */
 
+                    if (numOfChannels > SCAN_MAX_NUM_OF_CHANNELS)
+                    {
+                        TRACE1(pMeasurementMgr->hReport, REPORT_SEVERITY_ERROR,
+                               "rrmMgr_ParseRequestElement: num of channels=%d > SCAN_MAX_NUM_OF_CHANNELS\n",
+                               numOfChannels);
+                        return TI_NOK;
+                    }
                     TRACE2(pMeasurementMgr->hReport,
                            REPORT_SEVERITY_INFORMATION,
                            "rrmMgr_ParseRequestElement: SUB_ELE_AP_CHANNEL_REPORT detected. regClass=%d , num of channels=%d, \n",
@@ -520,8 +527,18 @@ TI_STATUS rrmMgr_ParseRequestElement(TI_HANDLE hMeasurementMgr, TI_UINT8 *pData,
 
                     if (BAND_TYPE_2_4GHZ == param.content.regClassChannelList.band) 
                     {
-                        for (i=0; i< numOfChannels ; i++) 
-                        {
+			for (i=0; i< numOfChannels ; i++)
+			{
+				/* if pCurrRequest->uActualNumOfChannelsBandBG overflowed, break (won't be able to add any channel) */
+				if (pCurrRequest->uActualNumOfChannelsBandBG >= SCAN_MAX_NUM_OF_CHANNELS) {
+					TRACE2(pMeasurementMgr->hReport,
+									 REPORT_SEVERITY_WARNING,
+									   "rrmMgr_ParseRequestElement: pCurrRequest->uActualNumOfChannelsBandBG (%d) >= SCAN_MAX_NUM_OF_CHANNELS (%d). breaking\n",
+									   pCurrRequest->uActualNumOfChannelsBandBG,
+									   SCAN_MAX_NUM_OF_CHANNELS);
+					break;
+				}
+
                             for (j=0 ; j< REG_DOMAIN_MAX_CHAN_NUM ;j++) 
                             {/* Add only channels that supported by the STA for the specified regulatory class */
                                 if (param.content.regClassChannelList.Channel[j] == pData[i+2]) 

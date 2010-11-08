@@ -63,6 +63,7 @@ typedef enum
  */
 TI_HANDLE	txMgmtQ_Create (TI_HANDLE hOs);
 void        txMgmtQ_Init (TStadHandlesList *pStadHandles);
+TI_STATUS   txMgmtQ_SetDefaults (TI_HANDLE hTxMgmtQ);
 TI_STATUS	txMgmtQ_Destroy (TI_HANDLE hTxMgmtQ);
 void        txMgmtQ_ClearQueues (TI_HANDLE hTxMgmtQ);
 TI_STATUS   txMgmtQ_Xmit (TI_HANDLE hTxMgmtQ, TTxCtrlBlk *pPktCtrlBlk, TI_BOOL bExternalContext);

@@ -229,7 +229,9 @@ S32 CuCommon_GetRssi(THandle hCuCommon, PS8 pdRssi, PS8 pbRssi)
     CuCommon_t* pCuCommon = (CuCommon_t*)hCuCommon; 
     S32 res;    
     TCuCommon_RoamingStatisticsTable buffer;
-    
+
+    os_memset(&buffer, 0, sizeof(TCuCommon_RoamingStatisticsTable));
+
     res = IPC_STA_Private_Send(pCuCommon->hIpcSta, TIWLN_802_11_RSSI, NULL, 0, 
                                                 &buffer, sizeof(TCuCommon_RoamingStatisticsTable));
     if(res == EOALERR_IPC_STA_ERROR_SENDING_WEXT)
@@ -246,6 +248,8 @@ S32 CuCommon_GetSnr(THandle hCuCommon, PU32 pdSnr, PU32 pbSnr)
     CuCommon_t* pCuCommon = (CuCommon_t*)hCuCommon; 
     S32 res;
     TCuCommon_RoamingStatisticsTable buffer;
+
+    os_memset(&buffer, 0, sizeof(TCuCommon_RoamingStatisticsTable));
         
     res = IPC_STA_Private_Send(pCuCommon->hIpcSta, TWD_SNR_RATIO_PARAM, NULL, 0, 
                                                 &buffer, sizeof(TCuCommon_RoamingStatisticsTable));
@@ -346,6 +350,8 @@ S32 CuCommon_GetDfsChannels(THandle hCuCommon, PU16 pMinDfsChannel, PU16 pMaxDfs
     CuCommon_t* pCuCommon = (CuCommon_t*)hCuCommon;
     S32 res;
     DFS_ChannelRange_t DFS_ChannelRange;
+
+    os_memset(&DFS_ChannelRange, 0, sizeof(DFS_ChannelRange_t));
     
     res = IPC_STA_Private_Send(pCuCommon->hIpcSta, TIWLN_REG_DOMAIN_GET_DFS_RANGE, NULL, 0, 
                                                 &DFS_ChannelRange, sizeof(DFS_ChannelRange_t));
@@ -424,6 +430,8 @@ S32 CuCommon_GetRxDataFiltersStatistics(THandle hCuCommon, PU32 pUnmatchedPacket
     CuCommon_t* pCuCommon = (CuCommon_t*)hCuCommon;
     S32 res;
     TCuCommon_RxDataFilteringStatistics buffer;
+
+    os_memset(&buffer, 0, sizeof(TCuCommon_RxDataFilteringStatistics));
     
     res = IPC_STA_Private_Send(pCuCommon->hIpcSta, TIWLN_GET_RX_DATA_FILTERS_STATISTICS, NULL, 0,
                                                 &buffer, sizeof(TCuCommon_RxDataFilteringStatistics));
@@ -444,6 +452,7 @@ S32 CuCommon_GetPowerConsumptionStat(THandle hCuCommon, ACXPowerConsumptionTimeS
     ACXPowerConsumptionTimeStat_t tStatistics;
     S32 res;
 
+    os_memset(&tStatistics, 0, sizeof(ACXPowerConsumptionTimeStat_t));
     
     res = IPC_STA_Private_Send(pCuCommon->hIpcSta, TIWLN_GET_POWER_CONSUMPTION_STATISTICS, NULL, 0,
                                                 &tStatistics, sizeof(ACXPowerConsumptionTimeStat_t));

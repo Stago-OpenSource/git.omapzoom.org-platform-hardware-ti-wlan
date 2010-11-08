@@ -837,7 +837,7 @@ typedef enum
 
 /* WiFi Simple Config Parameter Information Element */
 #define DOT11_WSC_PROBE_REQ_PARAM_ELE_LEN           (22)
-#define DOT11_WSC_BEACON_MAX_LENGTH 160
+#define DOT11_WSC_BEACON_MAX_LENGTH 251
 
 typedef struct 
 {
@@ -1010,6 +1010,7 @@ typedef enum
     EXT_SUPPORTED_RATES_IE_ID           = 50,
 	MOBILITY_DOMAIN_IE_ID               = 54,
     HT_INFORMATION_IE_ID                = 61,
+    RRM_ENABLED_CAPABILITIES_IE_ID      = 70,
     XCC_EXT_1_IE_ID                     = 133,
     XCC_EXT_2_IE_ID                     = 149,  
     CELL_POWER_IE                       = 150, /*XCC*/

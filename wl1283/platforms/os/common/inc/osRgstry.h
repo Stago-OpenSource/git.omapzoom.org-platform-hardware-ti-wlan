@@ -54,7 +54,7 @@ typedef struct {
 } REGISTRY_DATA, *PREGISTRY_DATA;
 
 
-void
+TI_STATUS
 regFillInitTable(
     TWlanDrvIfObjPtr pAdapter,
     void* pInitTable

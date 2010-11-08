@@ -52,7 +52,7 @@
 #include "WlanDrvIf.h"
 #include "WlanDrvIf.h"
 
-void regFillInitTable ( TWlanDrvIfObjPtr pAdapter, void* pInitTable);
+TI_STATUS regFillInitTable ( TWlanDrvIfObjPtr pAdapter, void* pInitTable);
 
 extern void osInitTable (TInitTable *InitTable);
 extern  int osInitTable_IniFile (TI_HANDLE hOs, TInitTable *InitTable, char *file_buf, int file_length);

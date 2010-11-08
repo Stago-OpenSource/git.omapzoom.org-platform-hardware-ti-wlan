@@ -69,8 +69,6 @@ typedef struct
 	TI_HANDLE        hOs;
 	TI_HANDLE        hReport; 
 
-    TI_BOOL          bContextSwitchRequired;       /* Indicate if the driver should switch to its  */
-                                                   /*   own context or not before handling events  */ 
     TI_HANDLE        hProtectionLock;              /* Handle of protection lock used by context clients */
     TI_UINT32        uNumClients;                  /* Number of registered clients      */
     TContextCbFunc   aClientCbFunc [MAX_CLIENTS];  /* Clients' callback functions       */
@@ -168,31 +166,6 @@ void context_Init (TI_HANDLE hContext, TI_HANDLE hOs, TI_HANDLE hReport)
     pContext->hProtectionLock = os_protectCreate (pContext->hOs);
 }
 
-
-/** 
- * \fn     context_SetDefaults
- * \brief  Configure module with default settings
- * 
- * Set default setting which indicates if the driver should switch to 
- *     its own context or not before handling events
- * 
- * \note   
- * \param  hContext           - The module's object                                          
- * \param  pContextInitParams - The module's init parameters                              
- * \return TI_OK on success or TI_NOK on failure 
- * \sa     
- */ 
-TI_STATUS context_SetDefaults (TI_HANDLE hContext, TContextInitParams *pContextInitParams)
-{
-	TContext *pContext = (TContext *)hContext;
-
-    /* Set parameters */
-    pContext->bContextSwitchRequired = pContextInitParams->bContextSwitchRequired;
-	
-    return TI_OK;
-}
-
-
 /** 
  * \fn     context_RegisterClient
  * \brief  Save client's parameters
@@ -274,7 +247,7 @@ TI_UINT32 context_RegisterClient (TI_HANDLE       hContext,
 void context_RequestSchedule (TI_HANDLE hContext, TI_UINT32 uClientId)
 {
 	TContext *pContext = (TContext *)hContext;
-
+    TI_BOOL bContextSwitchRequired;
 #ifdef TI_DBG
     pContext->aRequestCount[uClientId]++; 
     TRACE3(pContext->hReport, REPORT_SEVERITY_INFORMATION , "context_RequestSchedule(): Client=, ID=%d, enabled=%d, pending=%d\n", uClientId, pContext->aClientEnabled[uClientId], pContext->aClientPending[uClientId]);
@@ -290,18 +263,46 @@ void context_RequestSchedule (TI_HANDLE hContext, TI_UINT32 uClientId)
      * If configured to switch context, request driver task scheduling.
      * Else (context switch not required) call the driver task directly. 
      */
-    if (pContext->bContextSwitchRequired)
+    if (os_RequestSchedule (pContext->hOs, &bContextSwitchRequired) != TI_OK)
     {
-        if (os_RequestSchedule (pContext->hOs) != TI_OK)
-        {
-            os_wake_unlock(pContext->hOs);
-        }
+       os_wake_unlock(pContext->hOs);
     }
-    else 
+    if (!bContextSwitchRequired)
     {
         context_DriverTask (hContext);
-        os_wake_unlock(pContext->hOs);
     }
+}
+
+/**
+ * \fn     context_RequestScheduleWithinWlanThread
+ * \brief  Set client in driver context.
+ *
+ * This function is called by a client from signal context event.
+ * It sets the client's Pending flag.
+ * The context switch will be managed by OS.
+ * Thus, the client's callback will be called afterwards from the driver context.
+ *
+ * \note
+ * \param  hContext   - The module handle
+ * \param  uClientId  - The client's index
+ * \return void
+ * \sa     context_DriverTask
+ */
+void context_RequestScheduleWithinWlanThread (TI_HANDLE hContext, TI_UINT32 uClientId)
+{
+	TContext *pContext = (TContext *)hContext;
+
+#ifdef TI_DBG
+    pContext->aRequestCount[uClientId]++;
+    TRACE3(pContext->hReport, REPORT_SEVERITY_INFORMATION , "context_RequestScheduleWithinWlanThread(): Client=, ID=%d, enabled=%d, pending=%d\n", uClientId, pContext->aClientEnabled[uClientId], pContext->aClientPending[uClientId]);
+#endif /* TI_DBG */
+
+    /* Set client's Pending flag */
+    pContext->aClientPending[uClientId] = TI_TRUE;
+
+    /* Disable system suspend (enabled again after task completion) */
+    os_wake_unlock (pContext->hOs);
+
 }
 
 
@@ -369,7 +370,7 @@ void context_DriverTask (TI_HANDLE hContext)
 void context_EnableClient (TI_HANDLE hContext, TI_UINT32 uClientId)
 {
 	TContext *pContext = (TContext *)hContext;
-
+    TI_BOOL bContextSwitchRequired;
 #ifdef TI_DBG
     if (pContext->aClientEnabled[uClientId])
     {
@@ -392,17 +393,13 @@ void context_EnableClient (TI_HANDLE hContext, TI_UINT32 uClientId)
          * If configured to switch context, request driver task scheduling.
          * Else (context switch not required) call the driver task directly. 
          */
-        if (pContext->bContextSwitchRequired)
+        if (os_RequestSchedule (pContext->hOs, &bContextSwitchRequired) != TI_OK)
         {
-            if (os_RequestSchedule (pContext->hOs) != TI_OK)
-            {
-                os_wake_unlock(pContext->hOs);
-            }
+            os_wake_unlock(pContext->hOs);
         }
-        else 
+        if (!bContextSwitchRequired)
         {
             context_DriverTask (hContext);
-            os_wake_unlock(pContext->hOs);
         }
     }
 }
@@ -480,7 +477,6 @@ void context_Print(TI_HANDLE hContext)
 
     WLAN_OS_REPORT(("context_Print():  %d Clients Registered:\n", pContext->uNumClients));
     WLAN_OS_REPORT(("=======================================\n"));
-    WLAN_OS_REPORT(("bContextSwitchRequired = %d\n", pContext->bContextSwitchRequired));
 
 	for (i = 0; i < pContext->uNumClients; i++)
 	{

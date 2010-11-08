@@ -451,7 +451,14 @@ TI_STATUS cmdBld_CfgRxMsduFormat (TI_HANDLE hCmdBld, TI_BOOL bRxMsduForamtEnable
  ****************************************************************************/
 TI_STATUS cmdBld_CfgTid (TI_HANDLE hCmdBld, TQueueTrafficParams *pQtrafficParams, void *fCb, TI_HANDLE hCb)
 {
-    CMD_BLD_MARK_INIT_SEQUENCE_CMD_AS_VALID(hCmdBld, (__CFG_TID_0 + 2*pQtrafficParams->queueID))
+    if (pQtrafficParams->queueID >= MAX_NUM_OF_AC) {
+	TRACE2(((TCmdBld*)hCmdBld)->hReport, REPORT_SEVERITY_WARNING,
+			"pQtrafficParams->queueID (%d) >= MAX_NUM_OF_AC (%d). returning\n",
+			pQtrafficParams->queueID, MAX_NUM_OF_AC);
+		return TI_NOK;
+    }
+
+	CMD_BLD_MARK_INIT_SEQUENCE_CMD_AS_VALID(hCmdBld, (__CFG_TID_0 + 2*pQtrafficParams->queueID))
 
     DB_QUEUES(hCmdBld).isQueueConfigured[pQtrafficParams->queueID] = TI_TRUE;
     DB_QUEUES(hCmdBld).queues[pQtrafficParams->queueID] = *pQtrafficParams;
@@ -473,6 +480,13 @@ TI_STATUS cmdBld_CfgTid (TI_HANDLE hCmdBld, TQueueTrafficParams *pQtrafficParams
  ****************************************************************************/
 TI_STATUS cmdBld_CfgAcParams (TI_HANDLE hCmdBld, TAcQosParams *pAcQosParams, void *fCb, TI_HANDLE hCb)
 {
+	if (pAcQosParams->ac >= MAX_NUM_OF_AC) {
+		TRACE2(((TCmdBld*)hCmdBld)->hReport, REPORT_SEVERITY_WARNING,
+				"pAcQosParams->ac (%d) >= MAX_NUM_OF_AC (%d). returning\n",
+				pAcQosParams->ac, MAX_NUM_OF_AC);
+		return TI_NOK;
+	}
+
     CMD_BLD_MARK_INIT_SEQUENCE_CMD_AS_VALID(hCmdBld, (__CFG_AC_PARAMS_0 + 2*pAcQosParams->ac))
 
     DB_AC(hCmdBld).isAcConfigured[pAcQosParams->ac] = TI_TRUE;
@@ -691,6 +705,13 @@ TI_STATUS cmdBld_CfgBeaconFilterTable (TI_HANDLE    hCmdBld,
  ****************************************************************************/
 TI_STATUS cmdBld_CfgRssiSnrTrigger (TI_HANDLE hCmdBld, RssiSnrTriggerCfg_t *pTriggerParam, void *fCb, TI_HANDLE hCb) 
 {
+	if (pTriggerParam->index >= NUM_OF_RSSI_SNR_TRIGGERS) {
+		TRACE2(((TCmdBld*)hCmdBld)->hReport, REPORT_SEVERITY_WARNING,
+				"pTriggerParam->index (%d) >= NUM_OF_RSSI_SNR_TRIGGERS (%d). returning\n",
+				pTriggerParam->index, NUM_OF_RSSI_SNR_TRIGGERS);
+		return TI_NOK;
+	}
+
     CMD_BLD_MARK_INIT_SEQUENCE_CMD_AS_VALID(hCmdBld, (__CFG_RSSI_SNR_TRIGGER_0 + pTriggerParam->index))
 
     DB_WLAN(hCmdBld).tRssiSnrTrigger[pTriggerParam->index].index     = pTriggerParam->index;

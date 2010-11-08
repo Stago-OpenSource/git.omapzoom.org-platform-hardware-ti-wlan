@@ -79,8 +79,6 @@
 #include "XCCTSMngr.h"
 #endif
 
-#define DISCONNECT_TIMEOUT_MSEC      800
-
 /* Local functions prototypes */
 
 static TI_STATUS actionUnexpected(void *pData);

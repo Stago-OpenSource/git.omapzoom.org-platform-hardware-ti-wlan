@@ -94,7 +94,7 @@ static void 		powerMgrGuardTimerExpired (TI_HANDLE hPowerMgr, TI_BOOL bTwdInitOc
 static void 		powerMgrSetPsMode (TI_HANDLE hPowerMgr, E80211PsMode psMode, TI_HANDLE hPowerSaveCompleteCb,
 									   TPowerSaveResponseCb fCb);
 static PowerMgr_PowerMode_e powerMgrGetHighestPriority(TI_HANDLE hPowerMgr);
-
+static TI_STATUS	updatePowerAuthority(TI_HANDLE hPowerMgr);
 
 /*****************************************************************************
  **         Public Function prototypes                                      **
@@ -203,6 +203,7 @@ void PowerMgr_init (TStadHandlesList *pStadHandles)
     pPowerMgr->hRetryPsTimer		= NULL;
 	pPowerMgr->hPsPollFailureTimer	= NULL;
 	pPowerMgr->hEnterPsGuardTimer	= NULL;
+	pPowerMgr->eLastPowerAuth       = POWERAUTHO_POLICY_ELP; /* ELP is the default in FW */
     
     /* initialize the power manager keep-alive sub module */
     powerMgrKL_init (pPowerMgr->hPowerMgrKeepAlive, pStadHandles);
@@ -366,9 +367,7 @@ TI_STATUS PowerMgr_SetDefaults (TI_HANDLE hPowerMgr, PowerMgrInitParams_t* pPowe
     if (pPowerMgr->reAuthActivePriority)	
 		pPowerMgr->powerMngModePriority[POWER_MANAGER_REAUTH_PRIORITY].powerMode = POWER_MODE_ACTIVE;
 
-	/* set the defualt power policy */
-    TWD_CfgSleepAuth (pPowerMgr->hTWD, pPowerMgr->defaultPowerLevel);
-
+    updatePowerAuthority(pPowerMgr);
 
     /*create the timers */
     pPowerMgr->hRetryPsTimer = tmr_CreateTimer(pPowerMgr->hTimer);
@@ -457,36 +456,34 @@ TI_STATUS PowerMgr_startPS(TI_HANDLE hPowerMgr)
         powerMgrPowerProfileConfiguration(hPowerMgr, pPowerMgr->desiredPowerModeProfile);
     }
 
-    TWD_CfgSleepAuth (pPowerMgr->hTWD, pPowerMgr->PowerSavePowerLevel);
-
-   if ((pPowerMgr->betEnable)&&( pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE ))
-   {
+	if ((pPowerMgr->betEnable)&&( pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE ))
+	{
 		TrafficMonitor_StartEventNotif(pPowerMgr->hTrafficMonitor,
 									   pPowerMgr->betEnableTMEvent);
 
 		TrafficMonitor_StartEventNotif(pPowerMgr->hTrafficMonitor,
 									   pPowerMgr->betDisableTMEvent);
-
 	
+
 		frameCount = TrafficMonitor_GetFrameBandwidth(pPowerMgr->hTrafficMonitor);
 	
 		if (frameCount < pPowerMgr->BetEnableThreshold) 
 		{
-            pPowerMgr->betTrafficEnable = TI_TRUE;
-            
+			pPowerMgr->betTrafficEnable = TI_TRUE;
+
 		}
 		else if (frameCount > pPowerMgr->BetDisableThreshold) 
 		{
 			pPowerMgr->betTrafficEnable = TI_FALSE;
-        }
-       
+		}
+
 		PowerMgrConfigBetToFw(hPowerMgr,pPowerMgr->betTrafficEnable);
 	}
-    
-    /* also start the power manager keep-alive sub module */
-    powerMgrKL_start (pPowerMgr->hPowerMgrKeepAlive);
 
-    return TI_OK;
+	/* also start the power manager keep-alive sub module */
+	powerMgrKL_start (pPowerMgr->hPowerMgrKeepAlive);
+
+	return TI_OK;
 }
 
 
@@ -540,11 +537,8 @@ TI_STATUS PowerMgr_stopPS(TI_HANDLE hPowerMgr, TI_BOOL bDisconnect)
 		qosMngr_UpdatePsTraffic(pPowerMgr->hQosMngr,TI_FALSE);
 	}
 
-    
-    /* set the power policy of the system */
-    TWD_CfgSleepAuth (pPowerMgr->hTWD, pPowerMgr->defaultPowerLevel);
     if ((pPowerMgr->betEnable)&&( pPowerMgr->desiredPowerModeProfile != POWER_MODE_ACTIVE ))
-   {
+    {
 		TrafficMonitor_StopEventNotif(pPowerMgr->hTrafficMonitor,
 									  pPowerMgr->betEnableTMEvent);
 
@@ -557,6 +551,8 @@ TI_STATUS PowerMgr_stopPS(TI_HANDLE hPowerMgr, TI_BOOL bDisconnect)
 
 	pPowerMgr->psCurrentMode 	= POWER_SAVE_OFF;
 	pPowerMgr->psLastRequest 	= POWER_SAVE_OFF;
+
+	updatePowerAuthority(pPowerMgr);
 
     return TI_OK;
 }
@@ -628,6 +624,8 @@ TI_STATUS PowerMgr_setPowerMode(TI_HANDLE hPowerMgr)
         	}
             powerMgrPowerProfileConfiguration(hPowerMgr, powerMode);
         }
+
+        updatePowerAuthority(pPowerMgr);
     }
     else
     {
@@ -741,20 +739,14 @@ TI_STATUS powerMgr_setParam(TI_HANDLE thePowerMgrHandle,
 
     case POWER_MGR_POWER_LEVEL_PS:
         pPowerMgr->PowerSavePowerLevel = theParamP->content.PowerSavePowerLevel;
-        /* If we are connected, config the new power level (this param is for connected state) */
-		if (pPowerMgr->psEnable)
-        {
-			TWD_CfgSleepAuth (pPowerMgr->hTWD, pPowerMgr->PowerSavePowerLevel);
-		}
+
+        updatePowerAuthority(pPowerMgr);
         break;
 
     case POWER_MGR_POWER_LEVEL_DEFAULT:
         pPowerMgr->defaultPowerLevel = theParamP->content.DefaultPowerLevel;
-        /* If we are NOT connected, config the new power level (this param is for disconnected state) */
-		if (!pPowerMgr->psEnable)
-		{	
-			TWD_CfgSleepAuth (pPowerMgr->hTWD, pPowerMgr->defaultPowerLevel);
-		}
+
+        updatePowerAuthority(pPowerMgr);
         break;
 
     case POWER_MGR_POWER_LEVEL_DOZE_MODE:
@@ -871,6 +863,7 @@ static void powerSaveReportCB(TI_HANDLE hPowerMgr, char* str , TI_UINT32 strLen)
 
 		case ENTER_POWER_SAVE_SUCCESS:
             pPowerMgr->psCurrentMode = POWER_SAVE_ON;
+            updatePowerAuthority(pPowerMgr);
             break;
 
 		default:
@@ -1102,7 +1095,7 @@ static void powerMgrPowerProfileConfiguration(TI_HANDLE hPowerMgr, PowerMgr_Powe
         }
 
         powerMgrSetPsMode (hPowerMgr, POWER_SAVE_ON, NULL, NULL);
-        
+
         TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "PowerMode==SHORT_DOZE\n");
         break;
 
@@ -1117,7 +1110,7 @@ static void powerMgrPowerProfileConfiguration(TI_HANDLE hPowerMgr, PowerMgr_Powe
         }
 
         powerMgrSetPsMode (hPowerMgr, POWER_SAVE_ON, NULL, NULL);
-        
+
         TRACE0(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION, "PowerMode==LONG_DOZE\n");
         break;
 
@@ -1213,7 +1206,10 @@ TI_STATUS PowerMgr_notifyFWReset(TI_HANDLE hPowerMgr)
 	{
         powerMgrPowerProfileConfiguration(hPowerMgr, pPowerMgr->lastPowerModeProfile);
 	}
-	
+
+	pPowerMgr->eLastPowerAuth = POWERAUTHO_POLICY_NUM; /* Set to invalid value to force update (needed to keep TWD synced) */
+	updatePowerAuthority(pPowerMgr);
+
     return TI_OK;
 }
 
@@ -1481,10 +1477,15 @@ static void powerMgrSetPsMode (TI_HANDLE hPowerMgr, E80211PsMode psMode,
 						hPowerMgr,
 						POWER_SAVE_GUARD_TIME_MS,
 						TI_FALSE);
+
+        /* Power Authority will be updated when Power Save is effectively ON (when
+         * the call-back powerSaveReportCB() is called) */
 	}
 	else
 	{
-		pPowerMgr->psLastRequest = pPowerMgr->psCurrentMode = POWER_SAVE_OFF;
+        pPowerMgr->psLastRequest = pPowerMgr->psCurrentMode = POWER_SAVE_OFF;
+
+        updatePowerAuthority(pPowerMgr);
 	}
 
     /* call the TWD API*/
@@ -1514,3 +1515,76 @@ static void powerMgrGuardTimerExpired (TI_HANDLE hPowerMgr, TI_BOOL bTwdInitOccu
     /* Trigger PS recovery */
     healthMonitor_sendFailureEvent(pPowerMgr->hHealthMonitor, POWER_SAVE_FAILURE);
 }
+
+/****************************************************************************************
+*                               updatePowerAuthority                                    *
+*****************************************************************************************
+DESCRIPTION: Updates the minimum power-level the HW can be in, according to the state
+             of the Power Manager module.
+             Should be called whenever the Power Manager changes its state.
+
+INPUT:       hPowerMgr - handle to the PowerMgr object
+OUTPUT:      None
+RETURN:      TI_OK if the Power Authority was changed. TI_NOK otherwise.
+****************************************************************************************/
+static TI_STATUS updatePowerAuthority(TI_HANDLE hPowerMgr)
+{
+	PowerMgr_t*  pPowerMgr = (PowerMgr_t*)hPowerMgr;
+	EPowerPolicy ePowerAuth;  /* New Power Authority to set */
+	TI_STATUS    status;
+
+	if (pPowerMgr->psEnable)
+	{
+		if (POWER_SAVE_OFF == pPowerMgr->psCurrentMode)
+		{
+			/* If the Power Manager is enabled, but NOT in Power Save mode,
+			 * set Power Authority to AWAKE - don't allow the HW to "fall asleep" */
+			ePowerAuth = POWERAUTHO_POLICY_AWAKE;
+		}
+		else
+		{
+			/* If the Power Manager is enabled, and in Power Save mode,
+			 * set Power Authority to the default level for "connected and in
+			 * power-save" (as set in the INI file) */
+			ePowerAuth = pPowerMgr->PowerSavePowerLevel;
+		}
+	}
+	else
+	{
+		/* If the Power Manager is disabled, set Power Authority to the default level (as
+		 * configured in the INI file) */
+
+		ePowerAuth = pPowerMgr->defaultPowerLevel;
+	}
+
+	if (ePowerAuth == pPowerMgr->eLastPowerAuth)
+	{
+		/* Don't set - same as last one */
+
+		TRACE3(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION,
+			"psEnable=%d, psCurrentMode=%d. Ignoring request to set PowerAuthority to %d (same as last)\n",
+			pPowerMgr->psEnable, pPowerMgr->psCurrentMode, ePowerAuth);
+		status = TI_NOK;
+	}
+	else
+	{
+		/* Set the new Power Authority */
+
+		TRACE3(pPowerMgr->hReport, REPORT_SEVERITY_INFORMATION,
+				"psEnable=%d, psCurrentMode=%d. Setting PowerAuthority to %d\n",
+				pPowerMgr->psEnable, pPowerMgr->psCurrentMode, ePowerAuth);
+
+		status = TWD_CfgSleepAuth(pPowerMgr->hTWD, ePowerAuth);
+
+		if (TI_OK==status)
+		{
+			pPowerMgr->eLastPowerAuth = ePowerAuth;
+		}
+	}
+
+	return status;
+}
+
+
+
+

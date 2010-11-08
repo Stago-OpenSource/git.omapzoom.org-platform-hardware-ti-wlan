@@ -79,19 +79,22 @@ RETURN:         None
 VOID os_error_printf(S32 debug_level, const PS8 arg_list ,...)
 {
     static int g_debug_level = CU_MSG_ERROR;
-    S8 msg[MAX_HOST_MESSAGE_SIZE];
-    va_list ap;
+	S8 msg[MAX_HOST_MESSAGE_SIZE];
+	va_list ap;
+
 #ifdef OS_CLI_LOG_TO_FILE
-    char file_name[30]="/cli.log";
-    FILE *ftmp;
+	char file_name[30]="/cli.log";
+	FILE *ftmp;
 #endif
 
     if (debug_level < g_debug_level)
         return;
 
+
+
     /* Format the message */
     va_start(ap, arg_list);
-    vsprintf((char *)msg, (char *)arg_list, ap);
+    vsprintf((char*)msg, (char*)arg_list, ap);
     va_end(ap);
 
     /* print the message */
@@ -100,8 +103,8 @@ VOID os_error_printf(S32 debug_level, const PS8 arg_list ,...)
 #ifdef OS_CLI_LOG_TO_FILE
     ftmp = fopen(file_name, "a");
     if (ftmp != NULL) {
-        fprintf(ftmp,(char *)msg);
-        fclose(ftmp);
+	fprintf(ftmp,(char*)msg);
+	fclose(ftmp);
     }
 #endif
 }

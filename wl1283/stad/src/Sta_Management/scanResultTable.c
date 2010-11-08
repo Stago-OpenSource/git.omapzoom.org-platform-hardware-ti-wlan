@@ -44,10 +44,10 @@
 #include "scanResultTable.h"
 #include "siteMgrApi.h"
 #include "freq.h"
-
+#include "StaCap.h"
 
 //#define TABLE_ENTRIES_NUMBER    32
-
+#define DELTA_RSSI 10  /*use in scanResultTable_CheckRxSignalValidity */
 #define MILISECONDS(seconds)                            (seconds * 1000)
 #define UPDATE_LOCAL_TIMESTAMP(pSite, hOs)              pSite->localTimeStamp = os_timeStampMs(hOs);
 
@@ -321,7 +321,10 @@ TI_STATUS scanResultTable_UpdateEntry (TI_HANDLE hScanResultTable, TMacAddr *pBs
     pSite = scanResultTable_GetBySsidBssidPair (hScanResultTable, &tTempSsid ,pBssid);
     if (NULL != pSite)
     {
-        if (TI_NOK != scanResultTable_CheckRxSignalValidity(pScanResultTable, pSite, pFrame->rssi, pFrame->channel))
+        /*if the current channel != channel on which the frame was received then call to scanResultTable_UpdateSiteData */
+        if (((pFrame->parsedIEs->content.iePacket.pDSParamsSet != NULL)  &&
+            (pFrame->parsedIEs->content.iePacket.pDSParamsSet->currChannel == pFrame->channel)) ||
+            (TI_NOK != scanResultTable_CheckRxSignalValidity(pScanResultTable, pSite, pFrame->rssi, pFrame->channel)))
         {
             TRACE0(pScanResultTable->hReport, REPORT_SEVERITY_INFORMATION , "scanResultTable_UpdateEntry: entry already exists, updating\n");
             /* BSSID exists: update its data */
@@ -1288,9 +1291,14 @@ TI_STATUS scanResultTable_GetBssidSupportedRatesList (TI_HANDLE hScanResultTable
     TI_UINT32                uSiteIndex, firstOFDMloc = 0;
 	TI_UINT32                requiredLength;
 	OS_802_11_N_RATES	 	*pCurrRateString;
+    siteMgr_t               *pSiteMgr = (siteMgr_t*)pScanResultTable->hSiteMgr;
+	TI_UINT32                i = 0;
+	TI_BOOL                  b11nEnable;
 
     TRACE0(pScanResultTable->hReport, REPORT_SEVERITY_INFORMATION , "scanResultTable_GetBssidSupportedRatesList called");
 
+    /* Check if 11n is enabled */
+	StaCap_IsHtEnable(pSiteMgr->hStaCap, &b11nEnable);
     /* Verify the supplied length is enough*/
 	requiredLength = pScanResultTable->uCurrentSiteNumber*sizeof(OS_802_11_N_RATES);
 	if (requiredLength > *pLength)
@@ -1308,11 +1316,20 @@ TI_STATUS scanResultTable_GetBssidSupportedRatesList (TI_HANDLE hScanResultTable
 
         /* Supported Rates */
         os_memoryZero (pScanResultTable->hOS, (void *)pCurrRateString, sizeof(OS_802_11_N_RATES));
-        rate_DrvBitmapToNetStrIncluding11n (pSiteEntry->rateMask.supportedRateMask,
-												  pSiteEntry->rateMask.basicRateMask,
-												  (TI_UINT8*)pCurrRateString,
-												  &firstOFDMloc);
-	}
+        /* Only include 11n rates if support is enabled */
+		if (b11nEnable != TI_FALSE) {
+		  rate_DrvBitmapToNetStrIncluding11n (pSiteEntry->rateMask.supportedRateMask,
+		                                    pSiteEntry->rateMask.basicRateMask,
+		                                    (TI_UINT8*)pCurrRateString,
+		                                    &firstOFDMloc);
+		} else {
+		  rate_DrvBitmapToNetStr (pSiteEntry->rateMask.supportedRateMask,
+					  pSiteEntry->rateMask.basicRateMask,
+					  (TI_UINT8*)pCurrRateString,
+					  &i,
+					  &firstOFDMloc);
+		}
+    }
 
     return TI_OK;
 }
@@ -1353,8 +1370,8 @@ RETURN:     TI_OK / TI_NOK
  */ 
 static TI_STATUS scanResultTable_CheckRxSignalValidity(TScanResultTable *pScanResultTable, TSiteEntry *pSite, TI_INT8 rxLevel, TI_UINT8 channel)
 {
-     if ((channel != pSite->channel) &&
-         (rxLevel < pSite->rssi))
+    if ((channel != pSite->channel) &&
+         (rxLevel + DELTA_RSSI < pSite->rssi))  /* the Delta was added in order to avoide overlap between the channels */
      {   /* Ignore wrong packets with lower RSSI that were detect as
          ripples from different channels */
          TRACE4(pScanResultTable->hReport, REPORT_SEVERITY_WARNING, "scanResultTable_CheckRxSignalValidity:Rx RSSI =%d, on channel=%d, is lower then given RSSI =%d on channel=%d, dropping it.\n", rxLevel, channel, pSite->rssi, pSite->channel);

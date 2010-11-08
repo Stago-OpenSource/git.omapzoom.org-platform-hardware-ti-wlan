@@ -1405,8 +1405,6 @@ int cmdInterpret_convertAndExecute(TI_HANDLE hCmdInterpret, TConfigCommand *cmdO
             } 
             else if (my_command->flags & PRIVATE_CMD_GET_FLAG)
             {
-                
-                /* os_printf ("Calling getParam\n"); */
                 pParam->paramLength = my_command->out_buffer_len;
                 res = cmdDispatch_GetParam (pCmdInterpret->hCmdDispatch,pParam);
                 if(res == EXTERNAL_GET_PARAM_DENIED)

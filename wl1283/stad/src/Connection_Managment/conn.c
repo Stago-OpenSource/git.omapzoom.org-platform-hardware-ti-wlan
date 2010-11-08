@@ -543,9 +543,20 @@ TI_STATUS conn_ReportApConnStatus(TI_HANDLE	hConn, mgmtStatus_e status, TI_UINT1
     os_printf("%s: *** CONN LOST ***\n", __func__);
 #endif
 
-    conn_infraSMEvent(&(pConn->state), CONN_INFRA_DISCONNECT, pConn);
-    
-	return TI_OK;
+    switch(pConn->currentConnType)
+    {
+        case CONNECTION_IBSS:
+        case CONNECTION_SELF:
+            return conn_ibssSMEvent(&(pConn->state), CONN_IBSS_DISCONNECT, (TI_HANDLE)pConn);
+
+        case CONNECTION_INFRA:
+            return conn_infraSMEvent(&(pConn->state), CONN_INFRA_DISCONNECT, (TI_HANDLE)pConn);
+
+        case CONNECTION_NONE:
+            break;
+    }
+    return TI_OK;
+
 }
 
 

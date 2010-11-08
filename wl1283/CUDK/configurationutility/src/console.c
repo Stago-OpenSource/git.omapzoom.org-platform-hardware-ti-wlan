@@ -27,7 +27,6 @@
 *      
 *
 ****************************************************************************/
-
 /* includes */
 /************/
 #include <stdio.h>
@@ -653,6 +652,11 @@ static U8 Console_ParseString(Console_t* pConsole, PS8 input_string )
     TokenType_t tType;
     U16         nParms; 
         
+    if ((NULL == pConsole) || (NULL == input_string))
+    {
+        return 0;
+    }
+
     if (!pConsole->p_mon_root)
         return 1;
 
@@ -826,12 +830,14 @@ VOID Console_Start(THandle hConsole)
         }   
 
         if(res == OS_GETINPUTSTRING_CONTINUE)
+        {
             continue;
-
+        }
         /* change to NULL terminated strings */
         if( inbuf[os_strlen(inbuf)-1] == '\n' )
+	{
             inbuf[os_strlen(inbuf)-1] = 0;
-        
+        }
         /* parse the string */
         Console_ParseString(pConsole, inbuf);
     }

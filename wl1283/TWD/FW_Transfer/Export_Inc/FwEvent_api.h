@@ -89,6 +89,21 @@ void            fwEvent_InterruptRequest    (TI_HANDLE hFwEvent);
 
 
 /*
+ * \brief	Requests the context engine to schedule the driver task
+ *          from interrupt signal context
+ * \param  hFwEvent  - FwEvent Driver handle
+ * \return void
+ *
+ * \par Description
+ * Called by the ISR signal context.
+ * Requests the context engine to schedule the driver task
+ * for handling the FW-Events (FwEvent callback).
+ *
+ * \sa
+ */
+
+void fwEvent_InterruptRequestWithinWlanThread (TI_HANDLE hFwEvent);
+/*
  * \brief	Config the FwEvent module object
  * 
  * \param  hFwEvent  - FwEvent Driver handle

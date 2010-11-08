@@ -308,6 +308,31 @@ void fwEvent_InterruptRequest (TI_HANDLE hFwEvent)
     CL_TRACE_END_L1("tiwlan_drv.ko", "IRQ", "FwEvent", "");
 }
 
+/*
+ * \brief	FW interrupt handler, just switch to WLAN context for handling from OS signal context
+ *
+ * \param   hFwEvent - FwEvent Driver handle
+ * \return  void
+ *
+ * \par Description
+ * Called by interrupt signal(external context!).
+ * Requests the context engine to schedule the driver task for handling the FW-Events.
+ *
+ * \sa
+ */
+void fwEvent_InterruptRequestWithinWlanThread (TI_HANDLE hFwEvent)
+{
+    TfwEvent *pFwEvent = (TfwEvent *)hFwEvent;
+    CL_TRACE_START_L1();
+
+    TRACE0(pFwEvent->hReport, REPORT_SEVERITY_INFORMATION, "fwEvent_InterruptRequestWithinWlanThread()\n");
+
+    /* Request switch to driver context for handling the FW-Interrupt event */
+    context_RequestScheduleWithinWlanThread (pFwEvent->hContext, pFwEvent->uContextId);
+
+    CL_TRACE_END_L1("tiwlan_drv.ko", "IRQ", "FwEvent", "");
+}
+
 
 /*
  * \brief   The CB called in the driver context upon new interrupt

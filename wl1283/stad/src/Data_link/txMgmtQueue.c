@@ -68,7 +68,6 @@
 #include "context.h"
 #include "DrvMainModules.h"
 
-
 #define MGMT_QUEUES_TID		MAX_USER_PRIORITY
 
 typedef enum
@@ -121,6 +120,7 @@ typedef struct
 	TI_UINT32 aRequeuePackets[NUM_OF_MGMT_QUEUES];
 	TI_UINT32 aDroppedPackets[NUM_OF_MGMT_QUEUES];
 	TI_UINT32 aXmittedPackets[NUM_OF_MGMT_QUEUES];
+	TI_UINT32 uDummyPackets;                        /* Number of generated Dummy-Blocks packets */
 } TDbgCount;
 
 /* The module object. */
@@ -154,6 +154,7 @@ static void mgmtQueuesSM (TTxMgmtQ *pTxMgmtQ, ESmEvent smEvent);
 static void runSchedulerNotFromSm (TTxMgmtQ *pTxMgmtQ);
 static void runScheduler (TTxMgmtQ *pTxMgmtQ);
 static void updateQueuesBusyMap (TTxMgmtQ *pTxMgmtQ, TI_UINT32 tidBitMap);
+static void dummyPktReqCB(TI_HANDLE hTxMgmtQ, char* str , TI_UINT32 strLen);
 
 /*******************************************************************************
 *                       PUBLIC  FUNCTIONS  IMPLEMENTATION					   *
@@ -274,6 +275,40 @@ void txMgmtQ_Init (TStadHandlesList *pStadHandles)
 TRACE0(pTxMgmtQ->hReport, REPORT_SEVERITY_INIT, ".....Tx Mgmt Queue configured successfully\n");
 }
 
+/**
+ * \fn     txMgmtQ_SetDefaults
+ * \brief  Configure this modules default settings
+ *
+ * \note
+ * \param  hTxMgmtQ - The module's object
+ * \return TI_NOK if failed. TI_OK otherwise
+ * \sa
+ */
+TI_STATUS txMgmtQ_SetDefaults (TI_HANDLE hTxMgmtQ)
+{
+	TTxMgmtQ  *pTxMgmtQ = (TTxMgmtQ*) hTxMgmtQ;
+	TI_STATUS  status;
+
+	/* Register handler for, and enable the Dummy Packet Request event */
+	{
+		status = TWD_RegisterEvent (pTxMgmtQ->hTWD, TWD_OWN_EVENT_DUMMY_PKT_REQ,
+			(void *)dummyPktReqCB, pTxMgmtQ);
+
+		if (TI_OK != status)
+		{
+			return TI_NOK;
+		}
+
+		status = TWD_EnableEvent (pTxMgmtQ->hTWD, TWD_OWN_EVENT_DUMMY_PKT_REQ);
+
+		if (TI_OK != status)
+		{
+			return TI_NOK;
+		}
+	}
+
+	return TI_OK;
+}
 
 /** 
  * \fn     txMgmtQ_Destroy
@@ -902,6 +937,62 @@ static void updateQueuesBusyMap (TTxMgmtQ *pTxMgmtQ, TI_UINT32 uTidBitMap)
 	}
 }
 
+/****************************************************************************************
+ *                               dummyPktReqCB                                          *
+ ****************************************************************************************
+DESCRIPTION: Callback for the TWD_OWN_EVENT_DUMMY_PKT_REQ event - transmits a dummy
+             packet
+
+INPUT:      - hTxMgmtQ      - Handle to the TxMgmtQ module
+            - str			- Buffer containing the event data
+            - strLen        - Event data length
+OUTPUT:
+RETURN:    void.\n
+****************************************************************************************/
+void dummyPktReqCB(TI_HANDLE hTxMgmtQ, char* str , TI_UINT32 strLen)
+{
+	TTxMgmtQ *pTxMgmtQ = (TTxMgmtQ*)hTxMgmtQ;
+    TTxCtrlBlk* pTxCtrlBlk;
+    void* pPayload;
+    const TI_UINT16 uDummyPktBufLen = 1400;
+    TI_STATUS status;
+
+    /* Allocate control block for dummy packet */
+    pTxCtrlBlk = TWD_txCtrlBlk_Alloc(pTxMgmtQ->hTWD);
+    if (NULL == pTxCtrlBlk) {
+        TRACE0(pTxMgmtQ->hReport, REPORT_SEVERITY_ERROR, "dummyPktReqCB: TxCtrlBlk allocation failed!\n");
+        return;
+    }
+
+    /* Allocate payload buffer */
+    pPayload  = txCtrl_AllocPacketBuffer(pTxMgmtQ->hTxCtrl, pTxCtrlBlk, WLAN_HDR_LEN + uDummyPktBufLen);
+    if (NULL == pPayload)
+    {
+        TRACE0(pTxMgmtQ->hReport, REPORT_SEVERITY_ERROR, "dummyPktReqCB: Packet buffer allocation failed!\n");
+        TWD_txCtrlBlk_Free (pTxMgmtQ->hTWD, pTxCtrlBlk);
+        return;
+    }
+
+	/* Set packet parameters */
+    {
+		pTxCtrlBlk->tTxDescriptor.startTime = os_timeStampMs(pTxMgmtQ->hOs);
+
+		/* Mark as a Dummy Blocks Packet */
+		pTxCtrlBlk->tTxPktParams.uPktType = TX_PKT_TYPE_DUMMY_BLKS;
+
+		BUILD_TX_TWO_BUF_PKT_BDL (pTxCtrlBlk, pTxCtrlBlk->aPktHdr, WLAN_HDR_LEN, pPayload, uDummyPktBufLen);
+    }
+
+    pTxMgmtQ->tDbgCounters.uDummyPackets++;
+
+    /* Enqueue packet in the management-queues and run the scheduler. */
+    status = txMgmtQ_Xmit(pTxMgmtQ, pTxCtrlBlk, TI_FALSE);
+
+    if (TI_NOK == status)
+    {
+        TRACE0(pTxMgmtQ->hReport, REPORT_SEVERITY_ERROR, "dummyPktReqCB: xmit failed!\n");
+    }
+}
 
 
 /*******************************************************************************
@@ -996,6 +1087,10 @@ void txMgmtQ_PrintQueueStatistics (TI_HANDLE hTxMgmtQ)
 	WLAN_OS_REPORT(("-------------- Dropped Packets (queue full) --------------\n"));
     for(uQueId = 0; uQueId < NUM_OF_MGMT_QUEUES; uQueId++)
         WLAN_OS_REPORT(("Que[%d]:  %d\n", uQueId, pTxMgmtQ->tDbgCounters.aDroppedPackets[uQueId]));
+
+	WLAN_OS_REPORT(("----------------------------------------------------------\n"));
+
+	WLAN_OS_REPORT (("\"Dummy Blocks\" packets generated: %d\n", pTxMgmtQ->tDbgCounters.uDummyPackets));
 
 	WLAN_OS_REPORT(("==========================================================\n\n"));
 #endif    

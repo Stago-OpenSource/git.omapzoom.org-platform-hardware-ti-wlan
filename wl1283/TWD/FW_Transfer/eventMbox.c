@@ -168,7 +168,7 @@ static const TEventEntry eventTable [TWD_OWN_EVENT_MAX] =
 /*18*/{ BSS_LOSE_EVENT_ID,                      "BSS LOST "               		, 0},
 /*19*/{ REGAINED_BSS_EVENT_ID,                  "REGAINED BSS "           		, 0},
 /*20*/{ ROAMING_TRIGGER_MAX_TX_RETRY_EVENT_ID,  "MAX TX RETRY "           		, 0},
-/*21*/{ BIT_21,									"RESERVED"				  		, 0},
+/*21*/{ DUMMY_PACKET_ID,						"DUMMY PACKET REQUEST"	  		, 0},
 /*22*/{ SOFT_GEMINI_SENSE_EVENT_ID,             "SOFT GEMINI SENSE "      		, 1},
 /*23*/{ SOFT_GEMINI_PREDICTION_EVENT_ID,        "SOFT GEMINI PREDICTION " 		, 1},
 /*24*/{ SOFT_GEMINI_AVALANCHE_EVENT_ID,         "SOFT GEMINI AVALANCHE "  		, 0},
