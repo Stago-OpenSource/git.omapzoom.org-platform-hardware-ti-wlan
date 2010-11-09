@@ -73,7 +73,7 @@ TI_TRACE_BUFFER ?= n
 #
 # Support For Connection Scan Power Management
 #
-CONNECTION_SCAN_PM ?= n
+CONNECTION_SCAN_PM ?= y
 
 ##
 ##
