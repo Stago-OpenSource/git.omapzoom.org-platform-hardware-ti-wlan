@@ -5493,7 +5493,7 @@ VOID nvsUpdateFile(THandle hCuCmd, TNvsStruct nvsStruct, TI_UINT8 version,  S8 u
 #ifdef _WINDOWS
     PS8 nvsFilePath = (PS8)"/windows/nvs_map.bin";
 #else
-    PS8 nvsFilePath = (PS8)"./nvs_map.bin";
+    PS8 nvsFilePath = (PS8)"/data/misc/wifi/nvs_map.bin";
 #endif /*_WINDOWS*/
 	TI_UINT8		currentNVSbuffer[1500];
 	TI_UINT16		lengthOfCurrentNVSBufer;
