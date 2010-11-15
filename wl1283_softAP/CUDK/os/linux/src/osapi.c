@@ -43,7 +43,7 @@
 
 /* defines */
 /***********/
-#define MAX_HOST_MESSAGE_SIZE   256
+#define MAX_HOST_MESSAGE_SIZE   512
 
 S32 ipc_pipe[2];
 
@@ -79,19 +79,11 @@ RETURN:         None
 VOID os_error_printf(S32 debug_level, const PS8 arg_list ,...)
 {
     static int g_debug_level = CU_MSG_ERROR;
-#if defined HOST_PLATFORM_ZOOM2 || defined HOST_PLATFORM_ZOOM1
-	char file_name[30]="/cli.log";
-#else
-	char file_name[30]="/var/run/cli.log";
-#endif
-	FILE *ftmp;
 	va_list ap;
     S8 msg[MAX_HOST_MESSAGE_SIZE];
 
     if (debug_level < g_debug_level)
         return;
-
-    ftmp = fopen(file_name,"a");
 
     /* Format the message */
     va_start(ap, arg_list);
@@ -99,9 +91,6 @@ VOID os_error_printf(S32 debug_level, const PS8 arg_list ,...)
     va_end(ap);
 
     /* print the message */
-	
-	fprintf(ftmp,(char*)msg);
-	fclose(ftmp);
     fprintf(stderr, (char*)msg);
 }
 

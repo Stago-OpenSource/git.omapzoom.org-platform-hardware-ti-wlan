@@ -32,8 +32,14 @@
 #define MAX_KEY_DESCRIPTION 250
 
 
+#ifndef ANDROID
 #define HOSTAPD_FILE_NAME_ORIGINAL "hostapd.conf"
 #define HOSTAPD_FILE_NAME_TEMP     "hostapd_temp.conf"
+#else
+#define HOSTAPD_FILE_NAME_ORIGINAL "/data/misc/wifi/hostapd.conf"
+#define HOSTAPD_FILE_NAME_TEMP     "/data/misc/wifi/hostapd_temp.conf"
+#endif
+
 
 #include "osTIType.h"
 

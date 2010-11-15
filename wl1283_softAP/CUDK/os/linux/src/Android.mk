@@ -29,13 +29,6 @@ ifeq ($(BUILD_SUPPL), y)
   endif
 endif
 
-ifeq ("$(HOST_PLATFORM)","zoom2")
-	DK_DEFINES += -DHOST_PLATFORM_ZOOM2
-endif
-ifeq ("$(HOST_PLATFORM)","zoom1")
-	DK_DEFINES += -DHOST_PLATFORM_ZOOM1
-endif
-
 LOCAL_CFLAGS+= \
 	 -DANDROID
 
