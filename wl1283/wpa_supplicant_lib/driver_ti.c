@@ -572,6 +572,23 @@ static int wpa_driver_tista_driver_rx_data_filter_statistics( void *priv,
 	return res;
 }
 
+static int wpa_driver_tista_set_driver_ip(void *priv, u32 ip)
+{
+	struct wpa_driver_ti_data *drv = (struct wpa_driver_ti_data *)priv;
+	u32 staIp;
+	int res;
+
+	staIp = ip;
+	res = wpa_driver_tista_private_send(priv, SITE_MGR_SET_WLAN_IP_PARAM,
+		&ip, 4, NULL, 0);
+	if (0 != res)
+		wpa_printf(MSG_ERROR, "ERROR - Failed to set driver ip!");
+	else
+		wpa_printf(MSG_DEBUG, "%s success", __func__);
+
+	return res;
+}
+
 /*-----------------------------------------------------------------------------
 Routine Name: wpa_driver_tista_driver_cmd
 Routine Description: executes driver-specific commands
@@ -817,6 +834,13 @@ static int wpa_driver_tista_driver_cmd( void *priv, char *cmd, char *buf, size_t
 				}
 			}
 		}
+	}
+	else if( os_strncasecmp(cmd, "setip",5) == 0 ) {
+		u32 staIp;
+
+		staIp = (u32)atoi(cmd + 5);
+		wpa_printf(MSG_DEBUG,"setip command = %u", staIp);
+		ret = wpa_driver_tista_set_driver_ip( priv, staIp );
 	}
 	else {
 		wpa_printf(MSG_DEBUG,"Unsupported command");
