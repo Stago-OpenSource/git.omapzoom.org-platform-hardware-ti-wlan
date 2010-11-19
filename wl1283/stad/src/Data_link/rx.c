@@ -969,7 +969,7 @@ void rxData_receivePacketFromWlan (TI_HANDLE hRxData, void *pBuffer, TRxAttr* pR
         /* distribute mgmt pBuffer to mlme */
         if( mlmeParser_recv(pRxData->hMlme, pBuffer, pRxAttr) != TI_OK )
         {
-            TRACE0(pRxData->hReport, REPORT_SEVERITY_ERROR, " rxData_receivePacketFromWlan() : MLME returned error \n");
+            TRACE0(pRxData->hReport, REPORT_SEVERITY_WARNING, " rxData_receivePacketFromWlan() : MLME returned error \n");
         }
         break;
 
