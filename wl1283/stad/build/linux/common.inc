@@ -49,6 +49,11 @@ WSPI ?= n
 INTR ?= y
 
 #
+# Use Random MAC address for default MAC
+#
+RANDOM_MAC ?= y
+
+#
 # Enable or disable debugging
 #
 DEBUG ?= y
@@ -103,6 +108,10 @@ endif
 ifeq ($(INTR),n)
     DK_DEFINES += -D PRIODIC_INTERRUPT
 endif    
+
+ifeq ($(RANDOM_MAC),y)
+    DK_DEFINES += -D TI_RANDOM_DEFAULT_MAC
+endif
 
 ifeq ($(DEBUG),y)
     DK_DEFINES += -D TI_DBG
