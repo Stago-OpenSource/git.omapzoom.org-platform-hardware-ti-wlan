@@ -642,6 +642,9 @@ int wlanDrvIf_Start (struct net_device *dev)
 {
     TWlanDrvIfObj *drv = (TWlanDrvIfObj *)NETDEV_GET_PRIVATE(dev);
 
+#ifdef PER_DOMAIN_PM_HACK
+    wake_lock(&drv->wl_pm_hack);
+#endif
     ti_dprintf (TIWLAN_LOG_OTHER, "wlanDrvIf_Start()\n");
 
     if (!drv->tCommon.hDrvMain)
@@ -739,6 +742,9 @@ int wlanDrvIf_Stop (struct net_device *dev)
         return -ENODEV;
     }
 
+#ifdef  PER_DOMAIN_PM_HACK
+    wake_unlock(&drv->wl_pm_hack);
+#endif
     return 0;
 }
 
@@ -889,6 +895,9 @@ static int wlanDrvIf_Create (void)
 #ifdef CONFIG_HAS_WAKELOCK
 	wake_lock_init (&drv->wl_wifi, WAKE_LOCK_SUSPEND, "wifi_wake");
 	wake_lock_init (&drv->wl_rxwake, WAKE_LOCK_SUSPEND, "wifi_rx_wake");
+#ifdef PER_DOMAIN_PM_HACK
+	wake_lock_init (&drv->wl_pm_hack, WAKE_LOCK_SUSPEND, "wifi_temp_hack");
+#endif
 #endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
 	INIT_WORK(&drv->tWork, wlanDrvIf_DriverTask, (void *)drv);
@@ -977,6 +986,9 @@ drv_create_end_2:
 #ifdef CONFIG_HAS_WAKELOCK
 	wake_lock_destroy (&drv->wl_wifi);
 	wake_lock_destroy (&drv->wl_rxwake);
+#ifdef PER_DOMAIN_PM_HACK
+	wake_lock_destroy (&drv->wl_pm_hack);
+#endif
 #endif
 	if (drv->tiwlan_wq)
 		destroy_workqueue(drv->tiwlan_wq);
