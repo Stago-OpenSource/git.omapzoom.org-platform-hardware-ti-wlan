@@ -36,8 +36,21 @@ Module.symvers
 !.gitignore
 
 # Compat wireless files
+Kconfig.kernel
+Kconfig.versions
+.kernel_config_md5
+.config
+.config.old
+.tmp_*
+*.cmd
+*.tmp
+*.ver
+modules.order
+mac80211/compat_wl18xx/backport-include/backport/autoconf.h
+mac80211/compat_wl18xx/kconf/mconf
+mac80211/compat_wl18xx/kconf/conf
+.tmp_versions
 modules
-compat_autoconf.h
 
 # stgit generated dirs
 patches-*
