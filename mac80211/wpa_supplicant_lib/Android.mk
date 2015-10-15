@@ -55,6 +55,7 @@ endif
 
 INCLUDES = $(WPA_SUPPL_DIR) \
     $(WPA_SUPPL_DIR)/src \
+    $(WPA_SUPPL_DIR)/src/drivers \
     $(WPA_SUPPL_DIR)/src/common \
     $(WPA_SUPPL_DIR)/src/drivers \
     $(WPA_SUPPL_DIR)/src/l2_packet \
